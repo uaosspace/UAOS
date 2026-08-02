@@ -1,0 +1,6 @@
+{
+  "name": "UAOS - Ukrainian Association of Occupational Safety",
+  "description": "Офіційний вебсайт Громадської спілки «Українська Асоціація Професійної Безпеки» (UAOS). Професійне об'єднання експертів, виробників та постачальників у сфері безпеки праці.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

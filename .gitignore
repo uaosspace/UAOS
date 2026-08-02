@@ -1,0 +1,14 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+.venv/
+assets/
+.aistudio/
+studio/node_modules/
+studio/dist/
+studio/.sanity/

@@ -1,0 +1,190 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+@import "./styles/industrial-neon.css";
+
+#root {
+  min-height: 100vh;
+}
+
+/* Кнопки, стилізовані під посилання з макету */
+.brand,
+.desktop-nav button,
+.text-link,
+.member-logo,
+.feature-card .details,
+.read-more,
+.footer-col button,
+.footer-legal button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.desktop-nav button {
+  position: relative;
+  padding: 30px 0 27px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 680;
+  white-space: nowrap;
+  transition: color .25s ease;
+}
+
+.desktop-nav button::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 100%;
+  bottom: 19px;
+  height: 2px;
+  background: var(--yellow);
+  transition: right .35s cubic-bezier(.2,.8,.2,1);
+}
+
+.desktop-nav button:hover,
+.desktop-nav button:focus-visible {
+  color: var(--ink);
+}
+
+.desktop-nav button:hover::after,
+.desktop-nav button:focus-visible::after {
+  right: 0;
+}
+
+@media (max-width: 1100px) {
+  .desktop-nav button:nth-last-child(-n+2) {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .desktop-nav button,
+  .desktop-nav button:nth-last-child(-n+2) {
+    display: block;
+    padding: 13px 7px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .desktop-nav button::after {
+    display: none;
+  }
+}
+
+.news-image-placeholder {
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
+}
+
+.news-image img,
+.news-image .news-image-placeholder {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Wordmark: біла скруглена підкладка + підпис справа */
+.brand {
+  min-width: auto !important;
+  gap: 12px;
+}
+
+.brand-logo-plate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 4px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(15, 40, 60, 0.08);
+}
+
+.brand-logo {
+  display: block;
+  height: 48px;
+  width: auto;
+  max-width: min(200px, 38vw);
+  object-fit: contain;
+}
+
+@media (max-width: 860px) {
+  .brand-logo-plate {
+    padding: 4px;
+    border-radius: 14px;
+  }
+
+  .brand-logo {
+    height: 40px;
+    max-width: min(156px, 40vw);
+  }
+
+  .brand-copy span {
+    display: none;
+  }
+}
+
+/* Language dropdown */
+.lang-switcher {
+  position: relative;
+}
+
+.lang-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 120;
+  min-width: 168px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--page-deep) 94%, transparent);
+  backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: var(--shadow);
+}
+
+html[data-theme="light"] .lang-menu {
+  background: rgba(239, 249, 255, 0.96);
+}
+
+.lang-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  text-align: left;
+}
+
+.lang-menu button:hover,
+.lang-menu button:focus-visible,
+.lang-menu button.active {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+}
+
+.lang-menu .lang-code {
+  font-weight: 820;
+}
+
+.lang-menu .lang-name {
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}

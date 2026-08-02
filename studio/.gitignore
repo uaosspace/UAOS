@@ -1,0 +1,7 @@
+# Studio deps
+node_modules/
+dist/
+.sanity/
+*.log
+.env
+.env.local

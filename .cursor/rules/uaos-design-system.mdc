@@ -1,0 +1,76 @@
+---
+description: "Применять при UI/CSS/Tailwind, layout, темах, типографике, иконках, анимациях, responsive и a11y UAOS."
+globs: src/**/*.tsx,src/**/*.css
+alwaysApply: false
+---
+
+# UAOS Design System
+
+Источник истины: `src/index.css` (`@theme`, glass/grid utilities) и существующие секции в `src/components/**`.
+
+Перед UI-правкой:
+
+1. Открой ближайший похожий компонент и скопируй классы/структуру.
+2. Проверь токены в `src/index.css`.
+3. Не вводи новый визуальный язык, UI-kit или палитру без прямого запроса.
+
+## Стек
+
+- Tailwind CSS v4 через `@import "tailwindcss"` и `@theme`.
+- Иконки: `lucide-react`.
+- Темы: классы `light` / `dark` на `<html>`.
+- Без shadcn, MUI и новых CSS-framework без отдельного решения.
+
+## Токены
+
+- Цвета: `brand-blue-*`, `brand-yellow-*`, `brand-sky-*`, `brand-slate-*`.
+- Фоны страницы: существующие `bg-slate-50` / тёмные slate/950 и принятые hex из кода (`#060810` и аналоги только если уже используются рядом).
+- Шрифты: `font-sans`, `font-display`, `font-mono`, `font-manrope`.
+- Не добавляй случайные hex, шрифты и палитры, если аналог уже выражен токеном.
+
+## Примитивы
+
+Используй существующие классы из `index.css`, не дублируй локально:
+
+- `.glass-header`, `.glass-card`, `.glass-pill`, `.glass-card-hover`
+- `.bg-grid-pattern`
+- mesh-gradients / fixed blur-blobs как в `App.tsx` — не плоский одноцветный фон вместо атмосферы
+- scrollbar / `.no-scrollbar` / marquee — только если уже уместно по контексту
+
+## Layout
+
+- Контейнер: `max-w-7xl mx-auto px-4 sm:px-6 lg:px-8`.
+- Секции: `scroll-mt-24 py-6 lg:py-8` и действующие разделители `border-brand-slate-*`.
+- Радиусы: inputs `rounded-lg` → buttons/cards `rounded-xl`/`rounded-2xl` → крупные панели `rounded-3xl`.
+- `rounded-full` — только badges, overline и места, где паттерн уже принят.
+- Не используй одноразовые отрицательные offsets вместо адаптивной сетки.
+- Каждый новый блок — light и dark.
+
+## Повторяемые паттерны
+
+- Section header: mono overline → `font-display` title → синяя underline.
+- Primary CTA: `rounded-xl bg-brand-blue-500 hover:bg-brand-blue-600 text-white` + умеренная тень brand-blue.
+- Secondary CTA: существующий border/hover к brand-blue.
+- Forms: mono uppercase labels; компактные inputs; `focus:border-brand-blue-500`.
+- Footer остаётся тёмным (`bg-brand-slate-900`).
+- Folded/document cards — только где паттерн уже принят (Mission / Directions / Founders).
+
+Новый пользовательский текст добавляй через `src/data/translations/*` (`uk` + `en`), не хардкодом в JSX.
+
+## Состояния и доступность
+
+Для нового интерактивного блока проверь:
+
+- light и dark;
+- mobile и desktop;
+- loading, empty, error, disabled;
+- keyboard navigation и focus;
+- доступное имя и семантику контрола.
+
+## Анимации
+
+- Предпочитай существующие CSS, hover, IntersectionObserver и rAF.
+- Не добавляй glow, neon, purple-theme и тяжёлые multi-shadow ради декоративности.
+- Framer/GSAP или другая motion-библиотека — только с отдельным обоснованием и запросом.
+
+После значимого UI-изменения выполни визуальную проверку доступными browser-инструментами.
