@@ -76,7 +76,7 @@ export default function JoinApplicationForm({currentLang}: JoinApplicationFormPr
     setForm((prev) => ({...prev, [key]: value}))
   }
 
-  /** Клієнтська валідація дзеркалить обов'язкові поля/правила api/lib/joinApplication.ts. */
+  /** Клієнтська валідація дзеркалить обов'язкові поля/правила api/_lib/joinApplication.ts. */
   function validate(): string | null {
     if (!form.companyName.trim() || !form.activityField.trim() || !form.contactPerson.trim() || !form.email.trim() || !form.phone.trim()) {
       return t.join_form_error

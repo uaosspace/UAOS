@@ -8,7 +8,7 @@ alwaysApply: true
 ## Потоки
 
 - Сайт: `src/main.tsx` → `src/App.tsx` → pages/components → hooks → `src/data/*` → `src/lib/sanity.ts` или локальный seed.
-- Заявка: UI → `src/lib/joinRequests.ts` → `POST /api/join` → `api/lib/*` → Sanity и, при настройке, Formspree.
+- Заявка: UI → `src/lib/joinRequests.ts` → `POST /api/join` → `api/_lib/*` → Sanity и, при настройке, Formspree.
 - Studio: `studio/sanity.config.ts` → `studio/schemaTypes/*`.
 
 ## Роли
@@ -16,7 +16,7 @@ alwaysApply: true
 - `src/App.tsx`, `useAppNavigation`, `useSiteContent` и `api/join.ts` координируют сценарии.
 - `src/data/*` загружает и преобразует внешние данные во внутренние UI-модели.
 - Адаптеры могут выполнять mapping и нормализацию, но не определяют бизнес-политику и не становятся вторым источником истины.
-- `api/lib/*` содержит серверную валидацию, HTTP-обработку и инфраструктурные механизмы.
+- `api/_lib/*` содержит серверную валидацию, HTTP-обработку и инфраструктурные механизмы (префикс `_` — не Serverless Function на Vercel Hobby).
 - React state и hooks владеют состоянием интерфейса; Sanity владеет контентом и заявками.
 - Локальный seed — только контролируемый fallback при отсутствии конфигурации CMS.
 
@@ -26,7 +26,7 @@ alwaysApply: true
 - hooks → data/lib.
 - data adapters → Sanity client и типы.
 - join UI → `joinRequests.ts` → `/api/join`.
-- `/api/join` → `api/lib/*` → внешние server-side интеграции.
+- `/api/join` → `api/_lib/*` → внешние server-side интеграции.
 
 ## Запрещённые направления
 

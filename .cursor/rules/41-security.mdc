@@ -13,8 +13,8 @@ alwaysApply: false
 
 ## Join-заявки
 
-- `POST /api/join` валидирует и нормализует данные через `api/lib/joinApplication.ts`.
-- Rate limit остаётся в `api/lib/rateLimit.ts`.
+- `POST /api/join` валидирует и нормализует данные через `api/_lib/joinApplication.ts`.
+- Rate limit остаётся в `api/_lib/rateLimit.ts`.
 - Ошибки возвращаются через действующий HTTP/JSON-механизм без утечки внутренних деталей.
 - Не логируй содержимое заявок, email, телефоны, consent trail и другие PII без явной необходимости и безопасной политики хранения.
 - Повторная отправка и частичный сбой не должны незаметно создавать дубликаты.

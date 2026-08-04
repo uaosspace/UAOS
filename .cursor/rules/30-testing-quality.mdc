@@ -21,7 +21,7 @@ alwaysApply: false
 
 ## Инфраструктура
 
-- Unit-тесты расположены рядом с модулями: `src/lib/*.test.ts`, `src/data/*.test.ts`, `api/lib/*.test.ts`.
+- Unit-тесты расположены рядом с модулями: `src/lib/*.test.ts`, `src/data/*.test.ts`, `api/_lib/*.test.ts`.
 - Отдельных integration- и end-to-end suites пока нет.
 - Локальный seed в `src/data/*` — runtime fallback, а не test fixtures.
 

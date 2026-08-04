@@ -35,7 +35,7 @@ alwaysApply: true
 - фактическая реализация: исходный код, manifest, lock-файлы и конфигурация;
 - структура контента: `studio/schemaTypes/*`;
 - загрузка и преобразование контента: `src/data/*` и `src/lib/sanity.ts`;
-- форма вступления: `src/lib/joinRequests.ts`, `api/join.ts`, `api/lib/*`;
+- форма вступления: `src/lib/joinRequests.ts`, `api/join.ts`, `api/_lib/*`;
 - UI-тексты: `src/data/translations/*`;
 - дизайн: `src/index.css`, существующие компоненты и `uaos-design-system.mdc`;
 - архитектурная навигация: актуальный `CODE_MAP.md`.

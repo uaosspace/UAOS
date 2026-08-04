@@ -5,11 +5,11 @@ import {
   listApplications,
   updateApplicationStatus,
   type ApplicationStatus,
-} from '../lib/applicationsRepo'
-import {writeAuditEvent} from '../lib/audit'
-import {getClientIp, parseJsonBody, sendJsonError} from '../lib/http'
-import {isRateLimited} from '../lib/rateLimitStore'
-import {roleHasPermission, type AdminPermission} from '../lib/auth/policy'
+} from '../_lib/applicationsRepo'
+import {writeAuditEvent} from '../_lib/audit'
+import {getClientIp, parseJsonBody, sendJsonError} from '../_lib/http'
+import {isRateLimited} from '../_lib/rateLimitStore'
+import {roleHasPermission, type AdminPermission} from '../_lib/auth/policy'
 import {
   assertSameOrigin,
   authenticatePassword,
@@ -24,7 +24,7 @@ import {
   setSessionCookie,
   verifyUserMfa,
   type AdminSessionContext,
-} from '../lib/auth/session'
+} from '../_lib/auth/session'
 import {isRecord, readStringOr} from '../../src/lib/contentGuards'
 import {
   createMediaAsset,
@@ -43,8 +43,8 @@ import {
   upsertContentEvent,
   upsertContentMember,
   upsertContentNews,
-} from '../lib/contentRepo'
-import {getBlobByPathname, putPublicBlob, putPrivateBlob} from '../lib/blobStore'
+} from '../_lib/contentRepo'
+import {getBlobByPathname, putPublicBlob, putPrivateBlob} from '../_lib/blobStore'
 
 type RouteResult = {handled: true} | {handled: false}
 

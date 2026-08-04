@@ -1,13 +1,13 @@
 import type {VercelRequest, VercelResponse} from '@vercel/node'
-import {isDatabaseConfigured} from '../lib/db'
-import {sendJsonError} from '../lib/http'
+import {isDatabaseConfigured} from '../_lib/db'
+import {sendJsonError} from '../_lib/http'
 import {
   getPublishedSiteSettings,
   listPublishedDocuments,
   listPublishedEvents,
   listPublishedMembers,
   listPublishedNews,
-} from '../lib/contentRepo'
+} from '../_lib/contentRepo'
 
 function pathParts(req: VercelRequest): string[] {
   const route = req.query.route

@@ -22,7 +22,7 @@ alwaysApply: true
 - Загрузка, guards и mapping контента: `src/data/`.
 - Клиентская инфраструктура: `src/lib/`.
 - Serverless entry: `api/join.ts`.
-- Серверная логика и инфраструктура: `api/lib/`.
+- Серверная логика и инфраструктура: `api/_lib/` (underscore — helpers не считаются Vercel Serverless Functions).
 - Sanity Studio и schemas: `studio/`.
 - Assets: `public/`.
 - Generated output: `dist/`.
@@ -36,7 +36,7 @@ alwaysApply: true
 - Сохраняй strict TypeScript.
 - Не используй `any`, небезопасный cast или широкое исключение для сокрытия проблемы.
 - Nullable/optional обрабатывай явно через типы и guards.
-- Серверные ошибки возвращай через действующий механизм `api/lib/http.ts`.
+- Серверные ошибки возвращай через действующий механизм `api/_lib/http.ts`.
 - Не форматируй и не рефактори несвязанные файлы.
 - Комментируй только неочевидный алгоритм, инвариант, побочный эффект или ограничение совместимости.
 

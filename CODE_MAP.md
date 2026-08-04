@@ -42,14 +42,14 @@ UI (`JoinPage` → `JoinApplicationForm`) → `src/lib/joinRequests.ts` → `POS
 | `src/lib/contentGuards.ts` | Нормализация/guards |
 | `src/lib/joinRequests.ts` | Клиент join POST |
 | `src/lib/sanity.ts` | Stub (удалённый Sanity; бросает при вызове) |
-| `api/lib/db.ts` | Neon facade |
-| `api/lib/applicationsRepo.ts` | Заявки |
-| `api/lib/rateLimitStore.ts` | Distributed rate limit |
-| `api/lib/turnstile.ts` | Bot check |
-| `api/lib/brevoNotify.ts` | Low-PII mail |
-| `api/lib/auth/*` | Password/session/MFA/policy |
-| `api/lib/contentRepo.ts` | CMS tables |
-| `api/lib/blobStore.ts` | Vercel Blob |
+| `api/_lib/db.ts` | Neon facade (префикс `_` — не Serverless Function на Vercel Hobby) |
+| `api/_lib/applicationsRepo.ts` | Заявки |
+| `api/_lib/rateLimitStore.ts` | Distributed rate limit |
+| `api/_lib/turnstile.ts` | Bot check |
+| `api/_lib/brevoNotify.ts` | Low-PII mail |
+| `api/_lib/auth/*` | Password/session/MFA/policy |
+| `api/_lib/contentRepo.ts` | CMS tables |
+| `api/_lib/blobStore.ts` | Vercel Blob |
 | `db/migrations/*` | SQL migrations |
 | `scripts/migrate.mjs`, `seed-db.mjs`, `create-admin.mjs` | Ops scripts |
 | `studio/` | Placeholder «removed» (не рабочий CMS) |
