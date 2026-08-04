@@ -15,3 +15,4 @@ studio/.sanity/
 docs/backups/
 
 .vercel
+.playwright-mcp/
