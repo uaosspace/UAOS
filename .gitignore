@@ -12,3 +12,6 @@ assets/
 studio/node_modules/
 studio/dist/
 studio/.sanity/
+docs/backups/
+
+.vercel

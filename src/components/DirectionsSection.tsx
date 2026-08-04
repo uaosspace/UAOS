@@ -113,7 +113,7 @@ export default function DirectionsSection({ currentLang }: DirectionsSectionProp
           <h2 className="text-xs font-mono font-bold tracking-widest text-brand-blue-500 dark:text-brand-sky-300 uppercase">
             {t.goals_title}
           </h2>
-          <p className="text-3xl sm:text-4xl font-display font-bold text-brand-slate-900 dark:text-white tracking-tight">
+          <p className="text-2xl sm:text-3xl font-display font-semibold text-brand-slate-900 dark:text-white tracking-tight leading-snug">
             {t.goals_subtitle}
           </p>
           <div className="h-1 w-12 bg-brand-blue-500 mx-auto rounded-full"></div>

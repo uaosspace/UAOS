@@ -47,11 +47,11 @@ export default function EventDetails({ event, currentLang }: EventDetailsProps) 
             }`}>
               {typeText}
             </span>
-            <span className="px-3 py-1 text-xs font-semibold text-brand-slate-600 dark:text-brand-slate-300 bg-brand-slate-100 dark:bg-brand-slate-800 rounded-full">
+            <span className="px-3 py-1 text-xs font-semibold text-brand-slate-600 dark:text-brand-slate-200 bg-brand-slate-100 dark:bg-brand-slate-800 rounded-full">
               {formatText}
             </span>
             {past && (
-              <span className="px-3 py-1 text-xs font-semibold text-brand-slate-500 dark:text-brand-slate-400 bg-brand-slate-100 dark:bg-brand-slate-800 rounded-full">
+              <span className="px-3 py-1 text-xs font-semibold text-brand-slate-500 dark:text-brand-slate-300 bg-brand-slate-100 dark:bg-brand-slate-800 rounded-full">
                 {t.events_archive_tab}
               </span>
             )}
@@ -62,33 +62,33 @@ export default function EventDetails({ event, currentLang }: EventDetailsProps) 
           </h2>
 
           <div className="space-y-4 mb-8">
-            <div className="flex items-start gap-3 text-brand-slate-700 dark:text-brand-slate-300">
+            <div className="flex items-start gap-3 text-brand-slate-700 dark:text-brand-slate-200">
               <Clock className="w-5 h-5 text-brand-slate-400 shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium">{dateRange}</p>
-                <p className="text-sm text-brand-slate-500 dark:text-brand-slate-400">{t.events_timezone}</p>
+                <p className="text-sm text-brand-slate-500 dark:text-brand-slate-300">{t.events_timezone}</p>
               </div>
             </div>
 
             {(event.format === 'offline' || event.format === 'hybrid') && event.location && event.location[currentLang] && (
-              <div className="flex items-start gap-3 text-brand-slate-700 dark:text-brand-slate-300">
+              <div className="flex items-start gap-3 text-brand-slate-700 dark:text-brand-slate-200">
                 <MapPin className="w-5 h-5 text-brand-slate-400 shrink-0 mt-0.5" />
                 <p>{event.location[currentLang]}</p>
               </div>
             )}
 
             {(event.format === 'online' || event.format === 'hybrid') && (
-              <div className="flex items-start gap-3 text-brand-slate-700 dark:text-brand-slate-300">
+              <div className="flex items-start gap-3 text-brand-slate-700 dark:text-brand-slate-200">
                 <Globe className="w-5 h-5 text-brand-slate-400 shrink-0 mt-0.5" />
                 <p>{t.events_online}</p>
               </div>
             )}
 
             {event.organizer && event.organizer[currentLang] && (
-              <div className="flex items-start gap-3 text-brand-slate-700 dark:text-brand-slate-300">
+              <div className="flex items-start gap-3 text-brand-slate-700 dark:text-brand-slate-200">
                 <User className="w-5 h-5 text-brand-slate-400 shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm text-brand-slate-500 dark:text-brand-slate-400">{t.events_organizer}</p>
+                  <p className="text-sm text-brand-slate-500 dark:text-brand-slate-300">{t.events_organizer}</p>
                   <p>{event.organizer[currentLang]}</p>
                 </div>
               </div>
@@ -100,7 +100,7 @@ export default function EventDetails({ event, currentLang }: EventDetailsProps) 
               {event.shortDescription[currentLang]}
             </p>
             {event.fullDescription && event.fullDescription[currentLang] && (
-              <div className="text-brand-slate-600 dark:text-brand-slate-300 whitespace-pre-line">
+              <div className="text-brand-slate-600 dark:text-brand-slate-200 whitespace-pre-line">
                 {event.fullDescription[currentLang]}
               </div>
             )}

@@ -37,7 +37,7 @@ export default function CookieBanner({
             <p className="text-sm font-display font-semibold text-brand-slate-900 dark:text-white">
               {t.cookie_title}
             </p>
-            <p className="text-[11px] sm:text-xs text-brand-slate-600 dark:text-brand-slate-400 leading-relaxed">
+            <p className="text-[11px] sm:text-xs text-brand-slate-600 dark:text-brand-slate-300 leading-relaxed">
               {t.cookie_body}{' '}
               <button
                 type="button"

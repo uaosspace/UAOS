@@ -23,7 +23,7 @@ export default function UpcomingEventsPanel({ events, currentLang, onOpenEvents 
   if (upcoming.length === 0) {
     return (
       <div className="mt-8 rounded-2xl bg-white/5 dark:bg-brand-slate-800/20 backdrop-blur-sm border border-brand-slate-200/50 dark:border-brand-slate-700/50 p-4 flex items-center justify-between">
-        <span className="text-sm font-medium text-brand-slate-600 dark:text-brand-slate-400">
+        <span className="text-sm font-medium text-brand-slate-600 dark:text-brand-slate-300">
           {t.events_no_upcoming}
         </span>
         <button 
@@ -39,7 +39,7 @@ export default function UpcomingEventsPanel({ events, currentLang, onOpenEvents 
   return (
     <div className="mt-8">
       <div className="flex items-center justify-between mb-4 px-1">
-        <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-slate-500 dark:text-brand-slate-400">
+        <h3 className="text-xs font-mono font-bold uppercase tracking-widest text-brand-slate-500 dark:text-brand-slate-300">
           {t.events_upcoming}
         </h3>
         <button 

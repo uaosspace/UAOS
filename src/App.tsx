@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState} from 'react'
+import {useEffect, useMemo, useState, type ReactNode} from 'react'
 import Header from './components/Header'
 import Footer from './components/Footer'
 import SvgDefs from './components/SvgDefs'
@@ -7,11 +7,27 @@ import AnalyticsGate from './components/AnalyticsGate'
 import {useAppNavigation} from './hooks/useAppNavigation'
 import {useCookieConsent} from './hooks/useCookieConsent'
 import {useMembersResource} from './hooks/content/useMembersResource'
+import {useNewsResource} from './hooks/content/useNewsResource'
+import {useEventsResource} from './hooks/content/useEventsResource'
+import {useDocumentsResource} from './hooks/content/useDocumentsResource'
 import {LOCALE_META, parseStoredLocale, type Locale} from './data/locales'
 import {TRANSLATIONS} from './data/translations'
 import HomePage from './pages/HomePage'
+import AboutPage from './pages/AboutPage'
+import ActivityPage from './pages/ActivityPage'
+import MembersCatalogPage from './pages/MembersCatalogPage'
 import MemberDetailsPage from './pages/MemberDetailsPage'
+import NewsListPage from './pages/NewsListPage'
+import NewsDetailPage from './pages/NewsDetailPage'
+import EventsListPage from './pages/EventsListPage'
+import EventsDetailPage from './pages/EventsDetailPage'
+import KnowledgePage from './pages/KnowledgePage'
+import JoinPage from './pages/JoinPage'
+import ContactsPage from './pages/ContactsPage'
 import PrivacyRoutePage from './pages/PrivacyRoutePage'
+import NotFoundPage from './pages/NotFoundPage'
+import AdminApp from './pages/admin/AdminApp'
+import PageTransition from './components/PageTransition'
 import {APP_ROUTES} from './routes/appRoutes'
 
 export default function App() {
@@ -28,14 +44,34 @@ export default function App() {
 
   const {
     currentRoute,
-    activeMemberSlug,
+    routeParams,
     handleNavigation,
     handleSelectMember,
+    handleBackFromMember,
+    handleSelectNews,
+    handleSelectEvent,
   } = useAppNavigation()
 
   const membersNeeded =
-    currentRoute === APP_ROUTES.home || currentRoute === APP_ROUTES.memberDetails
+    currentRoute === APP_ROUTES.home ||
+    currentRoute === APP_ROUTES.memberDetails ||
+    currentRoute === APP_ROUTES.membersCatalog
   const {data: members} = useMembersResource(membersNeeded)
+
+  const newsNeeded =
+    currentRoute === APP_ROUTES.home ||
+    currentRoute === APP_ROUTES.newsList ||
+    currentRoute === APP_ROUTES.newsDetails
+  const {data: news} = useNewsResource(newsNeeded)
+
+  const eventsNeeded =
+    currentRoute === APP_ROUTES.home ||
+    currentRoute === APP_ROUTES.eventsList ||
+    currentRoute === APP_ROUTES.eventsDetails
+  const {data: events} = useEventsResource(eventsNeeded)
+
+  const documentsNeeded = currentRoute === APP_ROUTES.knowledge
+  const {data: documents} = useDocumentsResource(documentsNeeded)
 
   const {
     cookieConsent,
@@ -69,9 +105,114 @@ export default function App() {
   }, [currentTheme])
 
   const activeMember = useMemo(
-    () => members.find((member) => member.slug === activeMemberSlug) ?? null,
-    [activeMemberSlug, members],
+    () => members.find((member) => member.slug === routeParams.memberSlug) ?? null,
+    [routeParams.memberSlug, members],
   )
+  const activeNews = useMemo(
+    () => news.find((item) => item.slug === routeParams.newsSlug) ?? null,
+    [routeParams.newsSlug, news],
+  )
+  const activeEvent = useMemo(
+    () => events.find((event) => event.id === routeParams.eventSlug) ?? null,
+    [routeParams.eventSlug, events],
+  )
+
+  const pageTransitionKey = useMemo(
+    () =>
+      [
+        currentRoute,
+        routeParams.memberSlug,
+        routeParams.newsSlug,
+        routeParams.eventSlug,
+        routeParams.activityAnchor,
+      ]
+        .filter(Boolean)
+        .join(':'),
+    [currentRoute, routeParams],
+  )
+
+  let mainContent: ReactNode
+
+  if (currentRoute === APP_ROUTES.home) {
+    mainContent = (
+      <HomePage
+        currentLang={currentLang}
+        members={members}
+        news={news}
+        events={events}
+        onNavigate={handleNavigation}
+        onSelectMember={handleSelectMember}
+        onSelectNews={handleSelectNews}
+        onSelectEvent={handleSelectEvent}
+      />
+    )
+  } else if (currentRoute === APP_ROUTES.about) {
+    mainContent = <AboutPage currentLang={currentLang} />
+  } else if (currentRoute === APP_ROUTES.activity) {
+    mainContent = <ActivityPage currentLang={currentLang} anchor={routeParams.activityAnchor} />
+  } else if (currentRoute === APP_ROUTES.membersCatalog) {
+    mainContent = (
+      <MembersCatalogPage
+        currentLang={currentLang}
+        members={members}
+        onSelectMember={(slug) => handleSelectMember(slug, APP_ROUTES.membersCatalog)}
+      />
+    )
+  } else if (currentRoute === APP_ROUTES.memberDetails && activeMember) {
+    mainContent = <MemberDetailsPage currentLang={currentLang} member={activeMember} onBack={handleBackFromMember} />
+  } else if (currentRoute === APP_ROUTES.newsList) {
+    mainContent = (
+      <NewsListPage currentLang={currentLang} news={news} onSelectNews={handleSelectNews} onNavigate={handleNavigation} />
+    )
+  } else if (currentRoute === APP_ROUTES.newsDetails && activeNews) {
+    mainContent = (
+      <NewsDetailPage
+        currentLang={currentLang}
+        item={activeNews}
+        onBack={() => handleNavigation(APP_ROUTES.newsList, {skipScrollToTop: true})}
+      />
+    )
+  } else if (currentRoute === APP_ROUTES.eventsList) {
+    mainContent = (
+      <EventsListPage
+        currentLang={currentLang}
+        events={events}
+        onSelectEvent={handleSelectEvent}
+        onNavigate={handleNavigation}
+      />
+    )
+  } else if (currentRoute === APP_ROUTES.eventsDetails && activeEvent) {
+    mainContent = (
+      <EventsDetailPage
+        currentLang={currentLang}
+        event={activeEvent}
+        onBack={() => handleNavigation(APP_ROUTES.eventsList, {skipScrollToTop: true})}
+      />
+    )
+  } else if (currentRoute === APP_ROUTES.knowledge) {
+    mainContent = <KnowledgePage currentLang={currentLang} documents={documents} />
+  } else if (currentRoute === APP_ROUTES.join) {
+    mainContent = <JoinPage currentLang={currentLang} anchor={routeParams.activityAnchor} />
+  } else if (currentRoute === APP_ROUTES.contacts) {
+    mainContent = <ContactsPage currentLang={currentLang} />
+  } else if (currentRoute === APP_ROUTES.privacy) {
+    mainContent = <PrivacyRoutePage currentLang={currentLang} onBack={() => handleNavigation(APP_ROUTES.home)} />
+  } else if (currentRoute === APP_ROUTES.admin) {
+    mainContent = <AdminApp />
+  } else {
+    mainContent = <NotFoundPage currentLang={currentLang} onBackHome={() => handleNavigation(APP_ROUTES.home)} />
+  }
+
+  if (currentRoute === APP_ROUTES.admin) {
+    return (
+      <>
+        <SvgDefs />
+        <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+          {mainContent}
+        </div>
+      </>
+    )
+  }
 
   return (
     <>
@@ -87,42 +228,14 @@ export default function App() {
         />
 
         <main className="flex-grow">
-          {currentRoute === APP_ROUTES.home ? (
-            <HomePage
-              currentLang={currentLang}
-              currentRoute={currentRoute}
-              members={members}
-              onNavigate={handleNavigation}
-              onSelectMember={handleSelectMember}
-            />
-          ) : currentRoute === APP_ROUTES.memberDetails && activeMember ? (
-            <MemberDetailsPage
-              currentLang={currentLang}
-              member={activeMember}
-              onBack={() => handleNavigation('home', {skipScrollToTop: true})}
-            />
-          ) : currentRoute === APP_ROUTES.privacy ? (
-            <PrivacyRoutePage currentLang={currentLang} onBack={() => handleNavigation('home')} />
-          ) : (
-            <div className="container py-32 text-center space-y-4">
-              <h2 className="text-2xl font-bold">{t.page_not_found}</h2>
-              <button
-                type="button"
-                onClick={() => handleNavigation('home')}
-                className="scribble-link compact"
-              >
-                <span className="label">{t.back_home}</span>
-                <span className="arrow">→</span>
-              </button>
-            </div>
-          )}
+          <PageTransition key={pageTransitionKey}>{mainContent}</PageTransition>
         </main>
 
         <Footer
           currentLang={currentLang}
           currentRoute={currentRoute}
           onNavigate={handleNavigation}
-          onOpenPrivacy={() => handleNavigation('privacy')}
+          onOpenPrivacy={() => handleNavigation(APP_ROUTES.privacy)}
         />
 
         {cookieConsent === null && (
@@ -130,7 +243,7 @@ export default function App() {
             currentLang={currentLang}
             onAccept={acceptCookies}
             onNecessaryOnly={keepNecessaryCookiesOnly}
-            onOpenPrivacy={() => handleNavigation('privacy')}
+            onOpenPrivacy={() => handleNavigation(APP_ROUTES.privacy)}
           />
         )}
 

@@ -1,5 +1,7 @@
 import type {LocalizedText} from './shared'
 
+export type DocumentAccessLevel = 'public' | 'member' | 'internal'
+
 export interface DocumentItem {
   id: string
   title: LocalizedText
@@ -9,4 +11,6 @@ export interface DocumentItem {
   language: 'UA' | 'EN' | 'UA/EN'
   dateUpdated: string
   fileUrl: string
+  /** Рівень доступу до документа/матеріалу (розділ 16 ТЗ); публічний UI показує лише 'public'. */
+  accessLevel: DocumentAccessLevel
 }

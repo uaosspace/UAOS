@@ -1,11 +1,13 @@
 import {DocumentItem} from '../types'
-import {getSanityClient, mapLocale, sanityConfigured} from '../lib/sanity'
+import {ContentApiError, fetchContentItems} from '../lib/contentApi'
 import {
   isRecord,
   readArray,
+  readDocumentAccessLevel,
   readDocumentLanguage,
   readDocumentType,
   readHttpUrl,
+  readLocalizedText,
   readString,
   readStringOr,
 } from '../lib/contentGuards'
@@ -26,6 +28,7 @@ export const INITIAL_DOCUMENTS: DocumentItem[] = [
     language: 'UA',
     dateUpdated: '2026-03-10',
     fileUrl: '#',
+    accessLevel: 'public',
   },
   {
     id: 'rules',
@@ -42,6 +45,7 @@ export const INITIAL_DOCUMENTS: DocumentItem[] = [
     language: 'UA/EN',
     dateUpdated: '2026-04-15',
     fileUrl: '#',
+    accessLevel: 'public',
   },
   {
     id: 'code-of-conduct',
@@ -58,6 +62,7 @@ export const INITIAL_DOCUMENTS: DocumentItem[] = [
     language: 'UA/EN',
     dateUpdated: '2026-05-20',
     fileUrl: '#',
+    accessLevel: 'public',
   },
   {
     id: 'presentation',
@@ -74,6 +79,7 @@ export const INITIAL_DOCUMENTS: DocumentItem[] = [
     language: 'UA/EN',
     dateUpdated: '2026-06-01',
     fileUrl: '#',
+    accessLevel: 'public',
   },
   {
     id: 'board-regulations',
@@ -90,54 +96,77 @@ export const INITIAL_DOCUMENTS: DocumentItem[] = [
     language: 'UA',
     dateUpdated: '2026-03-12',
     fileUrl: '#',
+    accessLevel: 'public',
+  },
+  {
+    id: 'material-ppe-selection-guide',
+    title: {
+      uk: 'Гід із вибору засобів індивідуального захисту',
+      en: 'Guide to Selecting Personal Protective Equipment',
+    },
+    description: {
+      uk: 'Практичний матеріал про підбір ЗІЗ під ризики підприємства, підготовлений експертами асоціації.',
+      en: 'A practical publication on selecting PPE based on enterprise risks, prepared by association experts.',
+    },
+    type: 'link',
+    language: 'UA/EN',
+    dateUpdated: '2026-06-15',
+    fileUrl: '#',
+    accessLevel: 'public',
+  },
+  {
+    id: 'material-eu-safety-standards-overview',
+    title: {
+      uk: 'Огляд європейських підходів до безпеки праці',
+      en: 'Overview of European Occupational Safety Approaches',
+    },
+    description: {
+      uk: 'Аналітичний матеріал про сучасні європейські практики та їх застосовність в Україні.',
+      en: 'An analytical publication on modern European practices and their applicability in Ukraine.',
+    },
+    type: 'link',
+    language: 'UA/EN',
+    dateUpdated: '2026-07-01',
+    fileUrl: '#',
+    accessLevel: 'public',
   },
 ]
 
-const DOCS_QUERY = `*[_type == "associationDocument"] | order(dateUpdated desc) {
-  _id,
-  title,
-  description,
-  type,
-  size,
-  language,
-  dateUpdated,
-  externalUrl,
-  "fileUrl": file.asset->url
-}`
+/** У публічному UI "матеріали" — це type === 'link' (зовнішні публікації), решта — офіційні документи. */
+export function isMaterialDocument(doc: DocumentItem): boolean {
+  return doc.type === 'link'
+}
 
 /**
- * Преобразует Sanity-документ в безопасную карточку публичного раздела документов.
+ * Преобразует документ базы знаний (public API) в UI-модель.
  */
 export function mapDoc(doc: unknown): DocumentItem {
   const source = isRecord(doc) ? doc : {}
 
   return {
-    id: readStringOr(source._id, 'document-unknown'),
-    title: mapLocale(source.title as {uk?: string; en?: string} | null | undefined),
-    description: mapLocale(source.description as {uk?: string; en?: string} | null | undefined),
+    id: readStringOr(source.id, readStringOr(source._id, 'document-unknown')),
+    title: readLocalizedText(source.title),
+    description: readLocalizedText(source.description),
     type: readDocumentType(source.type),
     size: readString(source.size),
     language: readDocumentLanguage(source.language),
     dateUpdated: readStringOr(source.dateUpdated, new Date().toISOString().slice(0, 10)),
     fileUrl: readHttpUrl(source.fileUrl) || readHttpUrl(source.externalUrl) || '#',
+    accessLevel: readDocumentAccessLevel(source.accessLevel),
   }
 }
 
 export async function fetchDocuments(): Promise<DocumentItem[]> {
-  const client = getSanityClient()
-  if (!client || !sanityConfigured) {
-    return INITIAL_DOCUMENTS
-  }
   try {
-    const docs = await client.fetch(DOCS_QUERY)
-    const documentDocs = readArray(docs)
-    if (documentDocs.length === 0) {
+    const docs = await fetchContentItems<unknown>('documents')
+    return readArray(docs).map(mapDoc)
+  } catch (err) {
+    if (import.meta.env.DEV) {
+      console.warn('Content API fetchDocuments unavailable in DEV, using seed:', err)
       return INITIAL_DOCUMENTS
     }
-    return documentDocs.map(mapDoc)
-  } catch (err) {
-    console.error('Sanity fetchDocuments failed, using seed:', err)
-    return INITIAL_DOCUMENTS
+    if (err instanceof ContentApiError) throw err
+    throw new ContentApiError('Failed to load documents', 500)
   }
 }
 
@@ -146,5 +175,5 @@ export function getDocuments(): DocumentItem[] {
 }
 
 export function saveDocuments(_docs: DocumentItem[]): void {
-  // Content managed in Sanity Studio
+  // Content managed via /admin + Neon
 }

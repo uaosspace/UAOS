@@ -198,7 +198,7 @@ export default function SaveEventMenu({ event, currentLang }: SaveEventMenuProps
               </button>
             )}
           </div>
-          <div className="bg-brand-slate-50 dark:bg-brand-slate-900/50 p-3 text-xs text-brand-slate-500 dark:text-brand-slate-400 text-center border-t border-brand-slate-100 dark:border-brand-slate-700">
+          <div className="bg-brand-slate-50 dark:bg-brand-slate-900/50 p-3 text-xs text-brand-slate-500 dark:text-brand-slate-300 text-center border-t border-brand-slate-100 dark:border-brand-slate-700">
             {t.events_save_hint}
           </div>
         </div>

@@ -1,125 +1,62 @@
-# UAOS — ГС «УАПБ»
+# UAOS — публічний сайт асоціації
 
-Офіційний сайт громадської спілки **«Українська Асоціація Професійної Безпеки»** (UAOS).
-
-Корпоративний лендинг з каталогом учасників, подіями, новинами, документами, формою вступу.  
-Контент керується через **Sanity CMS**.
-
-**Репозиторій:** [github.com/uaosspace/UAOS](https://github.com/uaosspace/UAOS)
-
----
-
-## Архітектура
+React 19 + Vite 6 SPA на Vercel. Дані: **Neon Postgres**. Медіа: **Vercel Blob**. Адмінка: маршрут `/admin`. Sanity CMS видалено.
 
 ```
-Sanity Studio (адмінка)  →  Content Lake  →  Сайт (Vite/React на Vercel)
-Заявка на вступ          →  POST /api/join →  Sanity (+ опційно Formspree)
+Відвідувач  →  Vite SPA  →  /api/public/*  →  Neon
+Заявка      →  POST /api/join → Neon (+ Brevo low-PII notify)
+Редактор    →  /admin → /api/admin/* → Neon + Blob
 ```
 
-Поки `VITE_SANITY_PROJECT_ID` не заданий — сайт показує локальні seed-дані.
-
-Детальний чекліст акаунтів: [docs/SANITY_SETUP.md](docs/SANITY_SETUP.md)
-
----
-
-## Стек
-
-| | |
-|---|---|
-| UI | React 19 + TypeScript + Vite 6 |
-| Стилі | Tailwind CSS v4 |
-| CMS | Sanity Studio 3 (`studio/`) |
-| Хостинг сайту | Vercel |
-| Іконки / дати | lucide-react, luxon |
-
----
-
-## Запуск сайту
+## Швидкий старт
 
 ```bash
 npm install
-cp .env.example .env.local   # встав Project ID після створення Sanity
+cp .env.example .env.local
+# заповніть DATABASE_URL (і інші server secrets для API)
+npm run db:migrate
+npm run db:seed          # опційно, staging/dev
+npm run admin:create -- --email=you@example.com --password='…' --role=admin
 npm run dev
 ```
 
-Сайт: http://localhost:3000
+Локально публічний контент без запущеного API в DEV може показувати seed з попередженням у консолі.
 
-```bash
-npm run build
-npm run lint
-```
+## Скрипти
 
-### Env (сайт)
+| Команда | Призначення |
+|---------|-------------|
+| `npm run dev` | Vite на :3000 |
+| `npm run build` | Production build |
+| `npm run lint` | `tsc --noEmit` |
+| `npm test` | Vitest |
+| `npm run db:migrate` | SQL міграції |
+| `npm run db:seed` | Seed content tables |
+| `npm run admin:create` | Створити/оновити admin user |
 
-| Змінна | Де | Призначення |
-|---|---|---|
-| `VITE_SANITY_PROJECT_ID` | `.env.local` + Vercel | ID проєкту Sanity |
-| `VITE_SANITY_DATASET` | те саме | зазвичай `production` |
-| `VITE_SANITY_STUDIO_URL` | те саме | посилання на Studio |
-| `SANITY_API_WRITE_TOKEN` | **тільки Vercel** (secret) | запис заявок через `/api/join` |
-| `FORMSPREE_JOIN_ENDPOINT` | опційно | дубль заявки на email |
+## Env (див. `.env.example`)
 
----
+| Змінна | Де | Примітка |
+|--------|-----|----------|
+| `DATABASE_URL` | server only | Neon pooled |
+| `SESSION_SECRET` | server | 32-byte hex |
+| `MFA_ENC_KEY` | server | 32-byte hex |
+| `BLOB_READ_WRITE_TOKEN` | server | Vercel Blob |
+| `SITE_URL` | server | CSRF Origin |
+| `VITE_TURNSTILE_SITE_KEY` | public | optional locally |
+| `TURNSTILE_SECRET_KEY` | server | required in prod |
+| `BREVO_API_KEY` / `NOTIFY_EMAIL_*` | server | optional notify |
 
-## Sanity Studio
+## Документація
 
-```bash
-npm run studio:install
-cp studio/.env.example studio/.env   # той самий Project ID
-npm run studio                       # http://localhost:3333
-```
+- `CODE_MAP.md` — архітектура
+- `docs/OPS_CHECKLIST.md` — cutover / MFA / приймання
+- `docs/RUNBOOK.md` — restore / offboarding / інциденти
+- `docs/SANITY_SETUP.md` — stub (Sanity removed)
 
-Деплой Studio на Sanity Hosting:
+## Безпека
 
-```bash
-npm run studio:deploy
-```
-
-Після деплою онови `VITE_SANITY_STUDIO_URL` (напр. `https://uaos.sanity.studio`).
-
-Seed демо-подій (потрібен write token):
-
-```bash
-node --env-file=.env.local scripts/seed-events.mjs
-```
-
-У Studio також заведи singleton **Site settings**, документи, учасників, новини.
-
----
-
-## Адмін на сайті (`#/admin`)
-
-Спрощений хаб: кнопка «Відкрити Sanity Studio» + локальний fallback-список заявок.  
-Логін демо: `admin` / `admin123` (змінити перед продакшеном).
-
----
-
-## Vercel
-
-1. Import репо [github.com/uaosspace/UAOS](https://github.com/uaosspace/UAOS)  
-2. Framework: Vite  
-3. Env: `VITE_SANITY_*` + `SANITY_API_WRITE_TOKEN`  
-4. Production branch: `main`  
-5. Preview-гілки для правок UI; контент — drafts у Studio
-
-API route: [`api/join.ts`](api/join.ts)
-
----
-
-## Структура
-
-```
-src/                 # лендинг
-  lib/sanity.ts      # клієнт Sanity
-  data/              # fetch* + seed fallbacks
-  components/
-studio/              # Sanity Studio + schemaTypes
-api/join.ts          # serverless заявки
-docs/SANITY_SETUP.md
-```
-
----
-
-## Ліцензія
-
-Код і контент — для ГС «УАПБ» / UAOS.
+- Security headers + CSP enforce у `vercel.json`
+- Join: Turnstile, distributed rate limit, dedupe, correlation id на 5xx
+- Admin: scrypt passwords, HttpOnly sessions, TOTP MFA для PII-ролей, Origin CSRF, audit_events
+- Private Blob файли лише через `GET /api/admin/files/:id`

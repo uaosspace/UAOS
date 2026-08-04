@@ -42,6 +42,13 @@ export default function SvgDefs() {
           <circle cx="24" cy="24" r="19" fill="none" stroke="currentColor" strokeWidth="2" />
           <path d="m15 24 6 6 13-14" fill="none" stroke="currentColor" strokeWidth="2" />
         </symbol>
+        {/* Одна галочка для hero eyebrow — клиновидная, як у макеті (коротке ліве плече, довге праве). */}
+        <symbol id="icon-check-mark" viewBox="0 0 24 24">
+          <path
+            fill="currentColor"
+            d="M2 12.9 8.6 20.15 10.55 19.95 22.7 2.4 19.55.75 9.35 15.9 4.7 11.15Z"
+          />
+        </symbol>
         <symbol id="icon-calendar" viewBox="0 0 48 48">
           <rect x="7" y="10" width="34" height="32" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
           <path d="M15 5v10M33 5v10M7 20h34M15 27h4M24 27h4M33 27h4M15 34h4M24 34h4" fill="none" stroke="currentColor" strokeWidth="2" />

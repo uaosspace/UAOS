@@ -1,57 +1,100 @@
 import {useCallback, useEffect, useRef, useState} from 'react'
-import {APP_ROUTES, type AppRoute} from '../routes/appRoutes'
+import {APP_ROUTES, buildRoutePath, type AppRoute, type RouteParams} from '../routes/appRoutes'
+import {scrollToSection} from './useSectionNavigation'
 
 interface NavigationOptions {
   skipScrollToTop?: boolean
+  /** Якір активної секції (наприклад, для /activity#representation). */
+  anchor?: string
+}
+
+interface ParsedRoute {
+  route: AppRoute
+  params: RouteParams
 }
 
 /**
  * Безопасно обновляет history state, не ломаясь в ограниченных окружениях.
  */
-function safePushState(data: unknown, unused: string, url?: string | null) {
+function safePushState(url: string) {
   try {
-    window.history.pushState(data, unused, url)
+    window.history.pushState(null, '', url)
   } catch (error) {
     console.warn('History pushState is not supported or restricted:', error)
   }
 }
 
-/**
- * Читает текущий route и member slug из hash URL.
- */
-function parseRouteFromLocation(): {route: AppRoute; memberSlug: string | null} {
-  const hash = window.location.hash
-
-  if (hash.startsWith('#/members/')) {
-    return {
-      route: APP_ROUTES.memberDetails,
-      memberSlug: hash.replace('#/members/', ''),
-    }
-  }
-
-  if (hash === '#/privacy') {
-    return {
-      route: APP_ROUTES.privacy,
-      memberSlug: null,
-    }
-  }
-
-  return {
-    route: APP_ROUTES.home,
-    memberSlug: null,
+function safeReplaceState(url: string) {
+  try {
+    window.history.replaceState(null, '', url)
+  } catch (error) {
+    console.warn('History replaceState is not supported or restricted:', error)
   }
 }
 
 /**
- * Координирует hash/query-навигацию сайта и состояние модалки событий.
+ * Разбирает pathname на маршрут и динамические сегменты (slug/anchor).
+ */
+function matchPathname(pathname: string): ParsedRoute {
+  const segments = pathname.split('/').filter(Boolean)
+
+  if (segments.length === 0) return {route: APP_ROUTES.home, params: {}}
+
+  const [head, second] = segments
+
+  if (segments.length === 1) {
+    if (head === 'about') return {route: APP_ROUTES.about, params: {}}
+    if (head === 'activity') return {route: APP_ROUTES.activity, params: {}}
+    if (head === 'knowledge') return {route: APP_ROUTES.knowledge, params: {}}
+    if (head === 'join') return {route: APP_ROUTES.join, params: {}}
+    if (head === 'contacts') return {route: APP_ROUTES.contacts, params: {}}
+    if (head === 'privacy') return {route: APP_ROUTES.privacy, params: {}}
+    if (head === 'admin') return {route: APP_ROUTES.admin, params: {}}
+    if (head === 'members') return {route: APP_ROUTES.membersCatalog, params: {}}
+    if (head === 'news') return {route: APP_ROUTES.newsList, params: {}}
+    if (head === 'events') return {route: APP_ROUTES.eventsList, params: {}}
+  }
+
+  if (segments.length === 2 && second) {
+    if (head === 'admin') return {route: APP_ROUTES.admin, params: {}}
+    if (head === 'members') return {route: APP_ROUTES.memberDetails, params: {memberSlug: second}}
+    if (head === 'news') return {route: APP_ROUTES.newsDetails, params: {newsSlug: second}}
+    if (head === 'events') return {route: APP_ROUTES.eventsDetails, params: {eventSlug: second}}
+  }
+
+  if (head === 'admin') return {route: APP_ROUTES.admin, params: {}}
+
+  return {route: APP_ROUTES.notFound, params: {}}
+}
+
+/**
+ * Преобразует legacy hash-ссылки (#/members/:slug, #/privacy) в новый path-маршрут для обратной совместимости.
+ */
+function matchLegacyHash(hash: string): string | null {
+  if (hash.startsWith('#/members/')) {
+    const slug = hash.replace('#/members/', '')
+    return slug ? `/members/${slug}` : null
+  }
+  if (hash === '#/privacy') return '/privacy'
+  return null
+}
+
+function parseRouteFromLocation(): ParsedRoute {
+  return matchPathname(window.location.pathname)
+}
+
+/**
+ * Координирует path-навигацию сайта (pushState/popstate), slug-маршруты и состояние модалки событий.
  */
 export function useAppNavigation() {
   const [currentRoute, setCurrentRoute] = useState<AppRoute>(APP_ROUTES.home)
-  const [activeMemberSlug, setActiveMemberSlug] = useState<string | null>(null)
+  const [routeParams, setRouteParams] = useState<RouteParams>({})
   const [eventsModalOpen, setEventsModalOpen] = useState(false)
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
+  const memberProfileOriginRef = useRef<AppRoute>(APP_ROUTES.home)
   const wasOnMemberProfileRef = useRef(false)
 
+  // Возврат к #participants після виходу з профілю учасника, якщо прийшли з home-каруселі.
   useEffect(() => {
     if (currentRoute === APP_ROUTES.memberDetails) {
       wasOnMemberProfileRef.current = true
@@ -85,22 +128,29 @@ export function useAppNavigation() {
       setSelectedEventId(null)
     }
 
+    // Legacy hash-ссылки (#/members/:slug, #/privacy) редиректим на новый path без лишней записи в history.
+    const legacyPath = matchLegacyHash(window.location.hash)
+    if (legacyPath && window.location.pathname === '/') {
+      const nextUrl = new URL(window.location.href)
+      nextUrl.pathname = legacyPath
+      nextUrl.hash = ''
+      safeReplaceState(nextUrl.toString())
+    }
+
     /**
-     * Синхронизирует state с текущим URL при back/forward и ручной смене hash.
+     * Синхронизирует state с текущим URL при back/forward и ручной смене адреса.
      */
     const handleLocationChange = () => {
       const nextRoute = parseRouteFromLocation()
       setCurrentRoute(nextRoute.route)
-      setActiveMemberSlug(nextRoute.memberSlug)
+      setRouteParams(nextRoute.params)
     }
 
     handleLocationChange()
     window.addEventListener('popstate', handleLocationChange)
-    window.addEventListener('hashchange', handleLocationChange)
 
     return () => {
       window.removeEventListener('popstate', handleLocationChange)
-      window.removeEventListener('hashchange', handleLocationChange)
     }
   }, [])
 
@@ -121,7 +171,7 @@ export function useAppNavigation() {
       url.searchParams.delete('event')
     }
 
-    safePushState(null, '', url.toString())
+    safePushState(url.toString())
   }, [])
 
   /**
@@ -134,55 +184,88 @@ export function useAppNavigation() {
     const url = new URL(window.location.href)
     url.searchParams.delete('event')
     url.searchParams.delete('events')
-    safePushState(null, '', url.toString())
+    safePushState(url.toString())
   }, [])
 
   /**
-   * Переключает верхнеуровневые страницы сайта без полноценного роутера.
+   * Переключает верхнеуровневые страницы сайта по новому path-маршруту.
    */
   const handleNavigation = useCallback((route: AppRoute | 'admin', options?: NavigationOptions) => {
-    if (route === 'admin') {
-      route = APP_ROUTES.home
-    }
+    const nextRoute: AppRoute = route === 'admin' ? APP_ROUTES.admin : route
 
-    setCurrentRoute(route)
+    setCurrentRoute(nextRoute)
+    setRouteParams(options?.anchor ? {activityAnchor: options.anchor} : {})
 
-    if (route === APP_ROUTES.home) {
-      setActiveMemberSlug(null)
-      const url = new URL(window.location.href)
-      url.search = ''
-      url.hash = ''
-      safePushState(null, '', url.toString())
-      if (!options?.skipScrollToTop) {
-        window.scrollTo({top: 0, behavior: 'smooth'})
-      }
-      return
-    }
+    const url = new URL(window.location.href)
+    url.pathname = buildRoutePath(nextRoute)
+    url.search = ''
+    url.hash = options?.anchor ? `#${options.anchor}` : ''
+    safePushState(url.toString())
 
-    if (route === APP_ROUTES.privacy) {
-      const url = new URL(window.location.href)
-      url.hash = '#/privacy'
-      safePushState(null, '', url.toString())
+    if (options?.anchor) {
+      // Після зміни route даємо сторінці змонтуватися, потім скролимо до якоря.
+      window.setTimeout(() => scrollToSection(options.anchor!), 120)
+    } else if (!options?.skipScrollToTop) {
       window.scrollTo({top: 0, behavior: 'smooth'})
     }
   }, [])
 
   /**
-   * Открывает публичный профиль участника и фиксирует slug в hash URL.
+   * Открывает публичный профиль участника и фиксирует slug в path URL.
    */
-  const handleSelectMember = useCallback((slug: string) => {
-    setActiveMemberSlug(slug)
+  const handleSelectMember = useCallback((slug: string, originRoute: AppRoute = APP_ROUTES.home) => {
+    memberProfileOriginRef.current = originRoute
+    setRouteParams({memberSlug: slug})
     setCurrentRoute(APP_ROUTES.memberDetails)
 
     const url = new URL(window.location.href)
-    url.hash = `#/members/${slug}`
-    safePushState(null, '', url.toString())
+    url.pathname = buildRoutePath(APP_ROUTES.memberDetails, slug)
+    url.search = ''
+    url.hash = ''
+    safePushState(url.toString())
+    window.scrollTo({top: 0, behavior: 'smooth'})
+  }, [])
+
+  /**
+   * Возвращает пользователя туда, откуда он открыл профіль учасника (home-карусель або каталог).
+   */
+  const handleBackFromMember = useCallback(() => {
+    handleNavigation(memberProfileOriginRef.current, {skipScrollToTop: memberProfileOriginRef.current !== APP_ROUTES.home})
+  }, [handleNavigation])
+
+  /**
+   * Открывает деталі новини та фіксує slug у path URL.
+   */
+  const handleSelectNews = useCallback((slug: string) => {
+    setRouteParams({newsSlug: slug})
+    setCurrentRoute(APP_ROUTES.newsDetails)
+
+    const url = new URL(window.location.href)
+    url.pathname = buildRoutePath(APP_ROUTES.newsDetails, slug)
+    url.search = ''
+    url.hash = ''
+    safePushState(url.toString())
+    window.scrollTo({top: 0, behavior: 'smooth'})
+  }, [])
+
+  /**
+   * Открывает деталі події та фіксує id у path URL.
+   */
+  const handleSelectEvent = useCallback((eventId: string) => {
+    setRouteParams({eventSlug: eventId})
+    setCurrentRoute(APP_ROUTES.eventsDetails)
+
+    const url = new URL(window.location.href)
+    url.pathname = buildRoutePath(APP_ROUTES.eventsDetails, eventId)
+    url.search = ''
+    url.hash = ''
+    safePushState(url.toString())
     window.scrollTo({top: 0, behavior: 'smooth'})
   }, [])
 
   return {
     currentRoute,
-    activeMemberSlug,
+    routeParams,
     eventsModalOpen,
     selectedEventId,
     setSelectedEventId,
@@ -190,5 +273,8 @@ export function useAppNavigation() {
     closeEventsCalendar,
     handleNavigation,
     handleSelectMember,
+    handleBackFromMember,
+    handleSelectNews,
+    handleSelectEvent,
   }
 }

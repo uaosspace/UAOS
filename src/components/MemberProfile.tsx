@@ -26,7 +26,7 @@ export default function MemberProfile({ currentLang, member, onBack }: MemberPro
         {/* Back Link */}
         <button
           onClick={onBack}
-          className="inline-flex items-center space-x-2 text-xs font-mono font-bold text-brand-slate-500 hover:text-brand-blue-500 uppercase tracking-wider mb-8 focus:outline-none cursor-pointer group"
+          className="inline-flex items-center space-x-2 text-xs font-mono font-bold text-brand-slate-500 dark:text-brand-slate-300 hover:text-brand-blue-500 dark:hover:text-brand-sky-300 uppercase tracking-wider mb-8 focus:outline-none cursor-pointer group"
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           <span>{t.profile_back}</span>
@@ -45,7 +45,7 @@ export default function MemberProfile({ currentLang, member, onBack }: MemberPro
               <h2 className="text-xl font-display font-bold text-brand-slate-900 dark:text-white border-b border-brand-slate-100 dark:border-brand-slate-800 pb-2">
                 {currentLang === 'uk' ? 'Про компанію' : 'Company Overview'}
               </h2>
-              <p className="text-sm sm:text-base text-brand-slate-700 dark:text-brand-slate-300 leading-relaxed font-sans">
+              <p className="text-sm sm:text-base text-brand-slate-700 dark:text-brand-slate-200 leading-relaxed font-sans">
                 {resolveLocalized(member.fullDescription, currentLang)}
               </p>
             </div>

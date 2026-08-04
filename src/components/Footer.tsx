@@ -1,66 +1,48 @@
 import {TRANSLATIONS} from '../data/translations'
-import {useSectionNavigation} from '../hooks/useSectionNavigation'
 import BrandLogo from './BrandLogo'
 import type {Locale} from '../data/locales'
+import {APP_ROUTES, type AppRoute} from '../routes/appRoutes'
 
 interface FooterProps {
   currentLang: Locale
-  currentRoute?: string
-  onNavigate: (route: string) => void
+  currentRoute?: AppRoute
+  onNavigate: (route: AppRoute) => void
   onOpenPrivacy?: () => void
 }
 
 const FOOTER_NAV = [
-  'nav_about',
-  'nav_participants',
-  'nav_producers',
-  'nav_news',
-  'nav_standards',
-  'nav_education',
-] as const
-
-const FOOTER_NAV_TARGETS = [
-  'about',
-  'participants',
-  'services',
-  'news',
-  'services',
-  'services',
-] as const
+  {key: 'nav_about' as const, route: APP_ROUTES.about},
+  {key: 'nav_participants' as const, route: APP_ROUTES.membersCatalog},
+  {key: 'nav_activity' as const, route: APP_ROUTES.activity},
+  {key: 'nav_news' as const, route: APP_ROUTES.newsList},
+  {key: 'nav_knowledge' as const, route: APP_ROUTES.knowledge},
+  {key: 'nav_contacts' as const, route: APP_ROUTES.contacts},
+]
 
 const FOOTER_ACTIVITY = [
   'footer_activity_1',
   'footer_activity_2',
   'footer_activity_3',
   'footer_activity_4',
-  'footer_activity_5',
 ] as const
 
 export default function Footer({
   currentLang,
-  currentRoute = 'home',
   onNavigate,
   onOpenPrivacy,
 }: FooterProps) {
   const t = TRANSLATIONS[currentLang]
-  const goToSection = useSectionNavigation(() => onNavigate('home'), currentRoute)
   const year = new Date().getFullYear()
 
   return (
-    <footer className="site-footer" id="contacts">
+    <footer className="site-footer">
       <div className="container footer-grid">
         <div className="footer-brand">
           <button
             type="button"
             className="brand"
             aria-label={t.aria_home}
-            onClick={() => {
-              if (currentRoute !== 'home') {
-                onNavigate('home')
-              } else {
-                goToSection('about')
-              }
-            }}
+            onClick={() => onNavigate(APP_ROUTES.home)}
           >
             <BrandLogo />
             <span className="brand-copy">
@@ -70,29 +52,26 @@ export default function Footer({
           </button>
           <p>{t.footer_desc}</p>
           <div className="socials">
-            <a href="#join" aria-label={t.social_linkedin} onClick={(event) => { event.preventDefault(); goToSection('join') }}>in</a>
-            <a href="#join" aria-label={t.social_facebook} onClick={(event) => { event.preventDefault(); goToSection('join') }}>f</a>
-            <a href="#join" aria-label={t.social_youtube} onClick={(event) => { event.preventDefault(); goToSection('join') }}>▶</a>
-            <a href="#join" aria-label={t.social_telegram} onClick={(event) => { event.preventDefault(); goToSection('join') }}>↗</a>
+            <a href={`mailto:${t.footer_email}`} aria-label={t.social_linkedin}>in</a>
+            <a href={`mailto:${t.footer_email}`} aria-label={t.social_facebook}>f</a>
+            <a href={`mailto:${t.footer_email}`} aria-label={t.social_youtube}>▶</a>
+            <a href={`mailto:${t.footer_email}`} aria-label={t.social_telegram}>↗</a>
           </div>
         </div>
 
         <div className="footer-col">
           <h3>{t.footer_nav_title}</h3>
-          {FOOTER_NAV.map((key, index) => (
-            <button key={key} type="button" onClick={() => goToSection(FOOTER_NAV_TARGETS[index])}>
-              {t[key]}
+          {FOOTER_NAV.map((item) => (
+            <button key={item.key} type="button" onClick={() => onNavigate(item.route)}>
+              {t[item.key]}
             </button>
           ))}
-          <button type="button" onClick={() => goToSection('contacts')}>
-            {t.nav_contacts}
-          </button>
         </div>
 
         <div className="footer-col">
           <h3>{t.footer_activity_title}</h3>
           {FOOTER_ACTIVITY.map((key) => (
-            <button key={key} type="button" onClick={() => goToSection('services')}>
+            <button key={key} type="button" onClick={() => onNavigate(APP_ROUTES.activity)}>
               {t[key]}
             </button>
           ))}
@@ -119,7 +98,7 @@ export default function Footer({
           <button type="button" onClick={onOpenPrivacy}>
             {t.footer_privacy}
           </button>
-          <button type="button" onClick={() => goToSection('join')}>
+          <button type="button" onClick={() => onNavigate(APP_ROUTES.join)}>
             {t.footer_terms}
           </button>
         </span>

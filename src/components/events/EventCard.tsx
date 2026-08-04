@@ -50,13 +50,13 @@ export default function EventCard({ event, currentLang, onOpenDetails }: EventCa
         {/* Date column */}
         <div className="flex flex-col items-center justify-start pt-1 shrink-0 w-12">
           <span className="text-2xl font-display font-bold text-brand-slate-900 dark:text-white leading-none">{day}</span>
-          <span className="text-xs font-mono font-bold text-brand-slate-500 dark:text-brand-slate-400 mt-1 uppercase">{month}</span>
+          <span className="text-xs font-mono font-bold text-brand-slate-500 dark:text-brand-slate-300 mt-1 uppercase">{month}</span>
         </div>
         
         {/* Content column */}
         <div className="flex flex-col flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="text-xs font-mono font-semibold text-brand-slate-600 dark:text-brand-slate-300">{time}</span>
+            <span className="text-xs font-mono font-semibold text-brand-slate-600 dark:text-brand-slate-200">{time}</span>
             <span className="text-xs text-brand-slate-400">•</span>
             <span className={`text-[10px] font-mono font-bold uppercase tracking-wider ${typeColorClass}`}>
               {typeText}
@@ -67,7 +67,7 @@ export default function EventCard({ event, currentLang, onOpenDetails }: EventCa
             {event.title[currentLang]}
           </h4>
           
-          <div className="text-xs text-brand-slate-600 dark:text-brand-slate-300 line-clamp-1 mb-4">
+          <div className="text-xs text-brand-slate-600 dark:text-brand-slate-200 line-clamp-1 mb-4">
             <span className="font-semibold">{formatText}</span>
             {event.location && event.location[currentLang] && (
               <>

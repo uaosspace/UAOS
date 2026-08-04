@@ -61,7 +61,7 @@ export default function FoundersSection({ currentLang }: FoundersSectionProps) {
           <h2 className="text-xs font-mono font-bold tracking-widest text-brand-blue-500 dark:text-brand-sky-300 uppercase">
             {t.founders_title}
           </h2>
-          <p className="text-3xl sm:text-4xl font-display font-bold text-brand-slate-900 dark:text-white tracking-tight">
+          <p className="text-2xl sm:text-3xl font-display font-semibold text-brand-slate-900 dark:text-white tracking-tight leading-snug">
             {t.founders_subtitle}
           </p>
           <div className="h-1 w-12 bg-brand-blue-500 mx-auto rounded-full"></div>
@@ -124,7 +124,7 @@ export default function FoundersSection({ currentLang }: FoundersSectionProps) {
                   </div>
 
                   {/* Description */}
-                  <p className="text-sm text-brand-slate-600 dark:text-brand-slate-400 leading-relaxed pt-2">
+                  <p className="text-sm text-brand-slate-600 dark:text-brand-slate-300 leading-relaxed pt-2">
                     {founder.description[currentLang]}
                   </p>
 
@@ -170,7 +170,7 @@ export default function FoundersSection({ currentLang }: FoundersSectionProps) {
               <h3 className="text-xl font-display font-bold text-brand-slate-900 dark:text-white leading-tight">
                 {t.structure_title}
               </h3>
-              <p className="text-xs text-brand-slate-500 dark:text-brand-slate-400 leading-relaxed">
+              <p className="text-xs text-brand-slate-500 dark:text-brand-slate-300 leading-relaxed">
                 {t.structure_desc}
               </p>
             </div>

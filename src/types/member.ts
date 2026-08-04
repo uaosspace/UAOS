@@ -46,4 +46,12 @@ export interface AssociationMember {
   products?: MemberProduct[]
   lastUpdated?: string
   internalNotes?: string
+  /** Ідентифікатори з PARTICIPANT_TYPES (src/data/referenceLists.ts). */
+  participantTypes: string[]
+  /** Ідентифікатори з SECTORS. */
+  sectors?: string[]
+  /** Ідентифікатори з PRODUCT_CATEGORIES. */
+  productCategories?: string[]
+  region?: string
+  featured?: boolean
 }

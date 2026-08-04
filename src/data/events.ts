@@ -1,5 +1,5 @@
 import {AssociationEvent} from '../types'
-import {getSanityClient, sanityConfigured, urlForImage} from '../lib/sanity'
+import {ContentApiError, fetchContentItems} from '../lib/contentApi'
 import {
   isRecord,
   readArray,
@@ -7,7 +7,6 @@ import {
   readEventType,
   readHttpUrl,
   readLocalizedText,
-  readString,
   readStringOr,
 } from '../lib/contentGuards'
 
@@ -65,36 +64,18 @@ export const INITIAL_EVENTS: AssociationEvent[] = [
   },
 ]
 
-const EVENTS_QUERY = `*[_type == "event" && published == true] | order(startAt asc) {
-  _id,
-  _createdAt,
-  _updatedAt,
-  published,
-  title,
-  shortDescription,
-  fullDescription,
-  type,
-  format,
-  startAt,
-  endAt,
-  timeZone,
-  location,
-  onlineUrl,
-  registrationUrl,
-  organizer,
-  coverImage
-}`
-
 /**
- * Преобразует Sanity-документ события в безопасную модель для календаря.
+ * Преобразует документ события (public API) в безопасную модель для календаря.
  */
 export function mapEvent(doc: unknown): AssociationEvent {
   const source = isRecord(doc) ? doc : {}
-  const eventId = readStringOr(source._id, 'event-unknown')
+  const eventId = readStringOr(source.id, readStringOr(source._id, 'event-unknown'))
+  const locationValue = source.location
+  const organizerValue = source.organizer
 
   return {
     id: eventId,
-    published: Boolean(source.published),
+    published: source.published === undefined ? true : Boolean(source.published),
     title: readLocalizedText(source.title),
     shortDescription: readLocalizedText(source.shortDescription),
     fullDescription: readLocalizedText(source.fullDescription),
@@ -103,32 +84,36 @@ export function mapEvent(doc: unknown): AssociationEvent {
     startAt: readStringOr(source.startAt, new Date().toISOString()),
     endAt: readStringOr(source.endAt, readStringOr(source.startAt, new Date().toISOString())),
     timeZone: readStringOr(source.timeZone, 'Europe/Kyiv'),
-    location: isRecord(source.location) ? readLocalizedText(source.location) : undefined,
+    location: isRecord(locationValue)
+      ? readLocalizedText(locationValue)
+      : typeof locationValue === 'string' && locationValue
+        ? {uk: locationValue, en: locationValue}
+        : undefined,
     onlineUrl: readHttpUrl(source.onlineUrl),
     registrationUrl: readHttpUrl(source.registrationUrl),
-    organizer: isRecord(source.organizer) ? readLocalizedText(source.organizer) : undefined,
-    coverImageUrl: urlForImage(source.coverImage, 'eventCover') || undefined,
-    createdAt: readStringOr(source._createdAt, new Date().toISOString()),
-    updatedAt: readStringOr(source._updatedAt, new Date().toISOString()),
+    organizer: isRecord(organizerValue)
+      ? readLocalizedText(organizerValue)
+      : typeof organizerValue === 'string' && organizerValue
+        ? {uk: organizerValue, en: organizerValue}
+        : undefined,
+    coverImageUrl: readStringOr(source.coverImageUrl, '') || undefined,
+    createdAt: readStringOr(source.createdAt, new Date().toISOString()),
+    updatedAt: readStringOr(source.updatedAt, new Date().toISOString()),
   }
 }
 
-/** Async loader: Sanity when configured, otherwise seed. */
+/** Async loader: public content API; DEV may fall back to seed if API is down. */
 export async function fetchEvents(): Promise<AssociationEvent[]> {
-  const client = getSanityClient()
-  if (!client || !sanityConfigured) {
-    return INITIAL_EVENTS
-  }
   try {
-    const docs = await client.fetch(EVENTS_QUERY)
-    const eventDocs = readArray(docs)
-    if (eventDocs.length === 0) {
+    const docs = await fetchContentItems<unknown>('events')
+    return readArray(docs).map(mapEvent)
+  } catch (err) {
+    if (import.meta.env.DEV) {
+      console.warn('Content API fetchEvents unavailable in DEV, using seed:', err)
       return INITIAL_EVENTS
     }
-    return eventDocs.map(mapEvent)
-  } catch (err) {
-    console.error('Sanity fetchEvents failed, using seed:', err)
-    return INITIAL_EVENTS
+    if (err instanceof ContentApiError) throw err
+    throw new ContentApiError('Failed to load events', 500)
   }
 }
 

@@ -25,7 +25,7 @@ export default function ProfileContactCard({currentLang, member}: ProfileContact
           <div className="flex items-start space-x-3">
             <Globe className="w-5 h-5 text-brand-blue-500 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
-              <span className="block text-brand-slate-400 text-[9px] font-mono uppercase font-bold">
+              <span className="block text-brand-slate-500 dark:text-brand-slate-350 text-[9px] font-mono uppercase font-bold">
                 {currentLang === 'uk' ? 'Офіційний сайт' : 'Official website'}
               </span>
               <a
@@ -44,12 +44,12 @@ export default function ProfileContactCard({currentLang, member}: ProfileContact
           <div className="flex items-start space-x-3">
             <Mail className="w-5 h-5 text-brand-blue-500 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
-              <span className="block text-brand-slate-400 text-[9px] font-mono uppercase font-bold">
+              <span className="block text-brand-slate-500 dark:text-brand-slate-350 text-[9px] font-mono uppercase font-bold">
                 E-mail
               </span>
               <a
                 href={`mailto:${member.publicEmail}`}
-                className="text-xs font-semibold text-brand-slate-700 dark:text-brand-slate-300 hover:text-brand-blue-500"
+                className="text-xs font-semibold text-brand-slate-700 dark:text-brand-slate-100 hover:text-brand-blue-500 dark:hover:text-brand-sky-300"
               >
                 {member.publicEmail}
               </a>
@@ -61,12 +61,12 @@ export default function ProfileContactCard({currentLang, member}: ProfileContact
           <div className="flex items-start space-x-3">
             <Phone className="w-5 h-5 text-brand-blue-500 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
-              <span className="block text-brand-slate-400 text-[9px] font-mono uppercase font-bold">
+              <span className="block text-brand-slate-500 dark:text-brand-slate-350 text-[9px] font-mono uppercase font-bold">
                 {currentLang === 'uk' ? 'Телефон' : 'Phone'}
               </span>
               <a
                 href={`tel:${member.publicPhone}`}
-                className="text-xs font-semibold text-brand-slate-700 dark:text-brand-slate-300 hover:text-brand-blue-500"
+                className="text-xs font-semibold text-brand-slate-700 dark:text-brand-slate-100 hover:text-brand-blue-500 dark:hover:text-brand-sky-300"
               >
                 {member.publicPhone}
               </a>

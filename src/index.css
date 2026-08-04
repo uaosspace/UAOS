@@ -2,8 +2,129 @@
 @import "tailwindcss";
 @import "./styles/industrial-neon.css";
 
+/*
+ * Тема сайту перемикається класом `.dark` / `.light` на <html> (див. App.tsx),
+ * а не тільки prefers-color-scheme. Без цього dark:text-* лишаються «світлими»
+ * (slate-900) на тёмному industrial-фоні — саме те, що видно на скрінах.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Токены "glass" підмови дизайн-системи (MissionBenefits/Directions/Founders/Documents/
+ * MemberProfile/events/*): раніше використовувались у JSX (brand-blue-*, glass-card тощо),
+ * але не мали реального @theme-визначення — класи не генерувались і не рендерились.
+ * Значення нижче — узгоджені зі стандартними шкалами Tailwind (blue/slate/sky/amber),
+ * перейменованими під brand-* токени, що вже документовані в uaos-design-system.mdc.
+ */
+@theme {
+  --color-brand-blue-50: #eff6ff;
+  --color-brand-blue-100: #dbeafe;
+  --color-brand-blue-200: #bfdbfe;
+  --color-brand-blue-300: #93c5fd;
+  --color-brand-blue-400: #60a5fa;
+  --color-brand-blue-500: #3b82f6;
+  --color-brand-blue-600: #2563eb;
+  --color-brand-blue-700: #1d4ed8;
+  --color-brand-blue-800: #1e40af;
+  --color-brand-blue-900: #1e3a8a;
+  --color-brand-blue-950: #172554;
+
+  --color-brand-slate-50: #f8fafc;
+  --color-brand-slate-100: #f1f5f9;
+  --color-brand-slate-200: #e2e8f0;
+  --color-brand-slate-300: #cbd5e1;
+  --color-brand-slate-350: #b0c0d1;
+  --color-brand-slate-400: #94a3b8;
+  --color-brand-slate-500: #64748b;
+  --color-brand-slate-600: #475569;
+  --color-brand-slate-700: #334155;
+  --color-brand-slate-800: #1e293b;
+  --color-brand-slate-850: #172033;
+  --color-brand-slate-900: #0f172a;
+  --color-brand-slate-950: #020617;
+
+  --color-brand-sky-300: #7dd3fc;
+  --color-brand-sky-400: #38bdf8;
+
+  --color-brand-yellow-50: #fffbeb;
+  --color-brand-yellow-400: #fbbf24;
+  --color-brand-yellow-500: #f59e0b;
+  --color-brand-yellow-950: #451a03;
+
+  --font-display: 'Inter', 'Segoe UI', Arial, sans-serif;
+  --font-manrope: 'Inter', 'Segoe UI', Arial, sans-serif;
+}
+
 #root {
   min-height: 100vh;
+}
+
+/* "Glass" картки/пігулки — спільний примітив для сторінок поза industrial hero/features/news. */
+.glass-card {
+  background: color-mix(in srgb, var(--surface-solid) 88%, transparent);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(14px) saturate(140%);
+}
+
+.glass-card-hover {
+  transition: border-color .25s ease, box-shadow .25s ease, transform .25s ease;
+}
+
+.glass-card-hover:hover {
+  border-color: var(--line-strong);
+}
+
+.glass-pill {
+  background: color-mix(in srgb, var(--surface-raised) 82%, transparent);
+  border: 1px solid var(--line);
+}
+
+.bg-grid-pattern {
+  background-image:
+    linear-gradient(rgba(var(--neon-rgb), .12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--neon-rgb), .12) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+}
+
+/*
+ * Базовий inherit для кнопок — у @layer base, щоб утиліти text-* / dark:text-*
+ * мали вищий пріоритет (див. картки каталогу учасників як <button>).
+ */
+@layer base {
+  button {
+    color: inherit;
+  }
+}
+
+.scrollbar-hide,
+.scrollbar-none,
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.text-clamp-tagline {
+  font-size: clamp(1.05rem, 1rem + 0.6vw, 1.6rem);
 }
 
 /* Кнопки, стилізовані під посилання з макету */
@@ -28,7 +149,7 @@
   position: relative;
   padding: 30px 0 27px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14.4px;
   font-weight: 680;
   white-space: nowrap;
   transition: color .25s ease;
@@ -112,6 +233,14 @@
   object-fit: contain;
 }
 
+/*
+ * Назва завжди верстається компактним стовпчиком у 3–4 рядки, незалежно від ширини вікна.
+ * 108px обрано за виміром найдовших слів у наявних локалях (найширше — 105px, de).
+ */
+.brand-copy {
+  max-width: 108px;
+}
+
 @media (max-width: 860px) {
   .brand-logo-plate {
     padding: 4px;
@@ -128,9 +257,102 @@
   }
 }
 
-/* Language dropdown */
+/*
+ * На телефонах у шапці лишаються тільки лого, мова, тема і кнопка меню:
+ * інакше вміст .header-inner не вміщався і кнопка меню виходила за екран.
+ */
+@media (max-width: 620px) {
+  .brand-copy {
+    display: none;
+  }
+
+  .lang-switcher .lang-label,
+  .lang-switcher .lang-chevron {
+    display: none;
+  }
+
+  .lang-switcher .lang {
+    padding: 0 8px;
+  }
+}
+
+/* Language dropdown — pill-кнопка в дусі theme-switch */
 .lang-switcher {
   position: relative;
+}
+
+.lang-switcher .lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  box-shadow: inset 0 0 16px rgba(var(--neon-rgb), .07);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 820;
+  letter-spacing: .08em;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color .22s ease,
+    background .22s ease,
+    border-color .22s ease,
+    box-shadow .22s ease,
+    transform .22s ease;
+}
+
+.lang-switcher .lang:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+  background: var(--surface-raised);
+  box-shadow: var(--glow-soft);
+  transform: translateY(-1px);
+}
+
+.lang-switcher .lang:focus-visible {
+  outline: 2px solid var(--neon);
+  outline-offset: 3px;
+  color: var(--ink);
+}
+
+.lang-switcher.open .lang {
+  color: var(--ink);
+  border-color: var(--line-strong);
+  background: var(--surface-raised);
+  box-shadow: var(--glow-soft);
+}
+
+.lang-switcher .lang-flag {
+  display: block;
+  flex-shrink: 0;
+  width: 18px;
+  height: 13px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .12);
+  overflow: hidden;
+}
+
+.lang-switcher .lang-label {
+  min-width: 1.5em;
+}
+
+.lang-switcher .lang-chevron {
+  flex-shrink: 0;
+  opacity: .78;
+  transition: transform .22s ease, opacity .22s ease;
+}
+
+.lang-switcher .lang:hover .lang-chevron,
+.lang-switcher.open .lang-chevron {
+  opacity: 1;
+}
+
+.lang-switcher.open .lang-chevron {
+  transform: rotate(180deg);
 }
 
 .lang-menu {
@@ -138,7 +360,7 @@
   top: calc(100% + 8px);
   right: 0;
   z-index: 120;
-  min-width: 168px;
+  min-width: 196px;
   margin: 0;
   padding: 6px;
   list-style: none;
@@ -147,6 +369,31 @@
   background: color-mix(in srgb, var(--page-deep) 94%, transparent);
   backdrop-filter: blur(16px) saturate(140%);
   box-shadow: var(--shadow);
+  animation: lang-menu-enter .2s ease both;
+}
+
+@keyframes lang-menu-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lang-switcher .lang,
+  .lang-switcher .lang-chevron,
+  .lang-menu {
+    transition: none;
+    animation: none;
+  }
+
+  .lang-switcher .lang:hover {
+    transform: none;
+  }
 }
 
 html[data-theme="light"] .lang-menu {
@@ -155,10 +402,10 @@ html[data-theme="light"] .lang-menu {
 
 .lang-menu button {
   width: 100%;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   padding: 9px 10px;
   border: 0;
   border-radius: 8px;
@@ -169,6 +416,7 @@ html[data-theme="light"] .lang-menu {
   letter-spacing: 0.04em;
   cursor: pointer;
   text-align: left;
+  transition: color .18s ease, background .18s ease;
 }
 
 .lang-menu button:hover,
@@ -178,8 +426,18 @@ html[data-theme="light"] .lang-menu {
   background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
 }
 
+.lang-menu .lang-flag {
+  display: block;
+  width: 18px;
+  height: 13px;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .12);
+  overflow: hidden;
+}
+
 .lang-menu .lang-code {
   font-weight: 820;
+  min-width: 1.6em;
 }
 
 .lang-menu .lang-name {
@@ -187,4 +445,11 @@ html[data-theme="light"] .lang-menu {
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
+  justify-self: end;
+}
+
+.lang-menu button:hover .lang-name,
+.lang-menu button:focus-visible .lang-name,
+.lang-menu button.active .lang-name {
+  color: var(--ink);
 }

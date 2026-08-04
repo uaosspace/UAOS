@@ -1,3 +1,5 @@
+import type {ApplicantKind} from '../types'
+
 export interface JoinRequestSubmission {
   companyName: string
   website: string
@@ -8,6 +10,12 @@ export interface JoinRequestSubmission {
   message: string
   edrpou: string
   hp?: string
+  turnstileToken?: string
+  /** Опціональна класифікація заявника (розділ 12/16 ТЗ). */
+  applicantKind?: ApplicantKind
+  sectors?: string[]
+  productCategories?: string[]
+  competencies?: string[]
 }
 
 /**
@@ -22,6 +30,7 @@ export async function submitJoinRequest(payload: JoinRequestSubmission): Promise
       privacyConsent: true,
       consent: true,
       hp: payload.hp ?? '',
+      turnstileToken: payload.turnstileToken ?? '',
     }),
   })
 

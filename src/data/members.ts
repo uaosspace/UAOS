@@ -1,5 +1,5 @@
 import {AssociationMember} from '../types'
-import {getSanityClient, sanityConfigured, urlForImage} from '../lib/sanity'
+import {ContentApiError, fetchContentItems} from '../lib/contentApi'
 import {
   isRecord,
   readArray,
@@ -7,6 +7,7 @@ import {
   readLocalizedText,
   readMemberProfileLevel,
   readString,
+  readStringArray,
   readStringOr,
 } from '../lib/contentGuards'
 
@@ -54,6 +55,11 @@ export const INITIAL_MEMBERS: AssociationMember[] = [
       {uk: 'Заявки на ремонт через QR-код', en: 'Repair requests via QR code'},
     ],
     lastUpdated: '2026-08-02',
+    participantTypes: ['producer-supplier'],
+    sectors: ['manufacturing', 'logistics'],
+    productCategories: ['ppe-clothing'],
+    region: 'Київ',
+    featured: true,
   },
   {
     id: 'insight',
@@ -90,6 +96,11 @@ export const INITIAL_MEMBERS: AssociationMember[] = [
       {uk: 'Сертифіковані тканини та ЗІЗ', en: 'Certified fabrics and PPE'},
     ],
     lastUpdated: '2026-08-02',
+    participantTypes: ['producer-supplier'],
+    sectors: ['manufacturing'],
+    productCategories: ['ppe-clothing', 'ppe-footwear'],
+    region: 'Чернігів',
+    featured: true,
   },
   {
     id: 'biko',
@@ -126,6 +137,11 @@ export const INITIAL_MEMBERS: AssociationMember[] = [
       {uk: 'Мережа філій по Україні', en: 'Branch network across Ukraine'},
     ],
     lastUpdated: '2026-08-02',
+    participantTypes: ['producer-supplier'],
+    sectors: ['manufacturing', 'construction', 'retail'],
+    productCategories: ['ppe-clothing', 'ppe-footwear', 'ppe-head-eye-ear', 'ppe-hand'],
+    region: 'Дніпро',
+    featured: false,
   },
   {
     id: 'deltaplus',
@@ -160,6 +176,11 @@ export const INITIAL_MEMBERS: AssociationMember[] = [
       {uk: 'Глобальна експертиза Made in Delta Plus', en: 'Global Made in Delta Plus expertise'},
     ],
     lastUpdated: '2026-08-02',
+    participantTypes: ['producer-supplier'],
+    sectors: ['manufacturing', 'construction'],
+    productCategories: ['ppe-clothing', 'ppe-footwear', 'ppe-hand', 'height-safety'],
+    region: 'Франція',
+    featured: true,
   },
   {
     id: 'ultrasafety',
@@ -189,6 +210,11 @@ export const INITIAL_MEMBERS: AssociationMember[] = [
     websiteUrl: 'https://ultrasafety.com.ua/',
     publicEmail: 'sale@ultrasafety.com.ua',
     lastUpdated: '2026-08-02',
+    participantTypes: ['producer-supplier'],
+    sectors: ['manufacturing', 'retail'],
+    productCategories: ['ppe-clothing', 'ppe-footwear'],
+    region: 'Київ',
+    featured: false,
   },
   {
     id: 'assecuro',
@@ -229,6 +255,11 @@ export const INITIAL_MEMBERS: AssociationMember[] = [
       {uk: 'Виїзні випробування ЗІЗ', en: 'On-site PPE testing'},
     ],
     lastUpdated: '2026-08-02',
+    participantTypes: ['producer-supplier', 'expert-org'],
+    sectors: ['construction', 'energy'],
+    productCategories: ['height-safety', 'training-services'],
+    region: 'Київ',
+    featured: true,
   },
   {
     id: 'epg',
@@ -264,6 +295,11 @@ export const INITIAL_MEMBERS: AssociationMember[] = [
       {uk: 'Обладнання для склотари', en: 'Glass container industry equipment'},
     ],
     lastUpdated: '2026-08-02',
+    participantTypes: ['producer-supplier'],
+    sectors: ['manufacturing', 'metallurgy'],
+    productCategories: ['other-product'],
+    region: 'Київ',
+    featured: false,
   },
   {
     id: 'portal313',
@@ -303,6 +339,11 @@ export const INITIAL_MEMBERS: AssociationMember[] = [
       {uk: 'Атестація робочих місць', en: 'Workplace assessment'},
     ],
     lastUpdated: '2026-08-02',
+    participantTypes: ['producer-supplier', 'expert-org'],
+    sectors: ['manufacturing', 'construction', 'logistics'],
+    productCategories: ['ppe-clothing', 'ppe-footwear', 'training-services'],
+    region: 'Київ',
+    featured: true,
   },
   {
     id: 'stg',
@@ -338,70 +379,100 @@ export const INITIAL_MEMBERS: AssociationMember[] = [
       {uk: 'Постачання для важкої промисловості', en: 'Supply for heavy industry'},
     ],
     lastUpdated: '2026-08-02',
+    participantTypes: ['producer-supplier'],
+    sectors: ['manufacturing', 'metallurgy'],
+    productCategories: ['ppe-clothing'],
+    region: 'Україна / Польща',
+    featured: false,
+  },
+  {
+    id: 'eosb',
+    slug: 'eosb',
+    order: 10,
+    published: true,
+    profileLevel: 'basic',
+    name: {
+      uk: 'ГО «Експертне об’єднання з безпеки праці»',
+      en: 'Occupational Safety Experts Union NGO',
+    },
+    shortName: 'ЕОСБ',
+    category: {
+      uk: 'Навчання та експертиза з охорони праці',
+      en: 'Occupational safety training and expertise',
+    },
+    shortDescription: {
+      uk: 'Громадська організація фахівців з охорони праці: навчання, аудит ризиків і консультації для підприємств.',
+      en: 'A professional NGO of occupational safety specialists: training, risk audits, and consulting for enterprises.',
+    },
+    fullDescription: {
+      uk: 'ЕОСБ об’єднує незалежних експертів з охорони праці та проводить навчальні програми, аудит робочих місць і консультації щодо застосування засобів індивідуального захисту для малих і середніх підприємств. Організація співпрацює з галузевими асоціаціями та підтримує поширення сучасних практик безпеки праці в регіонах України.',
+      en: 'ЕОСБ brings together independent occupational safety experts and runs training programs, workplace audits, and consulting on personal protective equipment for small and medium enterprises. The organization cooperates with industry associations and promotes modern occupational safety practices across Ukraine’s regions.',
+    },
+    logoUrl: '',
+    coverImageUrl: 'https://images.unsplash.com/photo-1521791136064-7986c2920216?auto=format&fit=crop&q=80&w=800',
+    publicEmail: 'contact@eosb.org.ua',
+    competencies: [
+      {uk: 'Аудит ризиків на робочих місцях', en: 'Workplace risk audits'},
+      {uk: 'Навчання з охорони праці', en: 'Occupational safety training'},
+      {uk: 'Консультації з підбору ЗІЗ', en: 'PPE selection consulting'},
+    ],
+    lastUpdated: '2026-08-02',
+    participantTypes: ['expert-org'],
+    sectors: ['manufacturing', 'construction', 'agriculture'],
+    region: 'Львів',
+    featured: false,
   },
 ]
 
-const MEMBERS_QUERY = `*[_type == "member" && published == true] | order(order asc) {
-  _id,
-  _updatedAt,
-  published,
-  order,
-  "slug": slug.current,
-  profileLevel,
-  name,
-  shortName,
-  category,
-  shortDescription,
-  fullDescription,
-  logoImage,
-  coverImage,
-  websiteUrl,
-  publicEmail,
-  publicPhone,
-  competencies,
-  services,
-  certificates[]{ title, documentUrl, "fileUrl": file.asset->url },
-  cases[]{ title, description, image },
-  products[]{ name, description, image, price },
-  internalNotes
-}`
-
 /**
- * Преобразует Sanity-документ участника в безопасную UI-модель каталога.
+ * Преобразует документ участника (public API / seed-совместимый) в UI-модель.
  */
 export function mapMember(doc: unknown): AssociationMember {
   const source = isRecord(doc) ? doc : {}
-  const logoFromImage = urlForImage(source.logoImage, 'memberLogo')
-  const coverFromImage = urlForImage(source.coverImage, 'memberCover')
-  const memberId = readStringOr(source._id, 'member-unknown')
+  const memberId = readStringOr(source.id, readStringOr(source._id, 'member-unknown'))
+  const sectorsList = readStringArray(source.sectors)
+  const productCategoriesList = readStringArray(source.productCategories)
+  const logoUrl = readStringOr(source.logoUrl, '')
+  const coverImageUrl = readStringOr(source.coverImageUrl, '')
 
   return {
     id: memberId,
     slug: readString(source.slug) || memberId,
     order: typeof source.order === 'number' ? source.order : 0,
-    published: Boolean(source.published),
+    published: source.published === undefined ? true : Boolean(source.published),
     profileLevel: readMemberProfileLevel(source.profileLevel),
     name: readLocalizedText(source.name),
     shortName: readStringOr(source.shortName, ''),
     category: readLocalizedText(source.category),
     shortDescription: readLocalizedText(source.shortDescription),
     fullDescription: readLocalizedText(source.fullDescription),
-    logoUrl: logoFromImage || readStringOr(source.shortName, ''),
-    coverImageUrl: coverFromImage || '',
+    logoUrl: logoUrl || readStringOr(source.shortName, ''),
+    coverImageUrl,
     websiteUrl: readHttpUrl(source.websiteUrl),
     publicEmail: readString(source.publicEmail),
     publicPhone: readString(source.publicPhone),
+    participantTypes: readStringArray(source.participantTypes),
+    sectors: sectorsList.length ? sectorsList : undefined,
+    productCategories: productCategoriesList.length ? productCategoriesList : undefined,
+    region: readString(source.region),
+    featured: Boolean(source.featured),
     competencies: readArray(source.competencies).length
-      ? readArray(source.competencies).map((competency) => readLocalizedText(competency))
+      ? readArray(source.competencies).map((competency) =>
+          typeof competency === 'string'
+            ? {uk: competency, en: competency}
+            : readLocalizedText(competency),
+        )
       : undefined,
     services: readArray(source.services).length
-      ? readArray(source.services).map((service) => readLocalizedText(service))
+      ? readArray(source.services).map((service) =>
+          typeof service === 'string' ? {uk: service, en: service} : readLocalizedText(service),
+        )
       : undefined,
     certificates: readArray(source.certificates).length
       ? readArray(source.certificates).map((certificate, index) => {
           const item = isRecord(certificate) ? certificate : {}
           return {
-            id: `cert-${memberId}-${index}`,
+            id: readStringOr(item.id, `cert-${memberId}-${index}`),
             title: readLocalizedText(item.title),
             documentUrl: readHttpUrl(item.fileUrl) || readHttpUrl(item.documentUrl) || '#',
           }
@@ -411,10 +482,10 @@ export function mapMember(doc: unknown): AssociationMember {
       ? readArray(source.cases).map((memberCase, index) => {
           const item = isRecord(memberCase) ? memberCase : {}
           return {
-            id: `case-${memberId}-${index}`,
+            id: readStringOr(item.id, `case-${memberId}-${index}`),
             title: readLocalizedText(item.title),
             description: readLocalizedText(item.description),
-            imageUrl: urlForImage(item.image, 'memberCase') || undefined,
+            imageUrl: readStringOr(item.imageUrl, '') || undefined,
           }
         })
       : undefined,
@@ -422,33 +493,30 @@ export function mapMember(doc: unknown): AssociationMember {
       ? readArray(source.products).map((product, index) => {
           const item = isRecord(product) ? product : {}
           return {
-            id: `prod-${memberId}-${index}`,
+            id: readStringOr(item.id, `prod-${memberId}-${index}`),
             name: readLocalizedText(item.name),
             description: readLocalizedText(item.description),
-            imageUrl: urlForImage(item.image, 'memberProduct') || undefined,
+            imageUrl: readStringOr(item.imageUrl, '') || undefined,
             price: readString(item.price),
           }
         })
       : undefined,
-    lastUpdated: readString(source._updatedAt)?.slice(0, 10),
-    internalNotes: readString(source.internalNotes),
+    lastUpdated: readString(source.lastUpdated) || readString(source._updatedAt)?.slice(0, 10),
+    internalNotes: undefined,
   }
 }
 
-/** Async loader: Sanity when configured, otherwise seed. */
+/** Async loader: public content API; DEV may fall back to seed if API is down. */
 export async function fetchMembers(): Promise<AssociationMember[]> {
-  const client = getSanityClient()
-  if (!client || !sanityConfigured) {
-    return INITIAL_MEMBERS
-  }
   try {
-    const docs = await client.fetch(MEMBERS_QUERY)
-    if (!Array.isArray(docs) || docs.length === 0) {
-      return INITIAL_MEMBERS
-    }
+    const docs = await fetchContentItems<unknown>('members')
     return docs.map(mapMember)
   } catch (err) {
-    console.error('Sanity fetchMembers failed, using seed:', err)
-    return INITIAL_MEMBERS
+    if (import.meta.env.DEV) {
+      console.warn('Content API fetchMembers unavailable in DEV, using seed:', err)
+      return INITIAL_MEMBERS
+    }
+    if (err instanceof ContentApiError) throw err
+    throw new ContentApiError('Failed to load members', 500)
   }
 }

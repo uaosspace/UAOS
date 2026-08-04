@@ -1,22 +1,29 @@
 /**
  * Vercel Serverless Function: POST /api/join
- * Saves membership application to Sanity (requires SANITY_API_WRITE_TOKEN).
- * Optionally forwards to Formspree if FORMSPREE_JOIN_ENDPOINT is set.
+ * Validates membership application, stores it in Neon Postgres, records consent,
+ * and optionally sends a low-PII Brevo notification.
  */
 import type {VercelRequest, VercelResponse} from '@vercel/node'
-import {createClient} from '@sanity/client'
+import {createApplication} from './lib/applicationsRepo'
+import {writeAuditEvent} from './lib/audit'
+import {notifyJoinApplicationByEmail} from './lib/brevoNotify'
+import {isDatabaseConfigured} from './lib/db'
 import {getClientIp, parseJsonBody, requireJsonContentType, requireMethod, sendJsonError} from './lib/http'
 import {
   normalizeJoinApplication,
   normalizeJoinWebsite,
-  readJoinDestinationEnv,
   validateJoinApplication,
 } from './lib/joinApplication'
-import {MemoryRateLimiter} from './lib/rateLimit'
+import {isRateLimited} from './lib/rateLimitStore'
+import {verifyTurnstileToken} from './lib/turnstile'
+import {isRecord, readStringOr} from '../src/lib/contentGuards'
 
-const joinRateLimiter = new MemoryRateLimiter(10 * 60 * 1000, 5)
+const PRIVACY_POLICY_VERSION = process.env.PRIVACY_POLICY_VERSION?.trim() || '2026-08-03'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const correlationId = crypto.randomUUID()
+  res.setHeader('x-correlation-id', correlationId)
+
   const methodCheck = requireMethod(req, res, 'POST')
   if (methodCheck.ok === false) return methodCheck.response
 
@@ -35,79 +42,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (validationError) {
     return sendJsonError(res, 400, validationError)
   }
+
   const clientIp = getClientIp(req) || 'unknown'
-  const rateKey = `ip:${clientIp}`
-  if (joinRateLimiter.isLimited(rateKey)) {
+  if (await isRateLimited(`join:ip:${clientIp}`)) {
+    res.setHeader('Retry-After', '600')
     return sendJsonError(res, 429, 'Too many requests')
   }
 
+  const source = isRecord(body) ? body : {}
+  const turnstileToken = readStringOr(source.turnstileToken, '')
+  const turnstile = await verifyTurnstileToken({token: turnstileToken, remoteIp: clientIp})
+  if (!turnstile.ok) {
+    return sendJsonError(res, 400, turnstile.error || 'Bot check failed')
+  }
+
+  if (!isDatabaseConfigured()) {
+    return sendJsonError(res, 503, 'Join API not configured. Set DATABASE_URL.')
+  }
+
   const website = payload.website ? normalizeJoinWebsite(payload.website) : ''
-  const destinations = readJoinDestinationEnv()
+  const consentIp = clientIp === 'unknown' ? '' : clientIp
+  const userAgent = typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'].slice(0, 300) : ''
 
-  let sanitySaved = false
+  try {
+    const {application, duplicate} = await createApplication({
+      payload,
+      website,
+      consentIp,
+      policyVersion: PRIVACY_POLICY_VERSION,
+      noticeLanguage: 'uk',
+      userAgent,
+    })
 
-  if (destinations.projectId && destinations.projectId !== 'yourProjectId' && destinations.token) {
-    try {
-      const client = createClient({
-        projectId: destinations.projectId,
-        dataset: destinations.dataset,
-        apiVersion: '2025-01-01',
-        token: destinations.token,
-        useCdn: false,
+    await writeAuditEvent({
+      actorType: 'public',
+      action: duplicate ? 'application.duplicate' : 'application.created',
+      entityType: 'application',
+      entityId: application.id,
+      ip: consentIp,
+      metadata: {correlationId, applicantKind: application.applicantKind},
+    })
+
+    if (!duplicate) {
+      await notifyJoinApplicationByEmail({
+        applicationId: application.id,
+        companyName: application.companyName,
+        applicantKind: application.applicantKind,
+        sectors: application.sectors,
+        submittedAt: application.submittedAt,
       })
-      await client.create({
-        _type: 'joinRequest',
-        status: 'pending',
-        companyName: payload.companyName,
-        website: website || '',
-        activityField: payload.activityField,
-        edrpou: payload.edrpou || '',
-        contactPerson: payload.contactPerson,
-        email: payload.email,
-        phone: payload.phone,
-        message: payload.message || '',
-        privacyConsent: true,
-        consentTimestamp: payload.consentTimestamp,
-        consentIp: clientIp === 'unknown' ? '' : clientIp,
-        submittedAt: payload.consentTimestamp,
-      })
-      sanitySaved = true
-    } catch (err) {
-      console.error('Sanity join create failed:', err)
     }
-  }
 
-  const formspree = destinations.formspree
-  if (formspree) {
-    try {
-      await fetch(formspree, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', Accept: 'application/json'},
-        body: JSON.stringify({
-          companyName: payload.companyName,
-          website: website || '',
-          activityField: payload.activityField,
-          edrpou: payload.edrpou || '',
-          contactPerson: payload.contactPerson,
-          email: payload.email,
-          phone: payload.phone,
-          message: payload.message || '',
-          privacyConsent: true,
-          consentTimestamp: payload.consentTimestamp,
-        }),
-      })
-    } catch (err) {
-      console.error('Formspree forward failed:', err)
-    }
+    return res.status(200).json({ok: true, duplicate, applicationId: application.id})
+  } catch (err) {
+    console.error('Join create failed:', correlationId, err)
+    return sendJsonError(res, 500, 'Failed to save application')
   }
-
-  if (!sanitySaved && !formspree) {
-    return sendJsonError(
-      res,
-      503,
-      'Join API not configured. Set SANITY_API_WRITE_TOKEN or FORMSPREE_JOIN_ENDPOINT.'
-    )
-  }
-
-  return res.status(200).json({ok: true, sanitySaved})
 }

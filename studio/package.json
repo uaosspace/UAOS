@@ -1,24 +1,11 @@
 {
-  "name": "uaos-studio",
+  "name": "uaos-studio-removed",
   "private": true,
-  "version": "1.0.0",
-  "description": "Sanity Studio CMS for UAOS / ГС УАПБ",
+  "version": "0.0.0",
+  "description": "Sanity Studio removed from UAOS. Kept as a placeholder so old scripts fail clearly.",
   "scripts": {
-    "dev": "sanity dev",
-    "build": "sanity build",
-    "deploy": "sanity deploy",
-    "typegen": "sanity schema extract && sanity typegen generate"
-  },
-  "dependencies": {
-    "@sanity/vision": "^4.0.0",
-    "framer-motion": "^12.23.24",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "sanity": "^4.0.0",
-    "styled-components": "^6.1.15"
-  },
-  "devDependencies": {
-    "@types/react": "^19.0.0",
-    "typescript": "~5.8.2"
+    "dev": "node -e \"console.error('Sanity Studio removed. Use /admin'); process.exit(1)\"",
+    "build": "node -e \"console.error('Sanity Studio removed. Use /admin'); process.exit(1)\"",
+    "deploy": "node -e \"console.error('Sanity Studio removed. Use /admin'); process.exit(1)\""
   }
 }

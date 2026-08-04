@@ -6,6 +6,7 @@ interface ParticipantsSectionProps {
   currentLang: Locale
   members: AssociationMember[]
   onSelectMember: (slug: string) => void
+  onViewAllMembers?: () => void
 }
 
 /**
@@ -15,6 +16,7 @@ export default function ParticipantsSection({
   currentLang,
   members,
   onSelectMember,
+  onViewAllMembers,
 }: ParticipantsSectionProps) {
   return (
     <MembersCarousel
@@ -22,6 +24,7 @@ export default function ParticipantsSection({
       members={members}
       onSelectMember={onSelectMember}
       variant="industrial"
+      onViewAllMembers={onViewAllMembers}
     />
   )
 }

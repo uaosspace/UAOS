@@ -39,7 +39,7 @@ export default function PrivacyPage({currentLang, onBack}: PrivacyPageProps) {
               {currentLang === 'uk' ? 'ЗАХИСТ ДАНИХ · GDPR' : 'DATA PROTECTION · GDPR'}
             </span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-display font-bold text-brand-slate-900 dark:text-white leading-tight">
+          <h1 className="text-2xl sm:text-3xl font-display font-semibold text-brand-slate-900 dark:text-white tracking-tight leading-snug">
             {currentLang === 'uk'
               ? 'Політика конфіденційності та обробки персональних даних'
               : 'Privacy Policy and Personal Data Processing'}
@@ -51,7 +51,7 @@ export default function PrivacyPage({currentLang, onBack}: PrivacyPageProps) {
           </p>
         </div>
 
-        <div className="glass-card p-6 sm:p-10 rounded-3xl shadow-lg space-y-8 text-sm sm:text-base text-brand-slate-700 dark:text-brand-slate-300 leading-relaxed font-sans">
+        <div className="glass-card p-6 sm:p-10 rounded-3xl shadow-lg space-y-8 text-sm sm:text-base text-brand-slate-700 dark:text-brand-slate-200 leading-relaxed font-sans">
           {currentLang === 'uk' ? (
             <>
               <section className="space-y-3">
@@ -125,8 +125,12 @@ export default function PrivacyPage({currentLang, onBack}: PrivacyPageProps) {
                 <p>
                   Для забезпечення роботи сайту та безпечного зберігання інформації ми залучаємо
                   зовнішніх постачальників послуг (Обробників даних). Ваші дані можуть оброблятися та
-                  зберігатися на серверах хмарних інфраструктур (зокрема, хостинг-платформи{' '}
-                  <strong>Vercel</strong> та системи управління контентом <strong>Sanity</strong>).
+                  зберігатися у хмарній інфраструктурі: хостинг і serverless API{' '}
+                  <strong>Vercel</strong>, база даних <strong>Neon Postgres</strong> (регіон EU),
+                  файлове сховище <strong>Vercel Blob</strong>, перевірка ботів{' '}
+                  <strong>Cloudflare Turnstile</strong>, транзакційні сповіщення{' '}
+                  <strong>Brevo</strong>, а також аналітика <strong>Vercel Analytics</strong> лише
+                  після вашої згоди на cookie.
                 </p>
                 <p>
                   Оскільки ці сервери можуть розташовуватися за межами Європейської економічної зони
@@ -277,8 +281,11 @@ export default function PrivacyPage({currentLang, onBack}: PrivacyPageProps) {
                 </h2>
                 <p>
                   To operate the website and store information securely we use external service
-                  providers (Processors). Your data may be processed and stored on cloud infrastructure
-                  (including <strong>Vercel</strong> hosting and <strong>Sanity</strong> CMS).
+                  providers (Processors). Your data may be processed in cloud infrastructure:{' '}
+                  <strong>Vercel</strong> hosting and serverless API, <strong>Neon Postgres</strong>,{' '}
+                  <strong>Vercel Blob</strong>, <strong>Cloudflare Turnstile</strong>, transactional
+                  email via <strong>Brevo</strong>, and <strong>Vercel Analytics</strong> only after
+                  cookie consent.
                 </p>
                 <p>
                   As these servers may be located outside the EEA and Ukraine (including the USA),

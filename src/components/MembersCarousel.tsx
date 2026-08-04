@@ -11,6 +11,8 @@ interface MembersCarouselProps {
   onSelectMember: (slug: string) => void;
   /** Industrial shell: id="participants" + industrial section chrome */
   variant?: 'default' | 'industrial';
+  /** Показує посилання «Переглянути всіх учасників» → /members (розділ 8.1 ТЗ). */
+  onViewAllMembers?: () => void;
 }
 
 function isImageAssetUrl(value: string | undefined): value is string {
@@ -126,6 +128,7 @@ export default function MembersCarousel({
   members,
   onSelectMember,
   variant = 'default',
+  onViewAllMembers,
 }: MembersCarouselProps) {
   const t = TRANSLATIONS[currentLang];
   const isIndustrial = variant === 'industrial';
@@ -334,7 +337,7 @@ export default function MembersCarousel({
         className={
           isIndustrial
             ? undefined
-            : 'p-2.5 rounded-xl border border-brand-slate-200 dark:border-brand-slate-800 bg-white dark:bg-brand-slate-900 text-brand-slate-600 dark:text-brand-slate-300 hover:border-brand-blue-500 transition-colors cursor-pointer'
+            : 'p-2.5 rounded-xl border border-brand-slate-200 dark:border-brand-slate-800 bg-white dark:bg-brand-slate-900 text-brand-slate-600 dark:text-brand-slate-200 hover:border-brand-blue-500 transition-colors cursor-pointer'
         }
         aria-label={t.members_carousel_prev}
       >
@@ -346,7 +349,7 @@ export default function MembersCarousel({
         className={
           isIndustrial
             ? undefined
-            : 'p-2.5 rounded-xl border border-brand-slate-200 dark:border-brand-slate-800 bg-white dark:bg-brand-slate-900 text-brand-slate-600 dark:text-brand-slate-300 hover:border-brand-blue-500 transition-colors cursor-pointer'
+            : 'p-2.5 rounded-xl border border-brand-slate-200 dark:border-brand-slate-800 bg-white dark:bg-brand-slate-900 text-brand-slate-600 dark:text-brand-slate-200 hover:border-brand-blue-500 transition-colors cursor-pointer'
         }
         aria-label={isPlaying ? t.members_carousel_pause : t.members_carousel_play}
         title={isPlaying ? t.members_carousel_pause : t.members_carousel_play}
@@ -359,7 +362,7 @@ export default function MembersCarousel({
         className={
           isIndustrial
             ? undefined
-            : 'p-2.5 rounded-xl border border-brand-slate-200 dark:border-brand-slate-800 bg-white dark:bg-brand-slate-900 text-brand-slate-600 dark:text-brand-slate-300 hover:border-brand-blue-500 transition-colors cursor-pointer'
+            : 'p-2.5 rounded-xl border border-brand-slate-200 dark:border-brand-slate-800 bg-white dark:bg-brand-slate-900 text-brand-slate-600 dark:text-brand-slate-200 hover:border-brand-blue-500 transition-colors cursor-pointer'
         }
         aria-label={t.members_carousel_next}
       >
@@ -391,6 +394,11 @@ export default function MembersCarousel({
               </div>
               <div className="section-heading">
                 <h2>{t.participants_title}</h2>
+                {onViewAllMembers && (
+                  <button type="button" className="text-link" onClick={onViewAllMembers}>
+                    {t.participants_link} <span>→</span>
+                  </button>
+                )}
               </div>
             </div>
             {controls}
@@ -401,7 +409,7 @@ export default function MembersCarousel({
               <h2 className="text-xs font-mono font-bold tracking-widest text-brand-blue-500 dark:text-brand-sky-300 uppercase">
                 {t.nav_members}
               </h2>
-              <p className="text-3xl sm:text-4xl font-display font-bold text-brand-slate-900 dark:text-white tracking-tight">
+              <p className="text-2xl sm:text-3xl font-display font-semibold text-brand-slate-900 dark:text-white tracking-tight leading-snug">
                 {t.members_subtitle}
               </p>
             </div>
@@ -503,7 +511,7 @@ export default function MembersCarousel({
                       </div>
 
                       {/* Brief description, expanded on hover */}
-                      <p className={`text-xs text-brand-slate-600 dark:text-brand-slate-400 leading-relaxed transition-all duration-300 ${
+                      <p className={`text-xs text-brand-slate-600 dark:text-brand-slate-300 leading-relaxed transition-all duration-300 ${
                         isHovered ? 'line-clamp-none' : 'line-clamp-2'
                       }`}>
                         {resolveLocalized(member.shortDescription, currentLang)}

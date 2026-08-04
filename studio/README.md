@@ -1,33 +1,9 @@
-# Sanity Studio — UAOS
+# Sanity Studio removed
 
-## Локально
+UAOS no longer uses Sanity CMS.
 
-1. Скопируй `.env.example` → `.env` и вставь Project ID из [sanity.io/manage](https://www.sanity.io/manage)
-2. Из корня репо:
+- Public content: Neon via `/api/public/*`
+- Applications + stats: Neon via `/admin` and `/api/admin/*`
+- Media: Vercel Blob
 
-```bash
-npm run studio:install
-npm run studio
-```
-
-Откроется http://localhost:3333
-
-## Деплой Studio
-
-```bash
-npm run studio:deploy
-```
-
-Хост задан в `sanity.cli.ts` как `uaos` → обычно `https://uaos.sanity.studio`.  
-После деплоя обнови `VITE_SANITY_STUDIO_URL` на сайте.
-
-## Схемы
-
-| Тип | Назначение |
-|---|---|
-| `event` | Події |
-| `member` | Учасники |
-| `news` | Новини |
-| `associationDocument` | Документи / PDF |
-| `siteSettings` | Контакти (singleton) |
-| `joinRequest` | Заявки на вступ |
+See `docs/OPS_CHECKLIST.md` and root `README.md`.

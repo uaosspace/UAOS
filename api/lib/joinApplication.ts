@@ -1,4 +1,17 @@
-import {isRecord, readString, readStringOr} from '../../src/lib/contentGuards'
+import {isRecord, readStringArray, readStringOr} from '../../src/lib/contentGuards'
+
+const APPLICANT_KINDS = ['producer-supplier', 'consumer-enterprise', 'expert-org', 'other'] as const
+type ApplicantKind = (typeof APPLICANT_KINDS)[number]
+
+/** Ограничение на кількість та довжину елементів для sectors/productCategories/competencies (розділ 12 ТЗ). */
+const MAX_CLASSIFICATION_ITEMS = 10
+const MAX_CLASSIFICATION_ITEM_LENGTH = 60
+
+function normalizeClassificationList(value: unknown): string[] {
+  return readStringArray(value)
+    .slice(0, MAX_CLASSIFICATION_ITEMS)
+    .map((item) => item.slice(0, MAX_CLASSIFICATION_ITEM_LENGTH))
+}
 
 export interface NormalizedJoinApplication {
   companyName: string
@@ -12,6 +25,11 @@ export interface NormalizedJoinApplication {
   consentGiven: boolean
   honeypot: string
   consentTimestamp: string
+  /** Опціональна класифікація заявника (розділ 12/16 ТЗ) — не впливає на існуючі обов'язкові поля. */
+  applicantKind: ApplicantKind | ''
+  sectors: string[]
+  productCategories: string[]
+  competencies: string[]
 }
 
 /**
@@ -33,6 +51,12 @@ export function normalizeJoinApplication(body: unknown): NormalizedJoinApplicati
     consentGiven: source.privacyConsent === true || source.consent === true,
     honeypot: normalizeWhitespace(readStringOr(source.hp, '')),
     consentTimestamp: new Date().toISOString(),
+    applicantKind: (APPLICANT_KINDS as readonly string[]).includes(readStringOr(source.applicantKind, ''))
+      ? (source.applicantKind as ApplicantKind)
+      : '',
+    sectors: normalizeClassificationList(source.sectors),
+    productCategories: normalizeClassificationList(source.productCategories),
+    competencies: normalizeClassificationList(source.competencies),
   }
 }
 
@@ -89,13 +113,10 @@ export function normalizeJoinWebsite(urlValue: string): string {
 }
 
 /**
- * Читает env-конфигурацию интеграций для записи заявки.
+ * Читает server env, необходимый для записи заявки.
  */
 export function readJoinDestinationEnv() {
   return {
-    projectId: process.env.VITE_SANITY_PROJECT_ID || process.env.SANITY_PROJECT_ID,
-    dataset: process.env.VITE_SANITY_DATASET || process.env.SANITY_DATASET || 'production',
-    token: process.env.SANITY_API_WRITE_TOKEN,
-    formspree: readString(process.env.FORMSPREE_JOIN_ENDPOINT),
+    databaseConfigured: Boolean(process.env.DATABASE_URL?.trim()),
   }
 }

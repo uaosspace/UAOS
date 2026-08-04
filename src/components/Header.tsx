@@ -5,26 +5,24 @@ import type {Locale} from '../data/locales'
 import BrandLogo from './BrandLogo'
 import LanguageSwitcher from './LanguageSwitcher'
 import ScribbleLink from './ScribbleLink'
-import {useSectionNavigation} from '../hooks/useSectionNavigation'
+import {APP_ROUTES, type AppRoute} from '../routes/appRoutes'
 
 interface HeaderProps {
   currentLang: Locale
   setCurrentLang: (lang: Locale) => void
   currentTheme: 'light' | 'dark'
   setCurrentTheme: (theme: 'light' | 'dark') => void
-  currentRoute: string
-  onNavigate: (route: string) => void
+  currentRoute: AppRoute
+  onNavigate: (route: AppRoute, options?: {anchor?: string}) => void
 }
 
 const NAV_ITEMS = [
-  {id: 'about', key: 'nav_about' as const},
-  {id: 'participants', key: 'nav_participants' as const},
-  {id: 'services', key: 'nav_producers' as const},
-  {id: 'services', key: 'nav_services' as const},
-  {id: 'news', key: 'nav_news' as const},
-  {id: 'services', key: 'nav_standards' as const},
-  {id: 'services', key: 'nav_education' as const},
-  {id: 'contacts', key: 'nav_contacts' as const},
+  {route: APP_ROUTES.about, key: 'nav_about' as const},
+  {route: APP_ROUTES.membersCatalog, key: 'nav_participants' as const},
+  {route: APP_ROUTES.activity, key: 'nav_activity' as const},
+  {route: APP_ROUTES.newsList, key: 'nav_news' as const},
+  {route: APP_ROUTES.knowledge, key: 'nav_knowledge' as const},
+  {route: APP_ROUTES.contacts, key: 'nav_contacts' as const},
 ]
 
 export default function Header({
@@ -37,11 +35,10 @@ export default function Header({
 }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const t = TRANSLATIONS[currentLang]
-  const goToSection = useSectionNavigation(() => onNavigate('home'), currentRoute)
 
-  const handleNavClick = (sectionId: string) => {
+  const handleNavClick = (route: AppRoute, options?: {anchor?: string}) => {
     setMobileMenuOpen(false)
-    goToSection(sectionId)
+    onNavigate(route, options)
   }
 
   return (
@@ -53,11 +50,7 @@ export default function Header({
           aria-label={t.aria_home}
           onClick={() => {
             setMobileMenuOpen(false)
-            if (currentRoute !== 'home') {
-              onNavigate('home')
-            } else {
-              goToSection('about')
-            }
+            onNavigate(APP_ROUTES.home)
           }}
         >
           <BrandLogo />
@@ -76,7 +69,8 @@ export default function Header({
             <button
               key={item.key}
               type="button"
-              onClick={() => handleNavClick(item.id)}
+              aria-current={currentRoute === item.route ? 'page' : undefined}
+              onClick={() => handleNavClick(item.route)}
             >
               {t[item.key]}
             </button>
@@ -114,13 +108,21 @@ export default function Header({
             </button>
           </div>
 
-          <ScribbleLink compact href="#join" onClick={(event) => {
-            event.preventDefault()
-            handleNavClick('join')
-          }}>
+          <ScribbleLink
+            compact
+            href="/join#join-form"
+            onClick={(event) => {
+              event.preventDefault()
+              handleNavClick(APP_ROUTES.join, {anchor: 'join-form'})
+            }}
+          >
             <span className="label">{t.nav_join}</span>
             <span className="arrow">→</span>
           </ScribbleLink>
+
+          <a className="header-admin-link" href="/admin" title={t.nav_admin}>
+            {t.nav_admin}
+          </a>
 
           <button
             className="menu-button"

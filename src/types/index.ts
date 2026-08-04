@@ -1,3 +1,4 @@
+export * from './activity'
 export * from './commerce'
 export * from './document'
 export * from './event'

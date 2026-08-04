@@ -7,9 +7,19 @@ import { DocumentItem } from '../types';
 interface DocumentsSectionProps {
   currentLang: Locale;
   documents: DocumentItem[];
+  /** Дозволяє повторно використати секцію для «Публікацій і матеріалів» на /knowledge з іншим id/заголовком. */
+  sectionId?: string;
+  titleOverride?: string;
+  subtitleOverride?: string;
 }
 
-export default function DocumentsSection({ currentLang, documents }: DocumentsSectionProps) {
+export default function DocumentsSection({
+  currentLang,
+  documents,
+  sectionId = 'documents',
+  titleOverride,
+  subtitleOverride,
+}: DocumentsSectionProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [openingId, setOpeningId] = useState<string | null>(null);
 
@@ -36,16 +46,16 @@ export default function DocumentsSection({ currentLang, documents }: DocumentsSe
   };
 
   return (
-    <section id="documents" className="scroll-mt-24 py-6 lg:py-8 bg-transparent border-y border-brand-slate-200/20 dark:border-brand-slate-850/20 transition-colors duration-300">
+    <section id={sectionId} className="scroll-mt-24 py-6 lg:py-8 bg-transparent border-y border-brand-slate-200/20 dark:border-brand-slate-850/20 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-12 space-y-4">
           <h2 className="text-xs font-mono font-bold tracking-widest text-brand-blue-500 dark:text-brand-sky-300 uppercase">
-            {t.nav_documents}
+            {titleOverride ?? t.nav_documents}
           </h2>
-          <p className="text-3xl sm:text-4xl font-display font-bold text-brand-slate-900 dark:text-white tracking-tight">
-            {t.docs_subtitle}
+          <p className="text-2xl sm:text-3xl font-display font-semibold text-brand-slate-900 dark:text-white tracking-tight leading-snug">
+            {subtitleOverride ?? t.docs_subtitle}
           </p>
           <div className="h-1 w-12 bg-brand-blue-500 mx-auto rounded-full"></div>
         </div>
@@ -88,7 +98,7 @@ export default function DocumentsSection({ currentLang, documents }: DocumentsSe
                       <div className="flex items-center justify-center p-2 rounded-lg bg-red-50 dark:bg-red-950/20 text-red-500 border border-red-100/50 dark:border-red-900/10">
                         <FileText className="w-5 h-5" />
                       </div>
-                      <span className="text-[10px] font-mono font-bold bg-brand-slate-100 dark:bg-brand-slate-800 text-brand-slate-500 dark:text-brand-slate-400 px-2 py-0.5 rounded uppercase">
+                      <span className="text-[10px] font-mono font-bold bg-brand-slate-100 dark:bg-brand-slate-800 text-brand-slate-500 dark:text-brand-slate-300 px-2 py-0.5 rounded uppercase">
                         {doc.type}
                       </span>
                     </div>
@@ -104,7 +114,7 @@ export default function DocumentsSection({ currentLang, documents }: DocumentsSe
                     <h3 className="text-base font-display font-bold text-brand-slate-900 dark:text-white leading-snug group-hover:text-brand-blue-500 dark:group-hover:text-brand-sky-300 transition-colors">
                       {doc.title[currentLang]}
                     </h3>
-                    <p className="text-xs text-brand-slate-600 dark:text-brand-slate-400 leading-relaxed">
+                    <p className="text-xs text-brand-slate-600 dark:text-brand-slate-300 leading-relaxed">
                       {doc.description[currentLang]}
                     </p>
                   </div>
@@ -132,7 +142,7 @@ export default function DocumentsSection({ currentLang, documents }: DocumentsSe
                       openingId === doc.id
                         ? 'bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-950/20 dark:border-emerald-900/30 dark:text-emerald-400'
                         : hasDocumentUrl(doc)
-                          ? 'border-brand-slate-200 dark:border-brand-slate-800 text-brand-slate-700 dark:text-brand-slate-300 hover:border-brand-blue-500 dark:hover:border-brand-sky-400 hover:text-brand-blue-500 dark:hover:text-brand-sky-400 hover:bg-brand-blue-50/20 dark:hover:bg-brand-blue-950/10 cursor-pointer'
+                          ? 'border-brand-slate-200 dark:border-brand-slate-800 text-brand-slate-700 dark:text-brand-slate-200 hover:border-brand-blue-500 dark:hover:border-brand-sky-400 hover:text-brand-blue-500 dark:hover:text-brand-sky-400 hover:bg-brand-blue-50/20 dark:hover:bg-brand-blue-950/10 cursor-pointer'
                           : 'border-brand-slate-200 dark:border-brand-slate-800 text-brand-slate-400 dark:text-brand-slate-500 cursor-not-allowed opacity-70'
                     }`}
                   >
@@ -155,7 +165,7 @@ export default function DocumentsSection({ currentLang, documents }: DocumentsSe
           </div>
         ) : (
           <div className="text-center py-12 border border-dashed border-brand-slate-200 dark:border-brand-slate-800 rounded-2xl max-w-md mx-auto">
-            <p className="text-sm font-semibold text-brand-slate-500 dark:text-brand-slate-400 uppercase font-mono">
+            <p className="text-sm font-semibold text-brand-slate-500 dark:text-brand-slate-300 uppercase font-mono">
               {t.docs_empty}
             </p>
           </div>

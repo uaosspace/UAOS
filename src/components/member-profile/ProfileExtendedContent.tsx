@@ -52,7 +52,7 @@ export default function ProfileExtendedContent({
           </h2>
           <ul className="space-y-2.5">
             {member.services.map((service, index) => (
-              <li key={index} className="flex items-start space-x-2.5 text-xs text-brand-slate-600 dark:text-brand-slate-400">
+              <li key={index} className="flex items-start space-x-2.5 text-xs text-brand-slate-600 dark:text-brand-slate-200">
                 <span className="flex h-1.5 w-1.5 rounded-full bg-brand-blue-500 mt-1.5 shrink-0" />
                 <span className="font-sans leading-relaxed">{resolveLocalized(service, currentLang)}</span>
               </li>
@@ -77,13 +77,13 @@ export default function ProfileExtendedContent({
                   <h3 className="text-sm font-bold text-brand-slate-900 dark:text-white">
                     {resolveLocalized(product.name, currentLang)}
                   </h3>
-                  <p className="text-xs text-brand-slate-500 dark:text-brand-slate-400">
+                  <p className="text-xs text-brand-slate-500 dark:text-brand-slate-300">
                     {resolveLocalized(product.description, currentLang)}
                   </p>
                 </div>
                 {product.price && (
                   <div className="mt-4 pt-2 border-t border-brand-slate-100 dark:border-brand-slate-800 flex justify-between items-center">
-                    <span className="text-[10px] font-mono text-brand-slate-400 uppercase font-semibold">
+                    <span className="text-[10px] font-mono text-brand-slate-500 dark:text-brand-slate-350 uppercase font-semibold">
                       {currentLang === 'uk' ? 'Вартість' : 'Price'}
                     </span>
                     <span className="text-xs font-mono font-bold text-brand-blue-500 dark:text-brand-sky-300">
@@ -124,7 +124,7 @@ export default function ProfileExtendedContent({
                   <h3 className="text-sm font-bold text-brand-slate-900 dark:text-white">
                     {resolveLocalized(memberCase.title, currentLang)}
                   </h3>
-                  <p className="text-xs text-brand-slate-500 dark:text-brand-slate-400 leading-relaxed">
+                  <p className="text-xs text-brand-slate-500 dark:text-brand-slate-200 leading-relaxed">
                     {resolveLocalized(memberCase.description, currentLang)}
                   </p>
                 </div>
@@ -148,7 +148,7 @@ export default function ProfileExtendedContent({
               >
                 <div className="flex items-center space-x-2">
                   <Award className="w-4 h-4 text-brand-blue-500" />
-                  <span className="text-xs font-semibold text-brand-slate-700 dark:text-brand-slate-300">
+                  <span className="text-xs font-semibold text-brand-slate-700 dark:text-brand-slate-200">
                     {resolveLocalized(certificate.title, currentLang)}
                   </span>
                 </div>

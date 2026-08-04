@@ -1,18 +1,3 @@
-import {localeString, localeText} from './locale'
-import {eventType} from './event'
-import {memberType} from './member'
-import {newsType} from './news'
-import {siteSettingsType} from './siteSettings'
-import {associationDocumentType} from './associationDocument'
-import {joinRequestType} from './joinRequest'
+﻿/** Removed: Sanity schema index. Use Neon + /admin. */
+export default {}
 
-export const schemaTypes = [
-  localeString,
-  localeText,
-  eventType,
-  memberType,
-  newsType,
-  siteSettingsType,
-  associationDocumentType,
-  joinRequestType,
-]

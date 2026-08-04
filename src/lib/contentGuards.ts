@@ -93,3 +93,19 @@ export function readDocumentType(value: unknown): DocumentItem['type'] {
 export function readDocumentLanguage(value: unknown): DocumentItem['language'] {
   return value === 'EN' || value === 'UA/EN' ? value : 'UA'
 }
+
+/**
+ * Возвращает допустимый уровень доступа документа/материала; по умолчанию — публичный.
+ */
+export function readDocumentAccessLevel(value: unknown): DocumentItem['accessLevel'] {
+  return value === 'member' || value === 'internal' ? value : 'public'
+}
+
+/**
+ * Нормализует массив строковых идентификаторов (например, participantTypes/sectors).
+ */
+export function readStringArray(value: unknown): string[] {
+  return readArray(value)
+    .map((item) => readString(item))
+    .filter((item): item is string => Boolean(item))
+}

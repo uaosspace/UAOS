@@ -3,18 +3,21 @@ import {LOCALES} from './locales'
 import {industrialTranslations} from './translations/industrial'
 import {membershipTranslations} from './translations/membership'
 import {operationsTranslations} from './translations/operations'
+import {pagesTranslations} from './translations/pages'
 import {uiCoreTranslations} from './translations/uiCore'
 
 const legacyUk = {
   ...uiCoreTranslations.uk,
   ...membershipTranslations.uk,
   ...operationsTranslations.uk,
+  ...pagesTranslations.uk,
 }
 
 const legacyEn = {
   ...uiCoreTranslations.en,
   ...membershipTranslations.en,
   ...operationsTranslations.en,
+  ...pagesTranslations.en,
 }
 
 /**

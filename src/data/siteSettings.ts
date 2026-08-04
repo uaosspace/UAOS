@@ -1,5 +1,6 @@
 import {LocalizedText} from '../types'
-import {getSanityClient, mapLocale, sanityConfigured} from '../lib/sanity'
+import {ContentApiError, fetchContentItem} from '../lib/contentApi'
+import {isRecord, readLocalizedText, readStringOr} from '../lib/contentGuards'
 
 export interface SiteSettings {
   phone: string
@@ -21,31 +22,26 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   },
 }
 
-const SETTINGS_QUERY = `*[_type == "siteSettings"][0]{
-  phone,
-  email,
-  address,
-  brandTagline
-}`
-
 export async function fetchSiteSettings(): Promise<SiteSettings> {
-  const client = getSanityClient()
-  if (!client || !sanityConfigured) {
-    return DEFAULT_SITE_SETTINGS
-  }
   try {
-    const doc = await client.fetch(SETTINGS_QUERY)
-    if (!doc) return DEFAULT_SITE_SETTINGS
+    const item = await fetchContentItem<unknown>('site-settings')
+    const source = isRecord(item) ? item : {}
     return {
-      phone: doc.phone || DEFAULT_SITE_SETTINGS.phone,
-      email: doc.email || DEFAULT_SITE_SETTINGS.email,
-      address: doc.address ? mapLocale(doc.address) : DEFAULT_SITE_SETTINGS.address,
-      brandTagline: doc.brandTagline
-        ? mapLocale(doc.brandTagline)
+      phone: readStringOr(source.phone, DEFAULT_SITE_SETTINGS.phone),
+      email: readStringOr(source.email, DEFAULT_SITE_SETTINGS.email),
+      address: source.address
+        ? readLocalizedText(source.address)
+        : DEFAULT_SITE_SETTINGS.address,
+      brandTagline: source.brandTagline
+        ? readLocalizedText(source.brandTagline)
         : DEFAULT_SITE_SETTINGS.brandTagline,
     }
   } catch (err) {
-    console.error('Sanity fetchSiteSettings failed:', err)
-    return DEFAULT_SITE_SETTINGS
+    if (import.meta.env.DEV) {
+      console.warn('Content API fetchSiteSettings unavailable in DEV, using defaults:', err)
+      return DEFAULT_SITE_SETTINGS
+    }
+    if (err instanceof ContentApiError) throw err
+    throw new ContentApiError('Failed to load site settings', 500)
   }
 }

@@ -181,19 +181,19 @@ export default function EventsCalendarModal({
           <div className="flex gap-2 bg-brand-slate-100 dark:bg-brand-slate-900 p-1 rounded-lg">
             <button
               onClick={() => { setActiveTab('upcoming'); onSelectEvent(null); }}
-              className={`px-3 sm:px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === 'upcoming' ? 'bg-white dark:bg-brand-slate-800 shadow-sm text-brand-slate-900 dark:text-white' : 'text-brand-slate-600 dark:text-brand-slate-400 hover:text-brand-slate-900 dark:hover:text-white'}`}
+              className={`px-3 sm:px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === 'upcoming' ? 'bg-white dark:bg-brand-slate-800 shadow-sm text-brand-slate-900 dark:text-white' : 'text-brand-slate-600 dark:text-brand-slate-300 hover:text-brand-slate-900 dark:hover:text-white'}`}
             >
               <span className="flex items-center gap-2"><Clock className="w-4 h-4 hidden sm:block" />{t.events_upcoming_tab}</span>
             </button>
             <button
               onClick={() => { setActiveTab('calendar'); onSelectEvent(null); }}
-              className={`px-3 sm:px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === 'calendar' ? 'bg-white dark:bg-brand-slate-800 shadow-sm text-brand-slate-900 dark:text-white' : 'text-brand-slate-600 dark:text-brand-slate-400 hover:text-brand-slate-900 dark:hover:text-white'}`}
+              className={`px-3 sm:px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === 'calendar' ? 'bg-white dark:bg-brand-slate-800 shadow-sm text-brand-slate-900 dark:text-white' : 'text-brand-slate-600 dark:text-brand-slate-300 hover:text-brand-slate-900 dark:hover:text-white'}`}
             >
               <span className="flex items-center gap-2"><CalendarIcon className="w-4 h-4 hidden sm:block" />{t.events_calendar_tab}</span>
             </button>
             <button
               onClick={() => { setActiveTab('archive'); onSelectEvent(null); }}
-              className={`px-3 sm:px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === 'archive' ? 'bg-white dark:bg-brand-slate-800 shadow-sm text-brand-slate-900 dark:text-white' : 'text-brand-slate-600 dark:text-brand-slate-400 hover:text-brand-slate-900 dark:hover:text-white'}`}
+              className={`px-3 sm:px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${activeTab === 'archive' ? 'bg-white dark:bg-brand-slate-800 shadow-sm text-brand-slate-900 dark:text-white' : 'text-brand-slate-600 dark:text-brand-slate-300 hover:text-brand-slate-900 dark:hover:text-white'}`}
             >
               <span className="flex items-center gap-2"><Archive className="w-4 h-4 hidden sm:block" />{t.events_archive_tab}</span>
             </button>
@@ -215,7 +215,7 @@ export default function EventsCalendarModal({
               <div className="px-4 py-3 bg-white dark:bg-brand-slate-800 border-b border-brand-slate-200 dark:border-brand-slate-700 shrink-0">
                 <button 
                   onClick={() => onSelectEvent(null)}
-                  className="text-sm font-medium text-brand-slate-600 hover:text-brand-slate-900 dark:text-brand-slate-400 dark:hover:text-white flex items-center gap-1"
+                  className="text-sm font-medium text-brand-slate-600 hover:text-brand-slate-900 dark:text-brand-slate-300 dark:hover:text-white flex items-center gap-1"
                 >
                   <ChevronLeft className="w-4 h-4" /> {t.events_back_to_list}
                 </button>
@@ -250,10 +250,10 @@ export default function EventsCalendarModal({
                     <button onClick={goToday} className="px-2 py-1 text-xs font-medium text-brand-blue-600 hover:bg-brand-blue-50 dark:hover:bg-brand-blue-900/20 rounded mr-2">
                       {t.events_today}
                     </button>
-                    <button onClick={prevMonth} className="p-1 rounded-md hover:bg-brand-slate-100 dark:hover:bg-brand-slate-700 text-brand-slate-600 dark:text-brand-slate-400">
+                    <button onClick={prevMonth} className="p-1 rounded-md hover:bg-brand-slate-100 dark:hover:bg-brand-slate-700 text-brand-slate-600 dark:text-brand-slate-300">
                       <ChevronLeft className="w-5 h-5" />
                     </button>
-                    <button onClick={nextMonth} className="p-1 rounded-md hover:bg-brand-slate-100 dark:hover:bg-brand-slate-700 text-brand-slate-600 dark:text-brand-slate-400">
+                    <button onClick={nextMonth} className="p-1 rounded-md hover:bg-brand-slate-100 dark:hover:bg-brand-slate-700 text-brand-slate-600 dark:text-brand-slate-300">
                       <ChevronRight className="w-5 h-5" />
                     </button>
                   </div>
@@ -279,7 +279,7 @@ export default function EventsCalendarModal({
                           className={`
                             aspect-square flex flex-col items-center justify-start pt-1.5 pb-1 rounded-lg cursor-pointer transition-colors relative
                             ${!isCurrentMonth ? 'opacity-30' : ''}
-                            ${isSelected ? 'bg-brand-blue-100 dark:bg-brand-blue-900/40 text-brand-blue-700 dark:text-brand-sky-300 font-bold' : 'hover:bg-brand-slate-100 dark:hover:bg-brand-slate-800 text-brand-slate-700 dark:text-brand-slate-300'}
+                            ${isSelected ? 'bg-brand-blue-100 dark:bg-brand-blue-900/40 text-brand-blue-700 dark:text-brand-sky-300 font-bold' : 'hover:bg-brand-slate-100 dark:hover:bg-brand-slate-800 text-brand-slate-700 dark:text-brand-slate-200'}
                           `}
                         >
                           <span className={`w-7 h-7 flex items-center justify-center rounded-full text-sm ${isToday && !isSelected ? 'bg-brand-blue-500 text-white font-bold' : ''}`}>
@@ -300,7 +300,7 @@ export default function EventsCalendarModal({
                   
                   {selectedDate && (
                     <div className="mt-6 border-t border-brand-slate-200 dark:border-brand-slate-700 pt-4">
-                      <h4 className="text-sm font-semibold mb-3 text-brand-slate-700 dark:text-brand-slate-300">
+                      <h4 className="text-sm font-semibold mb-3 text-brand-slate-700 dark:text-brand-slate-200">
                         {selectedDate.setLocale(currentLang).toFormat('d MMMM yyyy')}
                       </h4>
                       {renderEventList(eventsForDay(selectedDate), t.events_no_day_events)}

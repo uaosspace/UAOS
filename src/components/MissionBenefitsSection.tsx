@@ -88,7 +88,7 @@ export default function MissionBenefitsSection({ currentLang }: MissionBenefitsS
               «{t.mission_text}»
             </p>
 
-            <div className="flex flex-col sm:flex-row lg:flex-col gap-4 pt-2 text-brand-slate-500 dark:text-brand-slate-400">
+            <div className="flex flex-col sm:flex-row lg:flex-col gap-4 pt-2 text-brand-slate-500 dark:text-brand-slate-300">
               <div className="flex items-center space-x-2">
                 <Heart className="w-4 h-4 text-brand-blue-500 shrink-0" />
                 <span className="text-[10px] font-mono tracking-wider uppercase font-semibold">
@@ -167,7 +167,7 @@ export default function MissionBenefitsSection({ currentLang }: MissionBenefitsS
                       </h3>
 
                       {/* Description */}
-                      <p className="text-xs sm:text-sm text-brand-slate-600 dark:text-brand-slate-400 leading-relaxed">
+                      <p className="text-xs sm:text-sm text-brand-slate-600 dark:text-brand-slate-300 leading-relaxed">
                         {card.description}
                       </p>
                     </div>

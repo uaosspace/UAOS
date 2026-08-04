@@ -1,0 +1,253 @@
+import type {VercelRequest, VercelResponse} from '@vercel/node'
+import {getSql} from '../db'
+import {createSessionToken, hashToken, verifyPassword} from './crypto'
+import {roleRequiresMfa, type AdminRole} from './policy'
+import {decryptSecret, encryptSecret, hashPassword} from './crypto'
+import {buildOtpAuthUrl, generateTotpSecret, verifyTotpCode} from './totp'
+
+export const SESSION_COOKIE = 'uaos_admin_session'
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000
+
+export interface AdminUserRecord {
+  id: string
+  email: string
+  displayName: string
+  role: AdminRole
+  mfaEnabled: boolean
+  active: boolean
+}
+
+export interface AdminSessionContext {
+  user: AdminUserRecord
+  sessionId: string
+}
+
+function mapUser(row: Record<string, unknown>): AdminUserRecord {
+  return {
+    id: String(row.id),
+    email: String(row.email),
+    displayName: String(row.display_name ?? ''),
+    role: String(row.role) as AdminRole,
+    mfaEnabled: Boolean(row.mfa_enabled),
+    active: Boolean(row.active),
+  }
+}
+
+export function readSessionToken(req: VercelRequest): string | null {
+  const raw = req.headers.cookie
+  if (!raw) return null
+  const parts = raw.split(';')
+  for (const part of parts) {
+    const [name, ...rest] = part.trim().split('=')
+    if (name === SESSION_COOKIE) return decodeURIComponent(rest.join('='))
+  }
+  return null
+}
+
+export function setSessionCookie(res: VercelResponse, token: string, secure: boolean) {
+  const maxAge = Math.floor(SESSION_TTL_MS / 1000)
+  const parts = [
+    `${SESSION_COOKIE}=${encodeURIComponent(token)}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Strict',
+    `Max-Age=${maxAge}`,
+  ]
+  if (secure) parts.push('Secure')
+  res.setHeader('Set-Cookie', parts.join('; '))
+}
+
+export function clearSessionCookie(res: VercelResponse, secure: boolean) {
+  const parts = [
+    `${SESSION_COOKIE}=`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Strict',
+    'Max-Age=0',
+  ]
+  if (secure) parts.push('Secure')
+  res.setHeader('Set-Cookie', parts.join('; '))
+}
+
+export async function createAdminUser(input: {
+  email: string
+  password: string
+  role: AdminRole
+  displayName?: string
+}): Promise<AdminUserRecord> {
+  const sql = getSql()
+  const passwordHash = hashPassword(input.password)
+  const rows = await sql`
+    INSERT INTO admin_users (email, display_name, password_hash, role)
+    VALUES (
+      ${input.email.trim().toLowerCase()},
+      ${input.displayName ?? ''},
+      ${passwordHash},
+      ${input.role}
+    )
+    RETURNING *
+  `
+  return mapUser(rows[0] as Record<string, unknown>)
+}
+
+export async function findAdminByEmail(email: string) {
+  const sql = getSql()
+  const rows = await sql`
+    SELECT * FROM admin_users WHERE lower(email) = ${email.trim().toLowerCase()} LIMIT 1
+  `
+  return rows[0] ? (rows[0] as Record<string, unknown>) : null
+}
+
+export async function authenticatePassword(
+  email: string,
+  password: string,
+): Promise<{user: AdminUserRecord; row: Record<string, unknown>} | null> {
+  const row = await findAdminByEmail(email)
+  if (!row || !row.active) return null
+  if (row.locked_until && new Date(String(row.locked_until)).getTime() > Date.now()) {
+    return null
+  }
+  if (!verifyPassword(password, String(row.password_hash))) {
+    const sql = getSql()
+    const fails = Number(row.failed_login_count ?? 0) + 1
+    const lockUntil =
+      fails >= 8 ? new Date(Date.now() + 15 * 60 * 1000).toISOString() : null
+    await sql`
+      UPDATE admin_users
+      SET failed_login_count = ${fails},
+          locked_until = ${lockUntil},
+          updated_at = now()
+      WHERE id = ${String(row.id)}::uuid
+    `
+    return null
+  }
+  const sql = getSql()
+  await sql`
+    UPDATE admin_users
+    SET failed_login_count = 0, locked_until = NULL, updated_at = now()
+    WHERE id = ${String(row.id)}::uuid
+  `
+  return {user: mapUser(row), row}
+}
+
+export async function createSession(input: {
+  userId: string
+  ip: string
+  userAgent: string
+}): Promise<string> {
+  const sql = getSql()
+  const token = createSessionToken()
+  const tokenHash = hashToken(token)
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString()
+  await sql`
+    INSERT INTO admin_sessions (user_id, token_hash, expires_at, ip, user_agent)
+    VALUES (${input.userId}::uuid, ${tokenHash}, ${expiresAt}, ${input.ip}, ${input.userAgent})
+  `
+  return token
+}
+
+export async function revokeSessionByToken(token: string): Promise<void> {
+  const sql = getSql()
+  await sql`
+    UPDATE admin_sessions
+    SET revoked_at = now()
+    WHERE token_hash = ${hashToken(token)} AND revoked_at IS NULL
+  `
+}
+
+export async function revokeAllUserSessions(userId: string): Promise<void> {
+  const sql = getSql()
+  await sql`
+    UPDATE admin_sessions
+    SET revoked_at = now()
+    WHERE user_id = ${userId}::uuid AND revoked_at IS NULL
+  `
+}
+
+export async function resolveSession(token: string): Promise<AdminSessionContext | null> {
+  const sql = getSql()
+  const rows = await sql`
+    SELECT s.id AS session_id, u.*
+    FROM admin_sessions s
+    JOIN admin_users u ON u.id = s.user_id
+    WHERE s.token_hash = ${hashToken(token)}
+      AND s.revoked_at IS NULL
+      AND s.expires_at > now()
+      AND u.active = true
+    LIMIT 1
+  `
+  if (!rows[0]) return null
+  const row = rows[0] as Record<string, unknown>
+  return {
+    sessionId: String(row.session_id),
+    user: mapUser(row),
+  }
+}
+
+export function getMfaEncKey(env: NodeJS.ProcessEnv = process.env): string {
+  const key = env.MFA_ENC_KEY?.trim()
+  if (!key || key.length !== 64) {
+    throw new Error('MFA_ENC_KEY must be 64 hex chars (32 bytes)')
+  }
+  return key
+}
+
+export async function beginMfaSetup(userId: string, email: string) {
+  const secret = generateTotpSecret()
+  const enc = encryptSecret(secret, getMfaEncKey())
+  const sql = getSql()
+  await sql`
+    UPDATE admin_users
+    SET mfa_secret_enc = ${enc}, mfa_enabled = false, updated_at = now()
+    WHERE id = ${userId}::uuid
+  `
+  return {
+    secret,
+    otpauthUrl: buildOtpAuthUrl({secret, email}),
+  }
+}
+
+export async function confirmMfaSetup(userId: string, code: string): Promise<boolean> {
+  const sql = getSql()
+  const rows = await sql`SELECT mfa_secret_enc FROM admin_users WHERE id = ${userId}::uuid LIMIT 1`
+  const enc = rows[0]?.mfa_secret_enc
+  if (!enc) return false
+  const secret = decryptSecret(String(enc), getMfaEncKey())
+  if (!verifyTotpCode(secret, code)) return false
+  await sql`
+    UPDATE admin_users
+    SET mfa_enabled = true, updated_at = now()
+    WHERE id = ${userId}::uuid
+  `
+  return true
+}
+
+export async function verifyUserMfa(userId: string, code: string): Promise<boolean> {
+  const sql = getSql()
+  const rows = await sql`
+    SELECT mfa_secret_enc, mfa_enabled, role
+    FROM admin_users WHERE id = ${userId}::uuid LIMIT 1
+  `
+  const row = rows[0]
+  if (!row) return false
+  if (!row.mfa_enabled) {
+    // MFA not yet enabled: allow password-only only for editor role that does not require MFA
+    return !roleRequiresMfa(String(row.role) as AdminRole)
+  }
+  if (!row.mfa_secret_enc) return false
+  const secret = decryptSecret(String(row.mfa_secret_enc), getMfaEncKey())
+  return verifyTotpCode(secret, code)
+}
+
+export function assertSameOrigin(req: VercelRequest, env: NodeJS.ProcessEnv = process.env): boolean {
+  const origin = typeof req.headers.origin === 'string' ? req.headers.origin : ''
+  const referer = typeof req.headers.referer === 'string' ? req.headers.referer : ''
+  const allowed = (env.SITE_URL || env.APP_URL || '').replace(/\/$/, '')
+  if (!allowed) {
+    // Local/dev without SITE_URL: accept missing origin (same-origin navigations)
+    return !origin || origin.includes('localhost') || origin.includes('127.0.0.1')
+  }
+  if (origin) return origin.replace(/\/$/, '') === allowed
+  if (referer) return referer.startsWith(allowed)
+  return false
+}

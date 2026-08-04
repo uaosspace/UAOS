@@ -4,7 +4,7 @@ import {mapEvent} from './events'
 import {mapMember} from './members'
 import {mapNews} from './news'
 
-describe('Sanity data mappers', () => {
+describe('Content API data mappers', () => {
   it('maps member documents into safe public models', () => {
     const member = mapMember({
       _id: 'member-1',

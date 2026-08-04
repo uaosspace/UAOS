@@ -1,53 +1,44 @@
 import type {Locale} from '../data/locales'
+import {resolveLocalized} from '../data/locales'
 import {TRANSLATIONS} from '../data/translations'
 import {useReveal} from '../hooks/useReveal'
 import {useSpotlightHandler} from '../hooks/useSpotlight'
-import {useSectionNavigation} from '../hooks/useSectionNavigation'
+import {ACTIVITY_DIRECTIONS} from '../data/activityDirections'
+import {APP_ROUTES, type AppRoute} from '../routes/appRoutes'
 
 interface FeaturesSectionProps {
   currentLang: Locale
-  currentRoute?: string
-  onNavigate?: (route: string) => void
+  onNavigate: (route: AppRoute, options?: {anchor?: string}) => void
 }
 
-const FEATURES = [
-  {icon: 'icon-shield', titleKey: 'feature_1_title', descKey: 'feature_1_desc'},
-  {icon: 'icon-doc', titleKey: 'feature_2_title', descKey: 'feature_2_desc'},
-  {icon: 'icon-cap', titleKey: 'feature_3_title', descKey: 'feature_3_desc'},
-  {icon: 'icon-globe', titleKey: 'feature_4_title', descKey: 'feature_4_desc'},
-] as const
-
-export default function FeaturesSection({
-  currentLang,
-  currentRoute = 'home',
-  onNavigate,
-}: FeaturesSectionProps) {
+/**
+ * Секція «4 напрями діяльності» на головній — джерело даних єдине з /activity (ACTIVITY_DIRECTIONS),
+ * щоб уникнути дублювання копірайту (розділ 6.2/9 ТЗ).
+ */
+export default function FeaturesSection({currentLang, onNavigate}: FeaturesSectionProps) {
   const t = TRANSLATIONS[currentLang]
   const revealRef = useReveal<HTMLDivElement>()
   const onSpotlight = useSpotlightHandler()
-  const goToSection = useSectionNavigation(() => onNavigate?.('home'), currentRoute)
+
+  const directions = ACTIVITY_DIRECTIONS.slice().sort((a, b) => a.sortOrder - b.sortOrder)
 
   return (
     <section className="section features" id="services">
       <div className="container">
         <div className="feature-grid reveal" ref={revealRef}>
-          {FEATURES.map((feature) => (
-            <article
-              key={feature.titleKey}
-              className="feature-card spotlight"
-              onPointerMove={onSpotlight}
-            >
+          {directions.map((direction) => (
+            <article key={direction.id} className="feature-card spotlight" onPointerMove={onSpotlight}>
               <svg className="feature-icon" aria-hidden="true">
-                <use href={`#${feature.icon}`} />
+                <use href={`#${direction.icon}`} />
               </svg>
-              <h3>{t[feature.titleKey]}</h3>
-              <p>{t[feature.descKey]}</p>
+              <h3>{resolveLocalized(direction.title, currentLang)}</h3>
+              <p>{resolveLocalized(direction.shortDescription, currentLang)}</p>
               <button
                 type="button"
                 className="details"
-                onClick={() => goToSection('join')}
+                onClick={() => onNavigate(APP_ROUTES.activity, {anchor: direction.anchor})}
               >
-                {t.feature_details} <span>→</span>
+                {t.btn_read_more} <span>→</span>
               </button>
             </article>
           ))}
