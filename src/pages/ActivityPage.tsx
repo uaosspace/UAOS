@@ -41,26 +41,16 @@ export default function ActivityPage({currentLang, anchor}: ActivityPageProps) {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
         {ACTIVITY_DIRECTIONS.slice()
           .sort((a, b) => a.sortOrder - b.sortOrder)
-          .map((direction, index) => (
+          .map((direction) => (
             <section
               key={direction.id}
               id={direction.anchor}
               className="scroll-mt-24 glass-card rounded-2xl p-6 sm:p-8"
             >
-              <div className="flex items-start gap-4 mb-5">
-                <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-brand-blue-50 dark:bg-brand-blue-950/40 text-brand-blue-500 shrink-0">
-                  <svg className="w-6 h-6" aria-hidden="true">
-                    <use href={`#${direction.icon}`} />
-                  </svg>
-                </div>
-                <div>
-                  <span className="text-[10px] font-mono font-bold text-brand-slate-400 uppercase tracking-wider">
-                    0{index + 1}
-                  </span>
-                  <h2 className="text-xl sm:text-2xl font-display font-bold text-brand-slate-900 dark:text-white leading-snug">
-                    {resolveLocalized(direction.title, currentLang)}
-                  </h2>
-                </div>
+              <div className="mb-5">
+                <h2 className="text-xl sm:text-2xl font-display font-bold text-brand-slate-900 dark:text-white leading-snug">
+                  {resolveLocalized(direction.title, currentLang)}
+                </h2>
               </div>
 
               <p className="text-sm sm:text-base text-brand-slate-700 dark:text-brand-slate-200 leading-relaxed mb-6">

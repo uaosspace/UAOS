@@ -4,6 +4,13 @@
 import {getSql} from './db.js'
 import {isRecord, readStringOr} from '../../src/lib/contentGuards.js'
 import {releaseOwnedMediaIfUnused} from './mediaCleanup.js'
+import {
+  clampOptionalText,
+  normalizeOptionalHttpUrl,
+  normalizeOptionalPublicEmail,
+  normalizeOptionalPublicPhone,
+  requireNonEmptyText,
+} from './contentValidation.js'
 
 function asLocalized(uk: unknown, en: unknown) {
   return {uk: String(uk ?? ''), en: String(en ?? '')}
@@ -213,54 +220,84 @@ export async function upsertContentMember(body: unknown) {
   const source = isRecord(body) ? body : {}
   const sql = getSql()
   const id = readStringOr(source.id, '')
-  const slug = readStringOr(source.slug, '')
-  if (!slug) throw new Error('slug required')
-  const status = readStringOr(source.status, 'draft') === 'published' ? 'published' : 'draft'
   const name = isRecord(source.name) ? source.name : {}
   const shortName = isRecord(source.shortName) ? source.shortName : {}
   const category = isRecord(source.category) ? source.category : {}
   const shortDescription = isRecord(source.shortDescription) ? source.shortDescription : {}
   const fullDescription = isRecord(source.fullDescription) ? source.fullDescription : {}
 
+  const nameUk = requireNonEmptyText(name.uk, 'name.uk', 200)
+  const nameEn = clampOptionalText(name.en, 200)
+  const slug = requireNonEmptyText(source.slug, 'slug', 80)
+  const status = readStringOr(source.status, 'draft') === 'published' ? 'published' : 'draft'
+  const profileLevel = readStringOr(source.profileLevel, 'basic') === 'extended' ? 'extended' : 'basic'
+  const sortOrder = Number.isFinite(Number(source.order)) ? Math.max(0, Math.min(9999, Number(source.order))) : 0
+
+  const websiteUrl = normalizeOptionalHttpUrl(source.websiteUrl, 'websiteUrl')
+  const logoUrl = normalizeOptionalHttpUrl(source.logoUrl, 'logoUrl')
+  const coverImageUrl = normalizeOptionalHttpUrl(source.coverImageUrl, 'coverImageUrl')
+  const publicEmail = normalizeOptionalPublicEmail(source.publicEmail)
+  const publicPhone = normalizeOptionalPublicPhone(source.publicPhone)
+
+  const shortNameUk = clampOptionalText(
+    typeof shortName.uk === 'string'
+      ? shortName.uk
+      : typeof source.shortName === 'string'
+        ? source.shortName
+        : '',
+    120,
+  )
+  const shortNameEn = clampOptionalText(shortName.en, 120)
+  const categoryUk = clampOptionalText(category.uk, 120)
+  const categoryEn = clampOptionalText(category.en, 120)
+  const shortDescriptionUk = clampOptionalText(shortDescription.uk, 2000)
+  const shortDescriptionEn = clampOptionalText(shortDescription.en, 2000)
+  const fullDescriptionUk = clampOptionalText(fullDescription.uk, 20000)
+  const fullDescriptionEn = clampOptionalText(fullDescription.en, 20000)
+  const region = clampOptionalText(source.region, 120)
+  const featured = Boolean(source.featured)
+
   if (id) {
+    const previous = await sql`
+      SELECT logo_url, cover_url FROM content_members WHERE id = ${id}::uuid LIMIT 1
+    `
+    const previousLogo = String((previous[0] as {logo_url?: unknown} | undefined)?.logo_url ?? '')
+    const previousCover = String((previous[0] as {cover_url?: unknown} | undefined)?.cover_url ?? '')
+
     const rows = await sql`
       UPDATE content_members SET
         slug = ${slug},
         status = ${status},
-        sort_order = ${Number(source.order ?? 0)},
-        profile_level = ${readStringOr(source.profileLevel, 'basic')},
-        name_uk = ${readStringOr(name.uk, '')},
-        name_en = ${readStringOr(name.en, '')},
-        short_name_uk = ${readStringOr(shortName.uk, '')},
-        short_name_en = ${readStringOr(shortName.en, '')},
-        category_uk = ${readStringOr(category.uk, '')},
-        category_en = ${readStringOr(category.en, '')},
-        short_description_uk = ${readStringOr(shortDescription.uk, '')},
-        short_description_en = ${readStringOr(shortDescription.en, '')},
-        full_description_uk = ${readStringOr(fullDescription.uk, '')},
-        full_description_en = ${readStringOr(fullDescription.en, '')},
-        logo_url = ${readStringOr(source.logoUrl, '')},
-        cover_url = ${readStringOr(source.coverImageUrl, '')},
-        website_url = ${readStringOr(source.websiteUrl, '')},
-        public_email = ${readStringOr(source.publicEmail, '')},
-        public_phone = ${readStringOr(source.publicPhone, '')},
-        participant_types = ${Array.isArray(source.participantTypes) ? source.participantTypes.map(String) : []},
-        sectors = ${Array.isArray(source.sectors) ? source.sectors.map(String) : []},
-        product_categories = ${Array.isArray(source.productCategories) ? source.productCategories.map(String) : []},
-        competencies = ${Array.isArray(source.competencies) ? source.competencies.map(String) : []},
-        region = ${readStringOr(source.region, '')},
-        featured = ${Boolean(source.featured)},
-        services = ${JSON.stringify(source.services ?? [])}::jsonb,
-        certificates = ${JSON.stringify(source.certificates ?? [])}::jsonb,
-        cases = ${JSON.stringify(source.cases ?? [])}::jsonb,
-        products = ${JSON.stringify(source.products ?? [])}::jsonb,
+        sort_order = ${sortOrder},
+        profile_level = ${profileLevel},
+        name_uk = ${nameUk},
+        name_en = ${nameEn},
+        short_name_uk = ${shortNameUk},
+        short_name_en = ${shortNameEn},
+        category_uk = ${categoryUk},
+        category_en = ${categoryEn},
+        short_description_uk = ${shortDescriptionUk},
+        short_description_en = ${shortDescriptionEn},
+        full_description_uk = ${fullDescriptionUk},
+        full_description_en = ${fullDescriptionEn},
+        logo_url = ${logoUrl},
+        cover_url = ${coverImageUrl},
+        website_url = ${websiteUrl},
+        public_email = ${publicEmail},
+        public_phone = ${publicPhone},
+        region = ${region},
+        featured = ${featured},
         updated_at = now()
       WHERE id = ${id}::uuid
       RETURNING *
     `
+    if (!rows[0]) throw new Error('Member not found')
+    if (previousLogo && previousLogo !== logoUrl) await releaseOwnedMediaIfUnused(previousLogo)
+    if (previousCover && previousCover !== coverImageUrl) await releaseOwnedMediaIfUnused(previousCover)
     return rows[0]
   }
 
+  const emptyJson = '[]'
   const rows = await sql`
     INSERT INTO content_members (
       slug, status, sort_order, profile_level,
@@ -270,24 +307,18 @@ export async function upsertContentMember(body: unknown) {
       participant_types, sectors, product_categories, competencies, region, featured,
       services, certificates, cases, products
     ) VALUES (
-      ${slug}, ${status}, ${Number(source.order ?? 0)}, ${readStringOr(source.profileLevel, 'basic')},
-      ${readStringOr(name.uk, '')}, ${readStringOr(name.en, '')},
-      ${readStringOr(shortName.uk, '')}, ${readStringOr(shortName.en, '')},
-      ${readStringOr(category.uk, '')}, ${readStringOr(category.en, '')},
-      ${readStringOr(shortDescription.uk, '')}, ${readStringOr(shortDescription.en, '')},
-      ${readStringOr(fullDescription.uk, '')}, ${readStringOr(fullDescription.en, '')},
-      ${readStringOr(source.logoUrl, '')}, ${readStringOr(source.coverImageUrl, '')},
-      ${readStringOr(source.websiteUrl, '')}, ${readStringOr(source.publicEmail, '')},
-      ${readStringOr(source.publicPhone, '')},
-      ${Array.isArray(source.participantTypes) ? source.participantTypes.map(String) : []},
-      ${Array.isArray(source.sectors) ? source.sectors.map(String) : []},
-      ${Array.isArray(source.productCategories) ? source.productCategories.map(String) : []},
-      ${Array.isArray(source.competencies) ? source.competencies.map(String) : []},
-      ${readStringOr(source.region, '')}, ${Boolean(source.featured)},
-      ${JSON.stringify(source.services ?? [])}::jsonb,
-      ${JSON.stringify(source.certificates ?? [])}::jsonb,
-      ${JSON.stringify(source.cases ?? [])}::jsonb,
-      ${JSON.stringify(source.products ?? [])}::jsonb
+      ${slug}, ${status}, ${sortOrder}, ${profileLevel},
+      ${nameUk}, ${nameEn},
+      ${shortNameUk}, ${shortNameEn},
+      ${categoryUk}, ${categoryEn},
+      ${shortDescriptionUk}, ${shortDescriptionEn},
+      ${fullDescriptionUk}, ${fullDescriptionEn},
+      ${logoUrl}, ${coverImageUrl},
+      ${websiteUrl}, ${publicEmail},
+      ${publicPhone},
+      ${[]}, ${[]}, ${[]}, ${[]},
+      ${region}, ${featured},
+      ${emptyJson}::jsonb, ${emptyJson}::jsonb, ${emptyJson}::jsonb, ${emptyJson}::jsonb
     )
     RETURNING *
   `
@@ -296,7 +327,14 @@ export async function upsertContentMember(body: unknown) {
 
 export async function deleteContentMember(id: string) {
   const sql = getSql()
+  const existing = await sql`
+    SELECT logo_url, cover_url FROM content_members WHERE id = ${id}::uuid LIMIT 1
+  `
+  const logoUrl = String((existing[0] as {logo_url?: unknown} | undefined)?.logo_url ?? '')
+  const coverUrl = String((existing[0] as {cover_url?: unknown} | undefined)?.cover_url ?? '')
   await sql`DELETE FROM content_members WHERE id = ${id}::uuid`
+  if (logoUrl) await releaseOwnedMediaIfUnused(logoUrl)
+  if (coverUrl) await releaseOwnedMediaIfUnused(coverUrl)
 }
 
 export async function upsertContentNews(body: unknown) {

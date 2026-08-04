@@ -61,6 +61,9 @@ type MemberDraft = {
   shortDescriptionEn: string
   websiteUrl: string
   logoUrl: string
+  coverUrl: string
+  featured: boolean
+  order: number
 }
 
 type EventDraft = {
@@ -143,6 +146,9 @@ const emptyMember = (): MemberDraft => ({
   shortDescriptionEn: '',
   websiteUrl: '',
   logoUrl: '',
+  coverUrl: '',
+  featured: false,
+  order: 0,
 })
 
 const emptyEvent = (): EventDraft => ({
@@ -357,18 +363,23 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
     setError(null)
     setMessage(null)
     try {
+      if (!member.nameUk.trim()) throw new Error(t.admin_member_name_required)
+      const slug = resolveContentSlug(member.slug, member.nameUk, 'member')
       await api('content/members', {
         method: 'POST',
         body: JSON.stringify({
           id: member.id,
-          slug: member.slug,
+          slug,
           status: member.status,
+          order: member.order,
+          featured: member.featured,
           name: {uk: member.nameUk, en: member.nameEn},
           shortName: {uk: member.shortNameUk, en: member.shortNameUk},
           category: {uk: member.categoryUk, en: member.categoryEn},
           shortDescription: {uk: member.shortDescriptionUk, en: member.shortDescriptionEn},
-          websiteUrl: member.websiteUrl,
-          logoUrl: member.logoUrl,
+          websiteUrl: member.websiteUrl.trim(),
+          logoUrl: member.logoUrl.trim(),
+          coverImageUrl: member.coverUrl.trim(),
         }),
       })
       setMessage(t.admin_saved)
@@ -376,6 +387,21 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
+    }
+  }
+
+  async function deleteMember() {
+    if (!member.id) return
+    if (!window.confirm(t.admin_delete_confirm)) return
+    setError(null)
+    setMessage(null)
+    try {
+      await api(`content/members/${member.id}`, {method: 'DELETE'})
+      setMessage(t.admin_saved)
+      setMember(emptyMember())
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed')
     }
   }
 
@@ -510,6 +536,9 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
       shortDescriptionEn: shortDescription.en || '',
       websiteUrl: String(raw.websiteUrl || ''),
       logoUrl: String(raw.logoUrl || ''),
+      coverUrl: String(raw.coverUrl || raw.coverImageUrl || ''),
+      featured: Boolean(raw.featured),
+      order: typeof raw.order === 'number' ? raw.order : Number(raw.order || 0) || 0,
     })
   }
 
@@ -716,11 +745,28 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
 
       {kind === 'members' ? (
         <form className={`${adminPanelClass} grid gap-3 md:grid-cols-2`} onSubmit={saveMember}>
-          <Field label={t.admin_field_slug} value={member.slug} onChange={(v) => setMember({...member, slug: v})} />
+          <p className="md:col-span-2 text-xs text-brand-slate-500 dark:text-brand-slate-400">
+            {t.admin_member_public_hint}
+          </p>
           {statusSelect(member.status, (v) => setMember({...member, status: v}))}
+          <label className="flex items-center gap-2 text-sm text-brand-slate-700 dark:text-brand-slate-200">
+            <input
+              type="checkbox"
+              checked={member.featured}
+              onChange={(e) => setMember({...member, featured: e.target.checked})}
+            />
+            {t.admin_field_featured}
+          </label>
           <Field label={t.admin_field_name_uk} value={member.nameUk} onChange={(v) => setMember({...member, nameUk: v})} />
           <Field label={t.admin_field_name_en} value={member.nameEn} onChange={(v) => setMember({...member, nameEn: v})} />
           <Field label={t.admin_field_short_name} value={member.shortNameUk} onChange={(v) => setMember({...member, shortNameUk: v})} />
+          <Field
+            label={t.admin_field_order}
+            value={String(member.order)}
+            onChange={(v) => setMember({...member, order: Number(v.replace(/\D/g, '')) || 0})}
+          />
+          <Field label={t.admin_field_category_uk} value={member.categoryUk} onChange={(v) => setMember({...member, categoryUk: v})} />
+          <Field label={t.admin_field_category_en} value={member.categoryEn} onChange={(v) => setMember({...member, categoryEn: v})} />
           <Field label={t.admin_field_website} value={member.websiteUrl} onChange={(v) => setMember({...member, websiteUrl: v})} />
           <Field
             label={t.admin_field_short_desc_uk}
@@ -750,10 +796,40 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
               }}
             />
           </label>
-          <div className="md:col-span-2">
+          <Field label={t.admin_field_cover_url} value={member.coverUrl} onChange={(v) => setMember({...member, coverUrl: v})} />
+          <label className="block space-y-1.5 text-sm">
+            <span className={adminLabelClass}>{t.admin_upload_cover}</span>
+            <input
+              className="block w-full text-sm text-brand-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-blue-500 file:px-3 file:py-2 file:text-white dark:text-brand-slate-300"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                void uploadFile(file)
+                  .then((asset) => setMember((prev) => ({...prev, coverUrl: asset.url})))
+                  .catch((err) => setError(err.message))
+              }}
+            />
+          </label>
+          <div className="md:col-span-2 flex flex-wrap gap-2">
             <button className={adminPrimaryBtnClass} type="submit">
               {t.admin_save_member}
             </button>
+            {member.id ? (
+              <button
+                className={`${adminSecondaryBtnClass} border-red-300 text-red-700 hover:border-red-500 hover:text-red-800 dark:border-red-800 dark:text-red-300 dark:hover:border-red-500`}
+                type="button"
+                onClick={() => void deleteMember()}
+              >
+                {t.admin_delete}
+              </button>
+            ) : null}
+            {member.id ? (
+              <button className={adminSecondaryBtnClass} type="button" onClick={() => setMember(emptyMember())}>
+                {t.admin_cancel}
+              </button>
+            ) : null}
           </div>
         </form>
       ) : null}

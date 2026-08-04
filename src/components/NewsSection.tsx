@@ -75,7 +75,7 @@ export default function NewsSection({
   return (
     <section className="section" id="news">
       <div className="container reveal" ref={revealRef}>
-        <div className="section-kicker" data-index="02 /">
+        <div className="section-kicker">
           {t.news_kicker}
         </div>
         <div className="section-heading">

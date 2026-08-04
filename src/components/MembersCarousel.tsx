@@ -389,7 +389,7 @@ export default function MembersCarousel({
         {isIndustrial ? (
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
             <div>
-              <div className="section-kicker" data-index="01 /">
+              <div className="section-kicker">
                 {t.participants_kicker}
               </div>
               <div className="section-heading">

@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest'
 import {generateTotpSecret, verifyTotpCode, buildOtpAuthUrl} from './totp.js'
 import {hashPassword, verifyPassword, hashToken, createSessionToken} from './crypto.js'
 import {roleHasPermission, roleRequiresMfa} from './policy.js'
+import {assertValidNewPassword} from './session.js'
 
 describe('admin auth primitives', () => {
   it('hashes and verifies passwords', () => {
@@ -28,5 +29,12 @@ describe('admin auth primitives', () => {
     expect(roleHasPermission('applications', 'applications.read')).toBe(true)
     expect(roleRequiresMfa('admin')).toBe(true)
     expect(roleRequiresMfa('editor')).toBe(false)
+  })
+
+  it('enforces password policy without accepting weak values', () => {
+    expect(() => assertValidNewPassword('short')).toThrow(/at least/)
+    expect(() => assertValidNewPassword('has spaces here!!')).toThrow(/whitespace/)
+    expect(() => assertValidNewPassword('a'.repeat(200))).toThrow(/too long/)
+    expect(() => assertValidNewPassword('LongEnoughPass1')).not.toThrow()
   })
 })

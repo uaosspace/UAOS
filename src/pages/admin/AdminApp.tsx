@@ -88,11 +88,15 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
   const [mfaCode, setMfaCode] = useState('')
   const [mfaSecret, setMfaSecret] = useState<string | null>(null)
   const [otpauthUrl, setOtpauthUrl] = useState<string | null>(null)
-  const [tab, setTab] = useState<'applications' | 'stats' | 'content'>('applications')
+  const [tab, setTab] = useState<'applications' | 'stats' | 'content' | 'account'>('applications')
   const [apps, setApps] = useState<ApplicationItem[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
   const [statusFilter, setStatusFilter] = useState('all')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordMessage, setPasswordMessage] = useState<string | null>(null)
 
   const selected = useMemo(
     () => apps.find((item) => item.id === selectedId) || null,
@@ -154,6 +158,28 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
     setUser(null)
     setApps([])
     setStats(null)
+  }
+
+  async function onChangePassword(event: FormEvent) {
+    event.preventDefault()
+    setError(null)
+    setPasswordMessage(null)
+    if (newPassword !== confirmPassword) {
+      setError(t.admin_password_mismatch)
+      return
+    }
+    try {
+      await api('auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({currentPassword, newPassword}),
+      })
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setPasswordMessage(t.admin_password_changed)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Password change failed')
+    }
   }
 
   async function startMfa() {
@@ -329,6 +355,7 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
     {id: 'applications', label: t.admin_tab_applications},
     {id: 'stats', label: t.admin_tab_stats},
     {id: 'content', label: t.admin_tab_content},
+    {id: 'account', label: t.admin_tab_account},
   ]
 
   return (
@@ -509,6 +536,60 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
       ) : null}
 
       {tab === 'content' ? <ContentEditors currentLang={currentLang} /> : null}
+
+      {tab === 'account' ? (
+        <div className={`${adminPanelClass} max-w-lg`}>
+          <h2 className="font-display text-xl font-semibold text-brand-slate-900 dark:text-white">
+            {t.admin_change_password_title}
+          </h2>
+          <p className="mt-1 text-sm text-brand-slate-500 dark:text-brand-slate-400">
+            {t.admin_change_password_hint}
+          </p>
+          <form className="mt-5 space-y-4" onSubmit={(event) => void onChangePassword(event)}>
+            <label className="block">
+              <span className={adminLabelClass}>{t.admin_current_password}</span>
+              <input
+                type="password"
+                autoComplete="current-password"
+                className={`${adminInputClass} mt-1`}
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                required
+              />
+            </label>
+            <label className="block">
+              <span className={adminLabelClass}>{t.admin_new_password}</span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                className={`${adminInputClass} mt-1`}
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                required
+                minLength={12}
+              />
+            </label>
+            <label className="block">
+              <span className={adminLabelClass}>{t.admin_confirm_password}</span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                className={`${adminInputClass} mt-1`}
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                required
+                minLength={12}
+              />
+            </label>
+            {passwordMessage ? (
+              <p className="text-sm text-emerald-700 dark:text-emerald-400">{passwordMessage}</p>
+            ) : null}
+            <button type="submit" className={adminPrimaryBtnClass}>
+              {t.admin_change_password_submit}
+            </button>
+          </form>
+        </div>
+      ) : null}
     </div>
   )
 }

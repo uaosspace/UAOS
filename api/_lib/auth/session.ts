@@ -164,6 +164,70 @@ export async function revokeAllUserSessions(userId: string): Promise<void> {
   `
 }
 
+export async function revokeOtherUserSessions(userId: string, keepSessionId: string): Promise<void> {
+  const sql = getSql()
+  await sql`
+    UPDATE admin_sessions
+    SET revoked_at = now()
+    WHERE user_id = ${userId}::uuid
+      AND id <> ${keepSessionId}::uuid
+      AND revoked_at IS NULL
+  `
+}
+
+const PASSWORD_MIN_LEN = 12
+const PASSWORD_MAX_LEN = 128
+
+/** Validates a new admin password without logging the value. */
+export function assertValidNewPassword(password: string): void {
+  if (typeof password !== 'string' || password.length < PASSWORD_MIN_LEN) {
+    throw new Error(`Password must be at least ${PASSWORD_MIN_LEN} characters`)
+  }
+  if (password.length > PASSWORD_MAX_LEN) {
+    throw new Error('Password is too long')
+  }
+  if (/\s/.test(password)) {
+    throw new Error('Password must not contain whitespace')
+  }
+}
+
+/**
+ * Changes password for the signed-in admin after verifying the current one.
+ * Does not log password values. Caller should revoke other sessions.
+ */
+export async function changeAdminPassword(input: {
+  userId: string
+  currentPassword: string
+  newPassword: string
+}): Promise<void> {
+  assertValidNewPassword(input.newPassword)
+  if (input.currentPassword === input.newPassword) {
+    throw new Error('New password must differ from the current password')
+  }
+
+  const sql = getSql()
+  const rows = await sql`
+    SELECT password_hash FROM admin_users
+    WHERE id = ${input.userId}::uuid AND active = true
+    LIMIT 1
+  `
+  const row = rows[0] as {password_hash?: unknown} | undefined
+  if (!row?.password_hash) throw new Error('User not found')
+  if (!verifyPassword(input.currentPassword, String(row.password_hash))) {
+    throw new Error('Current password is incorrect')
+  }
+
+  const passwordHash = hashPassword(input.newPassword)
+  await sql`
+    UPDATE admin_users
+    SET password_hash = ${passwordHash},
+        failed_login_count = 0,
+        locked_until = NULL,
+        updated_at = now()
+    WHERE id = ${input.userId}::uuid
+  `
+}
+
 export async function resolveSession(token: string): Promise<AdminSessionContext | null> {
   const sql = getSql()
   const rows = await sql`

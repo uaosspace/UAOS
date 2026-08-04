@@ -20,9 +20,11 @@ import {
   readSessionToken,
   resolveSession,
   revokeAllUserSessions,
+  revokeOtherUserSessions,
   revokeSessionByToken,
   setSessionCookie,
   verifyUserMfa,
+  changeAdminPassword,
   type AdminSessionContext,
 } from './_lib/auth/session.js'
 import {isRecord, readStringOr} from '../src/lib/contentGuards.js'
@@ -166,6 +168,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         user: session.user,
         mfaSetupRequired: !session.user.mfaEnabled && session.user.role !== 'editor',
       })
+    }
+
+    if (parts[1] === 'change-password' && method === 'POST') {
+      if (!requireMutationOrigin(req, res)) return
+      const session = await requireSession(req, res)
+      if (!session) return
+      if (await isRateLimited(`admin:change-password:${session.user.id}`, 15 * 60 * 1000, 10)) {
+        return sendJsonError(res, 429, 'Too many requests')
+      }
+      const body = parseJsonBody(req)
+      const source = isRecord(body) ? body : {}
+      const currentPassword = readStringOr(source.currentPassword, '')
+      const newPassword = readStringOr(source.newPassword, '')
+      if (!currentPassword || !newPassword) {
+        return sendJsonError(res, 400, 'currentPassword and newPassword required')
+      }
+      try {
+        await changeAdminPassword({
+          userId: session.user.id,
+          currentPassword,
+          newPassword,
+        })
+        await revokeOtherUserSessions(session.user.id, session.sessionId)
+        await writeAuditEvent({
+          actorType: 'admin',
+          actorId: session.user.id,
+          action: 'admin.password_changed',
+          entityType: 'admin_user',
+          entityId: session.user.id,
+          ip,
+        })
+        return res.status(200).json({ok: true})
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Password change failed'
+        return sendJsonError(res, 400, message)
+      }
     }
 
     if (parts[1] === 'mfa' && parts[2] === 'setup' && method === 'POST') {
@@ -320,23 +358,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const session = await requireSession(req, res, 'content.write')
         if (!session) return
         const body = parseJsonBody(req)
-        const item = await upsertContentMember(body)
-        await writeAuditEvent({
-          actorType: 'admin',
-          actorId: session.user.id,
-          action: 'content.member.upsert',
-          entityType: 'member',
-          entityId: item.id,
-          ip,
-        })
-        return res.status(200).json({item})
+        try {
+          const item = await upsertContentMember(body)
+          await writeAuditEvent({
+            actorType: 'admin',
+            actorId: session.user.id,
+            action: 'content.member.upsert',
+            entityType: 'member',
+            entityId: String((item as {id?: unknown}).id ?? ''),
+            ip,
+          })
+          return res.status(200).json({item})
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Save failed'
+          return sendJsonError(res, 400, message)
+        }
       }
       if (method === 'DELETE' && parts[2]) {
         if (!requireMutationOrigin(req, res)) return
         const session = await requireSession(req, res, 'content.write')
         if (!session) return
-        await deleteContentMember(parts[2])
-        return res.status(200).json({ok: true})
+        try {
+          await deleteContentMember(parts[2])
+          await writeAuditEvent({
+            actorType: 'admin',
+            actorId: session.user.id,
+            action: 'content.member.delete',
+            entityType: 'member',
+            entityId: parts[2],
+            ip,
+          })
+          return res.status(200).json({ok: true})
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Delete failed'
+          return sendJsonError(res, 400, message)
+        }
       }
     }
     if (entity === 'news') {

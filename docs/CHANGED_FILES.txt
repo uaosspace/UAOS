@@ -208,6 +208,8 @@ api/_lib/rateLimitStore.ts
 api/_lib/turnstile.ts
 api/_lib/audit.ts
 api/_lib/contentRepo.ts
+api/_lib/contentValidation.ts
+api/_lib/contentValidation.test.ts
 api/_lib/blobStore.ts
 api/_lib/mediaCleanup.ts
 api/_lib/mediaCleanup.test.ts
@@ -222,6 +224,8 @@ api/admin-router.ts
 api/public-router.ts
 src/pages/admin/adminUi.ts
 scripts/sync-vercel-development-env.mjs
+scripts/seed-members.mjs
+package.json
 docs/ENV.md
 scripts/_tidy-env-local.mjs
 src/utils/slugify.ts
