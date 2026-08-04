@@ -21,6 +21,25 @@ export function normalizeOptionalHttpUrl(raw: unknown, fieldName: string): strin
   return parsed.toString()
 }
 
+/**
+ * Logo/cover fields: absolute http(s) or same-origin site path (`/members/...`).
+ * Rejects protocol-relative (`//…`) and path traversal (`..`).
+ */
+export function normalizeOptionalMediaUrl(raw: unknown, fieldName: string): string {
+  const value = typeof raw === 'string' ? raw.trim() : ''
+  if (!value) return ''
+  if (value.startsWith('/') && !value.startsWith('//')) {
+    if (value.includes('\\') || /(^|\/)\.\.(\/|$)/.test(value)) {
+      throw new Error(`${fieldName} must be a valid media URL`)
+    }
+    if (value.length > 2048) {
+      throw new Error(`${fieldName} is too long`)
+    }
+    return value
+  }
+  return normalizeOptionalHttpUrl(value, fieldName)
+}
+
 export function requireNonEmptyText(raw: unknown, fieldName: string, maxLen = 500): string {
   const value = typeof raw === 'string' ? raw.trim() : ''
   if (!value) throw new Error(`${fieldName} required`)

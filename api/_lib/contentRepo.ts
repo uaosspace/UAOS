@@ -7,6 +7,7 @@ import {releaseOwnedMediaIfUnused} from './mediaCleanup.js'
 import {
   clampOptionalText,
   normalizeOptionalHttpUrl,
+  normalizeOptionalMediaUrl,
   normalizeOptionalPublicEmail,
   normalizeOptionalPublicPhone,
   requireNonEmptyText,
@@ -234,8 +235,8 @@ export async function upsertContentMember(body: unknown) {
   const sortOrder = Number.isFinite(Number(source.order)) ? Math.max(0, Math.min(9999, Number(source.order))) : 0
 
   const websiteUrl = normalizeOptionalHttpUrl(source.websiteUrl, 'websiteUrl')
-  const logoUrl = normalizeOptionalHttpUrl(source.logoUrl, 'logoUrl')
-  const coverImageUrl = normalizeOptionalHttpUrl(source.coverImageUrl, 'coverImageUrl')
+  const logoUrl = normalizeOptionalMediaUrl(source.logoUrl, 'logoUrl')
+  const coverImageUrl = normalizeOptionalMediaUrl(source.coverImageUrl, 'coverImageUrl')
   const publicEmail = normalizeOptionalPublicEmail(source.publicEmail)
   const publicPhone = normalizeOptionalPublicPhone(source.publicPhone)
 

@@ -2,6 +2,7 @@ import {describe, expect, it} from 'vitest'
 import {
   clampOptionalText,
   normalizeOptionalHttpUrl,
+  normalizeOptionalMediaUrl,
   normalizeOptionalPublicEmail,
   normalizeOptionalPublicPhone,
   requireNonEmptyText,
@@ -17,6 +18,17 @@ describe('contentValidation', () => {
     expect(() => normalizeOptionalHttpUrl('https://user:pass@evil.test', 'logoUrl')).toThrow(
       /credentials/,
     )
+  })
+
+  it('accepts site-relative media paths used by seeded member logos', () => {
+    expect(normalizeOptionalMediaUrl('/members/effetex.png?v=2', 'logoUrl')).toBe(
+      '/members/effetex.png?v=2',
+    )
+    expect(normalizeOptionalMediaUrl('https://cdn.example/a.png', 'coverImageUrl')).toBe(
+      'https://cdn.example/a.png',
+    )
+    expect(() => normalizeOptionalMediaUrl('//cdn.example/a.png', 'logoUrl')).toThrow(/http/)
+    expect(() => normalizeOptionalMediaUrl('/members/../secret.png', 'logoUrl')).toThrow(/media/)
   })
 
   it('requires non-empty text within limits', () => {
