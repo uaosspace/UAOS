@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState, type ReactNode} from 'react'
+import {useCallback, useEffect, useMemo, useState, type ReactNode} from 'react'
 import Header from './components/Header'
 import Footer from './components/Footer'
 import SvgDefs from './components/SvgDefs'
@@ -67,7 +67,8 @@ export default function App() {
   const eventsNeeded =
     currentRoute === APP_ROUTES.home ||
     currentRoute === APP_ROUTES.eventsList ||
-    currentRoute === APP_ROUTES.eventsDetails
+    currentRoute === APP_ROUTES.eventsDetails ||
+    currentRoute === APP_ROUTES.newsList
   const {data: events} = useEventsResource(eventsNeeded)
 
   const documentsNeeded = currentRoute === APP_ROUTES.knowledge
@@ -117,6 +118,18 @@ export default function App() {
     [routeParams.eventSlug, events],
   )
 
+  const openNews = useCallback(
+    (slug: string) => {
+      const item = news.find((entry) => entry.slug === slug)
+      if (item?.externalUrl) {
+        window.open(item.externalUrl, '_blank', 'noopener,noreferrer')
+        return
+      }
+      handleSelectNews(slug)
+    },
+    [news, handleSelectNews],
+  )
+
   const pageTransitionKey = useMemo(
     () =>
       [
@@ -142,7 +155,7 @@ export default function App() {
         events={events}
         onNavigate={handleNavigation}
         onSelectMember={handleSelectMember}
-        onSelectNews={handleSelectNews}
+        onSelectNews={openNews}
         onSelectEvent={handleSelectEvent}
       />
     )
@@ -162,7 +175,14 @@ export default function App() {
     mainContent = <MemberDetailsPage currentLang={currentLang} member={activeMember} onBack={handleBackFromMember} />
   } else if (currentRoute === APP_ROUTES.newsList) {
     mainContent = (
-      <NewsListPage currentLang={currentLang} news={news} onSelectNews={handleSelectNews} onNavigate={handleNavigation} />
+      <NewsListPage
+        currentLang={currentLang}
+        news={news}
+        events={events}
+        onSelectNews={openNews}
+        onSelectEvent={handleSelectEvent}
+        onNavigate={handleNavigation}
+      />
     )
   } else if (currentRoute === APP_ROUTES.newsDetails && activeNews) {
     mainContent = (
@@ -198,7 +218,9 @@ export default function App() {
   } else if (currentRoute === APP_ROUTES.privacy) {
     mainContent = <PrivacyRoutePage currentLang={currentLang} onBack={() => handleNavigation(APP_ROUTES.home)} />
   } else if (currentRoute === APP_ROUTES.admin) {
-    mainContent = <AdminApp />
+    mainContent = (
+      <AdminApp currentLang={currentLang} setCurrentLang={setCurrentLang} />
+    )
   } else {
     mainContent = <NotFoundPage currentLang={currentLang} onBackHome={() => handleNavigation(APP_ROUTES.home)} />
   }
@@ -207,8 +229,9 @@ export default function App() {
     return (
       <>
         <SvgDefs />
-        <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-          {mainContent}
+        <div className="relative min-h-screen overflow-hidden bg-slate-50 text-brand-slate-900 transition-colors duration-300 dark:bg-[#060810] dark:text-brand-slate-100">
+          <div className="pointer-events-none absolute inset-0 bg-grid-pattern opacity-40 dark:opacity-30" aria-hidden />
+          <div className="relative z-10">{mainContent}</div>
         </div>
       </>
     )

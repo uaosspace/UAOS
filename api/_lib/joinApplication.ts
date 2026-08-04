@@ -1,4 +1,4 @@
-import {isRecord, readStringArray, readStringOr} from '../../src/lib/contentGuards'
+import {isRecord, readStringArray, readStringOr} from '../../src/lib/contentGuards.js'
 
 const APPLICANT_KINDS = ['producer-supplier', 'consumer-enterprise', 'expert-org', 'other'] as const
 type ApplicantKind = (typeof APPLICANT_KINDS)[number]

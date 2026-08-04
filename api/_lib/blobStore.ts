@@ -1,4 +1,4 @@
-import {get, put} from '@vercel/blob'
+import {get, put, del} from '@vercel/blob'
 
 function requireBlobToken() {
   const token = process.env.BLOB_READ_WRITE_TOKEN?.trim()
@@ -30,4 +30,11 @@ export async function getBlobByPathname(pathname: string, access: 'public' | 'pr
     access,
     token: requireBlobToken(),
   })
+}
+
+/** Deletes a blob by public URL or storage pathname. */
+export async function deleteBlob(urlOrPathname: string): Promise<void> {
+  const target = urlOrPathname.trim()
+  if (!target) return
+  await del(target, {token: requireBlobToken()})
 }

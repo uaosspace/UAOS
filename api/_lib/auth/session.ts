@@ -1,9 +1,9 @@
 import type {VercelRequest, VercelResponse} from '@vercel/node'
-import {getSql} from '../db'
-import {createSessionToken, hashToken, verifyPassword} from './crypto'
-import {roleRequiresMfa, type AdminRole} from './policy'
-import {decryptSecret, encryptSecret, hashPassword} from './crypto'
-import {buildOtpAuthUrl, generateTotpSecret, verifyTotpCode} from './totp'
+import {getSql} from '../db.js'
+import {createSessionToken, hashToken, verifyPassword} from './crypto.js'
+import {roleRequiresMfa, type AdminRole} from './policy.js'
+import {decryptSecret, encryptSecret, hashPassword} from './crypto.js'
+import {buildOtpAuthUrl, generateTotpSecret, verifyTotpCode} from './totp.js'
 
 export const SESSION_COOKIE = 'uaos_admin_session'
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000

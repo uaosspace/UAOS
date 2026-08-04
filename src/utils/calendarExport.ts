@@ -8,33 +8,39 @@ function buildPublicUrl(eventId: string): string {
   return `${origin}${path}?event=${eventId}`;
 }
 
+function eventEndIso(event: AssociationEvent): string {
+  if (event.endAt?.trim()) return event.endAt
+  // Google/Outlook require an end; default +1h from start when admin left end empty.
+  return DateTime.fromISO(event.startAt, {zone: 'utc'}).plus({hours: 1}).toUTC().toISO() ?? event.startAt
+}
+
 export function getGoogleCalendarUrl(event: AssociationEvent, lang: Locale): string {
-  const start = DateTime.fromISO(event.startAt, { zone: 'utc' }).toFormat("yyyyMMdd'T'HHmmss'Z'");
-  const end = DateTime.fromISO(event.endAt, { zone: 'utc' }).toFormat("yyyyMMdd'T'HHmmss'Z'");
-  
-  const title = event.title[lang];
-  const desc = `${event.shortDescription[lang]}\n\n${buildPublicUrl(event.id)}`;
-  const location = event.location ? event.location[lang] : '';
+  const start = DateTime.fromISO(event.startAt, {zone: 'utc'}).toFormat("yyyyMMdd'T'HHmmss'Z'")
+  const end = DateTime.fromISO(eventEndIso(event), {zone: 'utc'}).toFormat("yyyyMMdd'T'HHmmss'Z'")
+
+  const title = event.title[lang] || event.title.uk || event.title.en || 'UAOS event'
+  const desc = `${event.shortDescription[lang] || event.shortDescription.uk || ''}\n\n${buildPublicUrl(event.id)}`
+  const location = event.location ? event.location[lang] || event.location.uk || '' : ''
 
   const params = new URLSearchParams({
     action: 'TEMPLATE',
     text: title,
     dates: `${start}/${end}`,
     details: desc,
-    location: location,
-    ctz: event.timeZone
-  });
+    location,
+    ctz: event.timeZone || 'Europe/Kyiv',
+  })
 
-  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+  return `https://calendar.google.com/calendar/render?${params.toString()}`
 }
 
 export function getOutlookCalendarUrl(event: AssociationEvent, lang: Locale): string {
-  const start = DateTime.fromISO(event.startAt, { zone: 'utc' }).toFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-  const end = DateTime.fromISO(event.endAt, { zone: 'utc' }).toFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
-  
-  const title = event.title[lang];
-  const desc = `${event.shortDescription[lang]}\n\n${buildPublicUrl(event.id)}`;
-  const location = event.location ? event.location[lang] : '';
+  const start = DateTime.fromISO(event.startAt, {zone: 'utc'}).toFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
+  const end = DateTime.fromISO(eventEndIso(event), {zone: 'utc'}).toFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
+
+  const title = event.title[lang] || event.title.uk || event.title.en || 'UAOS event'
+  const desc = `${event.shortDescription[lang] || event.shortDescription.uk || ''}\n\n${buildPublicUrl(event.id)}`
+  const location = event.location ? event.location[lang] || event.location.uk || '' : ''
 
   const params = new URLSearchParams({
     path: '/calendar/action/compose',
@@ -43,10 +49,10 @@ export function getOutlookCalendarUrl(event: AssociationEvent, lang: Locale): st
     enddt: end,
     subject: title,
     body: desc,
-    location: location
-  });
+    location,
+  })
 
-  return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`;
+  return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`
 }
 
 function escapeIcsText(str: string): string {
@@ -55,15 +61,17 @@ function escapeIcsText(str: string): string {
 }
 
 export function generateIcsBlob(event: AssociationEvent, lang: Locale): Blob {
-  const start = DateTime.fromISO(event.startAt, { zone: 'utc' }).toFormat("yyyyMMdd'T'HHmmss'Z'");
-  const end = DateTime.fromISO(event.endAt, { zone: 'utc' }).toFormat("yyyyMMdd'T'HHmmss'Z'");
-  const now = DateTime.utc().toFormat("yyyyMMdd'T'HHmmss'Z'");
-  const uid = `${event.id}@uaos`;
+  const start = DateTime.fromISO(event.startAt, {zone: 'utc'}).toFormat("yyyyMMdd'T'HHmmss'Z'")
+  const end = DateTime.fromISO(eventEndIso(event), {zone: 'utc'}).toFormat("yyyyMMdd'T'HHmmss'Z'")
+  const now = DateTime.utc().toFormat("yyyyMMdd'T'HHmmss'Z'")
+  const uid = `${event.id}@uaos`
 
-  const title = escapeIcsText(event.title[lang]);
-  const desc = escapeIcsText(`${event.shortDescription[lang]}\n\n${buildPublicUrl(event.id)}`);
-  const location = escapeIcsText(event.location ? event.location[lang] : '');
-  const url = buildPublicUrl(event.id);
+  const title = escapeIcsText(event.title[lang] || event.title.uk || event.title.en || 'UAOS event')
+  const desc = escapeIcsText(
+    `${event.shortDescription[lang] || event.shortDescription.uk || ''}\n\n${buildPublicUrl(event.id)}`,
+  )
+  const location = escapeIcsText(event.location ? event.location[lang] || event.location.uk || '' : '')
+  const url = buildPublicUrl(event.id)
 
   const icsContent = [
     'BEGIN:VCALENDAR',

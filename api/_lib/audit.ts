@@ -1,4 +1,4 @@
-import {getSql, isDatabaseConfigured} from './db'
+import {getSql, isDatabaseConfigured} from './db.js'
 
 export async function writeAuditEvent(input: {
   actorType: string

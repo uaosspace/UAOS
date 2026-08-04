@@ -1,4 +1,34 @@
 import {useCallback, useEffect, useState, type FormEvent} from 'react'
+import {DateTime} from 'luxon'
+import type {Locale} from '../../data/locales'
+import {TRANSLATIONS} from '../../data/translations'
+import {resolveContentSlug} from '../../utils/slugify'
+import {
+  adminInputClass,
+  adminLabelClass,
+  adminPanelClass,
+  adminPrimaryBtnClass,
+  adminSecondaryBtnClass,
+  adminTabActiveClass,
+  adminTabIdleClass,
+} from './adminUi'
+
+const ADMIN_EVENT_ZONE = 'Europe/Kyiv'
+
+function isoToKyivParts(iso: string): {date: string; time: string} {
+  if (!iso.trim()) return {date: '', time: ''}
+  const dt = DateTime.fromISO(iso, {setZone: true}).setZone(ADMIN_EVENT_ZONE)
+  if (!dt.isValid) return {date: '', time: ''}
+  return {date: dt.toFormat('yyyy-MM-dd'), time: dt.toFormat('HH:mm')}
+}
+
+function kyivPartsToIso(date: string, time: string): string {
+  if (!date.trim()) return ''
+  const clock = time.trim() || '10:00'
+  const dt = DateTime.fromISO(`${date}T${clock}`, {zone: ADMIN_EVENT_ZONE})
+  if (!dt.isValid) return ''
+  return dt.toUTC().toISO() ?? ''
+}
 
 type ContentKind = 'news' | 'members' | 'events' | 'documents' | 'settings'
 
@@ -14,6 +44,8 @@ type NewsDraft = {
   bodyUk: string
   bodyEn: string
   coverUrl: string
+  kind: 'internal' | 'link'
+  externalUrl: string
 }
 
 type MemberDraft = {
@@ -45,6 +77,7 @@ type EventDraft = {
   endAt: string
   locationUk: string
   locationEn: string
+  coverUrl: string
 }
 
 type DocumentDraft = {
@@ -94,6 +127,8 @@ const emptyNews = (): NewsDraft => ({
   bodyUk: '',
   bodyEn: '',
   coverUrl: '',
+  kind: 'internal',
+  externalUrl: '',
 })
 
 const emptyMember = (): MemberDraft => ({
@@ -123,6 +158,7 @@ const emptyEvent = (): EventDraft => ({
   endAt: '',
   locationUk: '',
   locationEn: '',
+  coverUrl: '',
 })
 
 const emptyDocument = (): DocumentDraft => ({
@@ -149,21 +185,75 @@ function Field({
   onChange: (value: string) => void
   multiline?: boolean
 }) {
-  const className =
-    'w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-900'
   return (
-    <label className="block space-y-1 text-sm">
-      <span className="text-slate-600 dark:text-slate-300">{label}</span>
+    <label className="block space-y-1.5 text-sm">
+      <span className={adminLabelClass}>{label}</span>
       {multiline ? (
-        <textarea className={className} rows={4} value={value} onChange={(e) => onChange(e.target.value)} />
+        <textarea
+          className={adminInputClass}
+          rows={4}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
       ) : (
-        <input className={className} value={value} onChange={(e) => onChange(e.target.value)} />
+        <input className={adminInputClass} value={value} onChange={(e) => onChange(e.target.value)} />
       )}
     </label>
   )
 }
 
-export default function ContentEditors() {
+/** Date + time pickers in Kyiv wall time; value stored as UTC ISO for the API. */
+function EventDateTimeFields({
+  dateLabel,
+  timeLabel,
+  isoValue,
+  onChange,
+  required,
+}: {
+  dateLabel: string
+  timeLabel: string
+  isoValue: string
+  onChange: (iso: string) => void
+  required?: boolean
+}) {
+  const {date, time} = isoToKyivParts(isoValue)
+
+  function commit(nextDate: string, nextTime: string) {
+    onChange(kyivPartsToIso(nextDate, nextTime))
+  }
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 md:col-span-2">
+      <label className="block space-y-1.5 text-sm">
+        <span className={adminLabelClass}>{dateLabel}</span>
+        <input
+          className={adminInputClass}
+          type="date"
+          value={date}
+          required={required}
+          onChange={(e) => commit(e.target.value, time || '10:00')}
+        />
+      </label>
+      <label className="block space-y-1.5 text-sm">
+        <span className={adminLabelClass}>{timeLabel}</span>
+        <input
+          className={adminInputClass}
+          type="time"
+          value={time}
+          required={required}
+          onChange={(e) => commit(date, e.target.value)}
+        />
+      </label>
+    </div>
+  )
+}
+
+type ContentEditorsProps = {
+  currentLang: Locale
+}
+
+export default function ContentEditors({currentLang}: ContentEditorsProps) {
+  const t = TRANSLATIONS[currentLang]
   const [kind, setKind] = useState<ContentKind>('news')
   const [items, setItems] = useState<unknown[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -232,20 +322,29 @@ export default function ContentEditors() {
     setError(null)
     setMessage(null)
     try {
+      const externalUrl = news.kind === 'link' ? news.externalUrl.trim() : ''
+      if (news.kind === 'link' && !/^https?:\/\//i.test(externalUrl)) {
+        throw new Error(t.admin_news_external_url_required)
+      }
+      const slug = resolveContentSlug(news.slug, news.titleUk, 'news')
       await api('content/news', {
         method: 'POST',
         body: JSON.stringify({
           id: news.id,
-          slug: news.slug,
+          slug,
           status: news.status,
           publishedAt: news.publishedAt,
           title: {uk: news.titleUk, en: news.titleEn},
           excerpt: {uk: news.excerptUk, en: news.excerptEn},
-          body: {uk: news.bodyUk, en: news.bodyEn},
+          body: {
+            uk: news.kind === 'internal' ? news.bodyUk : '',
+            en: news.kind === 'internal' ? news.bodyEn : '',
+          },
           coverImageUrl: news.coverUrl,
+          externalUrl,
         }),
       })
-      setMessage('News saved')
+      setMessage(t.admin_saved)
       setNews(emptyNews())
       await load()
     } catch (err) {
@@ -272,7 +371,7 @@ export default function ContentEditors() {
           logoUrl: member.logoUrl,
         }),
       })
-      setMessage('Member saved')
+      setMessage(t.admin_saved)
       setMember(emptyMember())
       await load()
     } catch (err) {
@@ -285,11 +384,12 @@ export default function ContentEditors() {
     setError(null)
     setMessage(null)
     try {
+      const slug = resolveContentSlug(eventItem.slug, eventItem.titleUk, 'event')
       await api('content/events', {
         method: 'POST',
         body: JSON.stringify({
           id: eventItem.id,
-          slug: eventItem.slug,
+          slug,
           status: eventItem.status,
           title: {uk: eventItem.titleUk, en: eventItem.titleEn},
           shortDescription: {uk: eventItem.shortDescriptionUk, en: eventItem.shortDescriptionEn},
@@ -298,13 +398,29 @@ export default function ContentEditors() {
           startAt: eventItem.startAt,
           endAt: eventItem.endAt,
           location: eventItem.locationUk || eventItem.locationEn,
+          coverImageUrl: eventItem.coverUrl,
         }),
       })
-      setMessage('Event saved')
+      setMessage(t.admin_saved)
       setEventItem(emptyEvent())
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
+    }
+  }
+
+  async function deleteEvent() {
+    if (!eventItem.id) return
+    if (!window.confirm(t.admin_delete_confirm)) return
+    setError(null)
+    setMessage(null)
+    try {
+      await api(`content/events/${eventItem.id}`, {method: 'DELETE'})
+      setMessage(t.admin_saved)
+      setEventItem(emptyEvent())
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed')
     }
   }
 
@@ -327,7 +443,7 @@ export default function ContentEditors() {
           fileUrl: documentItem.fileUrl,
         }),
       })
-      setMessage('Document saved')
+      setMessage(t.admin_saved)
       setDocumentItem(emptyDocument())
       await load()
     } catch (err) {
@@ -349,7 +465,7 @@ export default function ContentEditors() {
           brandTagline: {uk: settings.brandTaglineUk, en: settings.brandTaglineEn},
         }),
       })
-      setMessage('Settings saved')
+      setMessage(t.admin_saved)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
     }
@@ -359,6 +475,7 @@ export default function ContentEditors() {
     const title = (raw.title as {uk?: string; en?: string}) || {}
     const excerpt = (raw.excerpt as {uk?: string; en?: string}) || {}
     const body = (raw.body as {uk?: string; en?: string}) || {}
+    const externalUrl = String(raw.externalUrl || '')
     setNews({
       id: String(raw.id || ''),
       slug: String(raw.slug || ''),
@@ -371,6 +488,8 @@ export default function ContentEditors() {
       bodyUk: body.uk || '',
       bodyEn: body.en || '',
       coverUrl: String(raw.coverUrl || raw.coverImageUrl || ''),
+      kind: externalUrl ? 'link' : 'internal',
+      externalUrl,
     })
   }
 
@@ -411,6 +530,7 @@ export default function ContentEditors() {
       endAt: String(raw.endAt || ''),
       locationUk: String(raw.location || ''),
       locationEn: '',
+      coverUrl: String(raw.coverUrl || raw.coverImageUrl || ''),
     })
   }
 
@@ -432,77 +552,146 @@ export default function ContentEditors() {
     })
   }
 
+  const kindTabs: Array<{id: ContentKind; label: string}> = [
+    {id: 'news', label: t.admin_tab_news},
+    {id: 'members', label: t.admin_tab_members},
+    {id: 'events', label: t.admin_tab_events},
+    {id: 'documents', label: t.admin_tab_documents},
+    {id: 'settings', label: t.admin_tab_settings},
+  ]
+
+  const statusSelect = (value: 'draft' | 'published', onChange: (v: 'draft' | 'published') => void) => (
+    <label className="block space-y-1.5 text-sm">
+      <span className={adminLabelClass}>{t.admin_field_status}</span>
+      <select
+        className={adminInputClass}
+        value={value}
+        onChange={(e) => onChange(e.target.value as 'draft' | 'published')}
+      >
+        <option value="draft">{t.admin_status_draft}</option>
+        <option value="published">{t.admin_status_published}</option>
+      </select>
+    </label>
+  )
+
   return (
     <div className="mt-6 space-y-4">
       <div className="flex flex-wrap gap-2">
-        {(['news', 'members', 'events', 'documents', 'settings'] as const).map((name) => (
+        {kindTabs.map((item) => (
           <button
-            key={name}
-            className={`rounded px-3 py-1.5 text-sm ${kind === name ? 'bg-cyan-700 text-white' : 'border'}`}
-            onClick={() => setKind(name)}
+            key={item.id}
+            type="button"
+            className={kind === item.id ? adminTabActiveClass : adminTabIdleClass}
+            onClick={() => setKind(item.id)}
           >
-            {name}
+            {item.label}
           </button>
         ))}
       </div>
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
+      {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+      {message ? <p className="text-sm text-emerald-700 dark:text-emerald-400">{message}</p> : null}
 
       {kind !== 'settings' ? (
-        <ul className="max-h-48 overflow-auto divide-y rounded border text-sm dark:divide-slate-700 dark:border-slate-700">
-          {items.map((raw) => {
-            const item = raw as Record<string, unknown>
-            const id = String(item.id || item.slug || Math.random())
-            const label =
-              String((item.title as {uk?: string} | undefined)?.uk || '') ||
-              String((item.name as {uk?: string} | undefined)?.uk || '') ||
-              String(item.slug || id)
-            return (
-              <li key={id}>
-                <button
-                  className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
-                  onClick={() => {
-                    if (kind === 'news') pickNews(item)
-                    if (kind === 'members') pickMember(item)
-                    if (kind === 'events') pickEvent(item)
-                    if (kind === 'documents') pickDocument(item)
-                    setMessage(`Editing ${label}`)
-                  }}
-                >
-                  <span className="font-medium">{label}</span>
-                  <span className="ml-2 text-xs text-slate-500">{String(item.status || '')}</span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+        <div className={adminPanelClass}>
+          <ul className="max-h-52 overflow-auto divide-y divide-brand-slate-200 dark:divide-brand-slate-700">
+            {items.map((raw) => {
+              const item = raw as Record<string, unknown>
+              const id = String(item.id || item.slug || Math.random())
+              const label =
+                String((item.title as {uk?: string} | undefined)?.uk || '') ||
+                String((item.name as {uk?: string} | undefined)?.uk || '') ||
+                String(item.slug || id)
+              return (
+                <li key={id}>
+                  <button
+                    type="button"
+                    className="w-full rounded-xl px-3 py-2.5 text-left text-sm transition hover:bg-brand-slate-50 dark:hover:bg-brand-slate-800/60"
+                    onClick={() => {
+                      if (kind === 'news') pickNews(item)
+                      if (kind === 'members') pickMember(item)
+                      if (kind === 'events') pickEvent(item)
+                      if (kind === 'documents') pickDocument(item)
+                      setMessage(`${t.admin_editing}: ${label}`)
+                    }}
+                  >
+                    <span className="font-medium text-brand-slate-900 dark:text-white">{label}</span>
+                    <span className="ml-2 text-xs text-brand-slate-500">
+                      {String(item.status || '') === 'published'
+                        ? t.admin_status_published
+                        : t.admin_status_draft}
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
       ) : null}
 
       {kind === 'news' ? (
-        <form className="grid gap-3 md:grid-cols-2" onSubmit={saveNews}>
-          <Field label="Slug" value={news.slug} onChange={(v) => setNews({...news, slug: v})} />
-          <label className="block space-y-1 text-sm">
-            <span>Status</span>
+        <form className={`${adminPanelClass} grid gap-3 md:grid-cols-2`} onSubmit={saveNews}>
+          <label className="block space-y-1.5 text-sm md:col-span-2">
+            <span className={adminLabelClass}>{t.admin_news_kind}</span>
             <select
-              className="w-full rounded border px-3 py-2"
-              value={news.status}
-              onChange={(e) => setNews({...news, status: e.target.value as 'draft' | 'published'})}
+              className={adminInputClass}
+              value={news.kind}
+              onChange={(e) =>
+                setNews({...news, kind: e.target.value === 'link' ? 'link' : 'internal'})
+              }
             >
-              <option value="draft">draft</option>
-              <option value="published">published</option>
+              <option value="internal">{t.admin_news_kind_internal}</option>
+              <option value="link">{t.admin_news_kind_link}</option>
             </select>
           </label>
-          <Field label="Title UK *" value={news.titleUk} onChange={(v) => setNews({...news, titleUk: v})} />
-          <Field label="Title EN" value={news.titleEn} onChange={(v) => setNews({...news, titleEn: v})} />
-          <Field label="Excerpt UK" value={news.excerptUk} onChange={(v) => setNews({...news, excerptUk: v})} multiline />
-          <Field label="Excerpt EN" value={news.excerptEn} onChange={(v) => setNews({...news, excerptEn: v})} multiline />
-          <Field label="Body UK" value={news.bodyUk} onChange={(v) => setNews({...news, bodyUk: v})} multiline />
-          <Field label="Body EN" value={news.bodyEn} onChange={(v) => setNews({...news, bodyEn: v})} multiline />
-          <Field label="Cover URL" value={news.coverUrl} onChange={(v) => setNews({...news, coverUrl: v})} />
-          <label className="block space-y-1 text-sm">
-            <span>Upload cover</span>
+          <Field label={t.admin_field_slug} value={news.slug} onChange={(v) => setNews({...news, slug: v})} />
+          {statusSelect(news.status, (v) => setNews({...news, status: v}))}
+          <Field label={t.admin_field_title_uk} value={news.titleUk} onChange={(v) => setNews({...news, titleUk: v})} />
+          <Field label={t.admin_field_title_en} value={news.titleEn} onChange={(v) => setNews({...news, titleEn: v})} />
+          <Field label={t.admin_field_excerpt_uk} value={news.excerptUk} onChange={(v) => setNews({...news, excerptUk: v})} multiline />
+          <Field label={t.admin_field_excerpt_en} value={news.excerptEn} onChange={(v) => setNews({...news, excerptEn: v})} multiline />
+          {news.kind === 'link' ? (
+            <div className="md:col-span-2 grid gap-3 md:grid-cols-2">
+              <Field
+                label={t.admin_field_news_external_url}
+                value={news.externalUrl}
+                onChange={(v) => setNews({...news, externalUrl: v})}
+              />
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  className={adminSecondaryBtnClass}
+                  onClick={() => {
+                    setError(null)
+                    void api<{imageUrl: string}>('media/fetch-og', {
+                      method: 'POST',
+                      body: JSON.stringify({url: news.externalUrl}),
+                    })
+                      .then((data) => {
+                        setNews((prev) => ({...prev, coverUrl: data.imageUrl}))
+                        setMessage(t.admin_news_cover_fetched)
+                      })
+                      .catch((err) => setError(err instanceof Error ? err.message : 'Fetch failed'))
+                  }}
+                >
+                  {t.admin_news_fetch_cover}
+                </button>
+              </div>
+              <p className="md:col-span-2 text-xs text-brand-slate-500 dark:text-brand-slate-400">
+                {t.admin_news_link_hint}
+              </p>
+            </div>
+          ) : (
+            <>
+              <Field label={t.admin_field_body_uk} value={news.bodyUk} onChange={(v) => setNews({...news, bodyUk: v})} multiline />
+              <Field label={t.admin_field_body_en} value={news.bodyEn} onChange={(v) => setNews({...news, bodyEn: v})} multiline />
+            </>
+          )}
+          <Field label={t.admin_field_cover_url} value={news.coverUrl} onChange={(v) => setNews({...news, coverUrl: v})} />
+          <label className="block space-y-1.5 text-sm">
+            <span className={adminLabelClass}>{t.admin_upload_cover}</span>
             <input
+              className="block w-full text-sm text-brand-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-blue-500 file:px-3 file:py-2 file:text-white dark:text-brand-slate-300"
               type="file"
               accept="image/png,image/jpeg,image/webp"
               onChange={(e) => {
@@ -511,54 +700,45 @@ export default function ContentEditors() {
                 void uploadFile(file)
                   .then((asset) => {
                     setNews((prev) => ({...prev, coverUrl: asset.url}))
-                    setMessage(`Uploaded ${asset.id}`)
+                    setMessage(t.admin_saved)
                   })
                   .catch((err) => setError(err.message))
               }}
             />
           </label>
           <div className="md:col-span-2">
-            <button className="rounded bg-cyan-700 px-3 py-2 text-white" type="submit">
-              Save news
+            <button className={adminPrimaryBtnClass} type="submit">
+              {t.admin_save_news}
             </button>
           </div>
         </form>
       ) : null}
 
       {kind === 'members' ? (
-        <form className="grid gap-3 md:grid-cols-2" onSubmit={saveMember}>
-          <Field label="Slug" value={member.slug} onChange={(v) => setMember({...member, slug: v})} />
-          <label className="block space-y-1 text-sm">
-            <span>Status</span>
-            <select
-              className="w-full rounded border px-3 py-2"
-              value={member.status}
-              onChange={(e) => setMember({...member, status: e.target.value as 'draft' | 'published'})}
-            >
-              <option value="draft">draft</option>
-              <option value="published">published</option>
-            </select>
-          </label>
-          <Field label="Name UK *" value={member.nameUk} onChange={(v) => setMember({...member, nameUk: v})} />
-          <Field label="Name EN" value={member.nameEn} onChange={(v) => setMember({...member, nameEn: v})} />
-          <Field label="Short name" value={member.shortNameUk} onChange={(v) => setMember({...member, shortNameUk: v})} />
-          <Field label="Website" value={member.websiteUrl} onChange={(v) => setMember({...member, websiteUrl: v})} />
+        <form className={`${adminPanelClass} grid gap-3 md:grid-cols-2`} onSubmit={saveMember}>
+          <Field label={t.admin_field_slug} value={member.slug} onChange={(v) => setMember({...member, slug: v})} />
+          {statusSelect(member.status, (v) => setMember({...member, status: v}))}
+          <Field label={t.admin_field_name_uk} value={member.nameUk} onChange={(v) => setMember({...member, nameUk: v})} />
+          <Field label={t.admin_field_name_en} value={member.nameEn} onChange={(v) => setMember({...member, nameEn: v})} />
+          <Field label={t.admin_field_short_name} value={member.shortNameUk} onChange={(v) => setMember({...member, shortNameUk: v})} />
+          <Field label={t.admin_field_website} value={member.websiteUrl} onChange={(v) => setMember({...member, websiteUrl: v})} />
           <Field
-            label="Short description UK"
+            label={t.admin_field_short_desc_uk}
             value={member.shortDescriptionUk}
             onChange={(v) => setMember({...member, shortDescriptionUk: v})}
             multiline
           />
           <Field
-            label="Short description EN"
+            label={t.admin_field_short_desc_en}
             value={member.shortDescriptionEn}
             onChange={(v) => setMember({...member, shortDescriptionEn: v})}
             multiline
           />
-          <Field label="Logo URL" value={member.logoUrl} onChange={(v) => setMember({...member, logoUrl: v})} />
-          <label className="block space-y-1 text-sm">
-            <span>Upload logo</span>
+          <Field label={t.admin_field_logo_url} value={member.logoUrl} onChange={(v) => setMember({...member, logoUrl: v})} />
+          <label className="block space-y-1.5 text-sm">
+            <span className={adminLabelClass}>{t.admin_upload_logo}</span>
             <input
+              className="block w-full text-sm text-brand-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-blue-500 file:px-3 file:py-2 file:text-white dark:text-brand-slate-300"
               type="file"
               accept="image/png,image/jpeg,image/webp"
               onChange={(e) => {
@@ -571,83 +751,107 @@ export default function ContentEditors() {
             />
           </label>
           <div className="md:col-span-2">
-            <button className="rounded bg-cyan-700 px-3 py-2 text-white" type="submit">
-              Save member
+            <button className={adminPrimaryBtnClass} type="submit">
+              {t.admin_save_member}
             </button>
           </div>
         </form>
       ) : null}
 
       {kind === 'events' ? (
-        <form className="grid gap-3 md:grid-cols-2" onSubmit={saveEvent}>
-          <Field label="Slug" value={eventItem.slug} onChange={(v) => setEventItem({...eventItem, slug: v})} />
-          <label className="block space-y-1 text-sm">
-            <span>Status</span>
-            <select
-              className="w-full rounded border px-3 py-2"
-              value={eventItem.status}
-              onChange={(e) => setEventItem({...eventItem, status: e.target.value as 'draft' | 'published'})}
-            >
-              <option value="draft">draft</option>
-              <option value="published">published</option>
-            </select>
-          </label>
-          <Field label="Title UK *" value={eventItem.titleUk} onChange={(v) => setEventItem({...eventItem, titleUk: v})} />
-          <Field label="Title EN" value={eventItem.titleEn} onChange={(v) => setEventItem({...eventItem, titleEn: v})} />
-          <Field label="Start (ISO)" value={eventItem.startAt} onChange={(v) => setEventItem({...eventItem, startAt: v})} />
-          <Field label="End (ISO)" value={eventItem.endAt} onChange={(v) => setEventItem({...eventItem, endAt: v})} />
+        <form className={`${adminPanelClass} grid gap-3 md:grid-cols-2`} onSubmit={saveEvent}>
+          {statusSelect(eventItem.status, (v) => setEventItem({...eventItem, status: v}))}
+          <div className="hidden md:block" aria-hidden />
+          <Field label={t.admin_field_title_uk} value={eventItem.titleUk} onChange={(v) => setEventItem({...eventItem, titleUk: v})} />
+          <Field label={t.admin_field_title_en} value={eventItem.titleEn} onChange={(v) => setEventItem({...eventItem, titleEn: v})} />
+          <p className="md:col-span-2 text-xs text-brand-slate-500 dark:text-brand-slate-400">
+            {t.admin_field_event_tz_hint}
+          </p>
+          <EventDateTimeFields
+            dateLabel={t.admin_field_start_date}
+            timeLabel={t.admin_field_start_time}
+            isoValue={eventItem.startAt}
+            required
+            onChange={(iso) => setEventItem({...eventItem, startAt: iso})}
+          />
+          <EventDateTimeFields
+            dateLabel={t.admin_field_end_date}
+            timeLabel={t.admin_field_end_time}
+            isoValue={eventItem.endAt}
+            onChange={(iso) => setEventItem({...eventItem, endAt: iso})}
+          />
           <Field
-            label="Short UK"
+            label={t.admin_field_short_uk}
             value={eventItem.shortDescriptionUk}
             onChange={(v) => setEventItem({...eventItem, shortDescriptionUk: v})}
             multiline
           />
           <Field
-            label="Short EN"
+            label={t.admin_field_short_en}
             value={eventItem.shortDescriptionEn}
             onChange={(v) => setEventItem({...eventItem, shortDescriptionEn: v})}
             multiline
           />
-          <div className="md:col-span-2">
-            <button className="rounded bg-cyan-700 px-3 py-2 text-white" type="submit">
-              Save event
+          <Field
+            label={t.admin_field_cover_url}
+            value={eventItem.coverUrl}
+            onChange={(v) => setEventItem({...eventItem, coverUrl: v})}
+          />
+          <label className="block space-y-1.5 text-sm">
+            <span className={adminLabelClass}>{t.admin_upload_cover}</span>
+            <input
+              className="block w-full text-sm text-brand-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-blue-500 file:px-3 file:py-2 file:text-white dark:text-brand-slate-300"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                void uploadFile(file)
+                  .then((asset) => {
+                    setEventItem((prev) => ({...prev, coverUrl: asset.url}))
+                    setMessage(t.admin_saved)
+                  })
+                  .catch((err) => setError(err.message))
+              }}
+            />
+          </label>
+          <div className="md:col-span-2 flex flex-wrap gap-2">
+            <button className={adminPrimaryBtnClass} type="submit">
+              {t.admin_save_event}
             </button>
+            {eventItem.id ? (
+              <button
+                className={`${adminSecondaryBtnClass} border-red-300 text-red-700 hover:border-red-500 hover:text-red-800 dark:border-red-800 dark:text-red-300 dark:hover:border-red-500`}
+                type="button"
+                onClick={() => void deleteEvent()}
+              >
+                {t.admin_delete}
+              </button>
+            ) : null}
+            {eventItem.id ? (
+              <button
+                className={adminSecondaryBtnClass}
+                type="button"
+                onClick={() => setEventItem(emptyEvent())}
+              >
+                {t.admin_cancel}
+              </button>
+            ) : null}
           </div>
         </form>
       ) : null}
 
       {kind === 'documents' ? (
-        <form className="grid gap-3 md:grid-cols-2" onSubmit={saveDocument}>
-          <Field label="Slug" value={documentItem.slug} onChange={(v) => setDocumentItem({...documentItem, slug: v})} />
-          <label className="block space-y-1 text-sm">
-            <span>Status</span>
-            <select
-              className="w-full rounded border px-3 py-2"
-              value={documentItem.status}
-              onChange={(e) => setDocumentItem({...documentItem, status: e.target.value as 'draft' | 'published'})}
-            >
-              <option value="draft">draft</option>
-              <option value="published">published</option>
-            </select>
-          </label>
-          <Field
-            label="Title UK *"
-            value={documentItem.titleUk}
-            onChange={(v) => setDocumentItem({...documentItem, titleUk: v})}
-          />
-          <Field
-            label="Title EN"
-            value={documentItem.titleEn}
-            onChange={(v) => setDocumentItem({...documentItem, titleEn: v})}
-          />
-          <Field
-            label="File URL"
-            value={documentItem.fileUrl}
-            onChange={(v) => setDocumentItem({...documentItem, fileUrl: v})}
-          />
-          <label className="block space-y-1 text-sm">
-            <span>Upload PDF (private for members access)</span>
+        <form className={`${adminPanelClass} grid gap-3 md:grid-cols-2`} onSubmit={saveDocument}>
+          <Field label={t.admin_field_slug} value={documentItem.slug} onChange={(v) => setDocumentItem({...documentItem, slug: v})} />
+          {statusSelect(documentItem.status, (v) => setDocumentItem({...documentItem, status: v}))}
+          <Field label={t.admin_field_title_uk} value={documentItem.titleUk} onChange={(v) => setDocumentItem({...documentItem, titleUk: v})} />
+          <Field label={t.admin_field_title_en} value={documentItem.titleEn} onChange={(v) => setDocumentItem({...documentItem, titleEn: v})} />
+          <Field label={t.admin_field_file_url} value={documentItem.fileUrl} onChange={(v) => setDocumentItem({...documentItem, fileUrl: v})} />
+          <label className="block space-y-1.5 text-sm">
+            <span className={adminLabelClass}>{t.admin_upload_file}</span>
             <input
+              className="block w-full text-sm text-brand-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-blue-500 file:px-3 file:py-2 file:text-white dark:text-brand-slate-300"
               type="file"
               accept="application/pdf,image/png,image/jpeg,image/webp"
               onChange={(e) => {
@@ -666,10 +870,10 @@ export default function ContentEditors() {
               }}
             />
           </label>
-          <label className="block space-y-1 text-sm">
-            <span>Access</span>
+          <label className="block space-y-1.5 text-sm">
+            <span className={adminLabelClass}>{t.admin_field_access}</span>
             <select
-              className="w-full rounded border px-3 py-2"
+              className={adminInputClass}
               value={documentItem.accessLevel}
               onChange={(e) =>
                 setDocumentItem({
@@ -678,45 +882,37 @@ export default function ContentEditors() {
                 })
               }
             >
-              <option value="public">public</option>
-              <option value="members">members (private blob)</option>
+              <option value="public">{t.admin_access_public}</option>
+              <option value="members">{t.admin_access_members}</option>
             </select>
           </label>
           <div className="md:col-span-2">
-            <button className="rounded bg-cyan-700 px-3 py-2 text-white" type="submit">
-              Save document
+            <button className={adminPrimaryBtnClass} type="submit">
+              {t.admin_save_document}
             </button>
           </div>
         </form>
       ) : null}
 
       {kind === 'settings' ? (
-        <form className="grid gap-3 md:grid-cols-2" onSubmit={saveSettings}>
-          <Field label="Phone" value={settings.phone} onChange={(v) => setSettings({...settings, phone: v})} />
-          <Field label="Email" value={settings.email} onChange={(v) => setSettings({...settings, email: v})} />
+        <form className={`${adminPanelClass} grid gap-3 md:grid-cols-2`} onSubmit={saveSettings}>
+          <Field label={t.admin_field_phone} value={settings.phone} onChange={(v) => setSettings({...settings, phone: v})} />
+          <Field label={t.admin_field_email} value={settings.email} onChange={(v) => setSettings({...settings, email: v})} />
+          <Field label={t.admin_field_address_uk} value={settings.addressUk} onChange={(v) => setSettings({...settings, addressUk: v})} />
+          <Field label={t.admin_field_address_en} value={settings.addressEn} onChange={(v) => setSettings({...settings, addressEn: v})} />
           <Field
-            label="Address UK"
-            value={settings.addressUk}
-            onChange={(v) => setSettings({...settings, addressUk: v})}
-          />
-          <Field
-            label="Address EN"
-            value={settings.addressEn}
-            onChange={(v) => setSettings({...settings, addressEn: v})}
-          />
-          <Field
-            label="Tagline UK"
+            label={t.admin_field_tagline_uk}
             value={settings.brandTaglineUk}
             onChange={(v) => setSettings({...settings, brandTaglineUk: v})}
           />
           <Field
-            label="Tagline EN"
+            label={t.admin_field_tagline_en}
             value={settings.brandTaglineEn}
             onChange={(v) => setSettings({...settings, brandTaglineEn: v})}
           />
           <div className="md:col-span-2">
-            <button className="rounded bg-cyan-700 px-3 py-2 text-white" type="submit">
-              Save settings
+            <button className={adminPrimaryBtnClass} type="submit">
+              {t.admin_save_settings}
             </button>
           </div>
         </form>

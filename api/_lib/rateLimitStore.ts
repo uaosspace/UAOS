@@ -1,5 +1,5 @@
-import {getSql, isDatabaseConfigured} from './db'
-import {MemoryRateLimiter} from './rateLimit'
+import {getSql, isDatabaseConfigured} from './db.js'
+import {MemoryRateLimiter} from './rateLimit.js'
 
 const memoryFallback = new MemoryRateLimiter(10 * 60 * 1000, 5)
 

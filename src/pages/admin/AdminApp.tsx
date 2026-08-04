@@ -1,5 +1,19 @@
 import ContentEditors from './ContentEditors'
+import {
+  adminInputClass,
+  adminLabelClass,
+  adminPanelClass,
+  adminPrimaryBtnClass,
+  adminSecondaryBtnClass,
+  adminTabActiveClass,
+  adminTabIdleClass,
+} from './adminUi'
 import {useCallback, useEffect, useMemo, useState, type FormEvent} from 'react'
+import type {Locale} from '../../data/locales'
+import {TRANSLATIONS} from '../../data/translations'
+import LanguageSwitcher from '../../components/LanguageSwitcher'
+import BrandLogo from '../../components/BrandLogo'
+import {Loader2, LogOut, ExternalLink} from 'lucide-react'
 
 type AdminUser = {
   id: string
@@ -30,6 +44,11 @@ type Stats = {
   bySector: Array<{key: string; count: number}>
 }
 
+type AdminAppProps = {
+  currentLang: Locale
+  setCurrentLang: (lang: Locale) => void
+}
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api/admin/${path}`, {
     credentials: 'include',
@@ -43,7 +62,23 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T
 }
 
-export default function AdminApp() {
+function statusLabel(t: (typeof TRANSLATIONS)[Locale], status: string): string {
+  switch (status) {
+    case 'pending':
+      return t.admin_app_status_pending
+    case 'reviewed':
+      return t.admin_app_status_reviewed
+    case 'accepted':
+      return t.admin_app_status_accepted
+    case 'rejected':
+      return t.admin_app_status_rejected
+    default:
+      return status
+  }
+}
+
+export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
+  const t = TRANSLATIONS[currentLang]
   const [user, setUser] = useState<AdminUser | null>(null)
   const [mfaSetupRequired, setMfaSetupRequired] = useState(false)
   const [bootstrapping, setBootstrapping] = useState(true)
@@ -110,7 +145,7 @@ export default function AdminApp() {
       setPassword('')
       setMfaCode('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      setError(err instanceof Error ? err.message : t.admin_invalid_credentials)
     }
   }
 
@@ -151,198 +186,320 @@ export default function AdminApp() {
     setApps((prev) => prev.map((item) => (item.id === data.item.id ? {...item, ...data.item} : item)))
   }
 
+  const toolbar = (
+    <div className="flex flex-wrap items-center gap-2">
+      <LanguageSwitcher currentLang={currentLang} setCurrentLang={setCurrentLang} />
+      <a href="/" className={adminSecondaryBtnClass}>
+        <ExternalLink size={16} className="mr-1.5 opacity-70" aria-hidden />
+        {t.admin_site_link}
+      </a>
+      {user ? (
+        <button type="button" className={adminSecondaryBtnClass} onClick={() => void onLogout()}>
+          <LogOut size={16} className="mr-1.5 opacity-70" aria-hidden />
+          {t.admin_sign_out}
+        </button>
+      ) : null}
+    </div>
+  )
+
   if (bootstrapping) {
-    return <div className="mx-auto max-w-3xl p-8 text-slate-700 dark:text-slate-200">Loading…</div>
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center gap-2 text-brand-slate-600 dark:text-brand-slate-300">
+        <Loader2 className="h-5 w-5 animate-spin text-brand-blue-500" aria-hidden />
+        <span className="text-sm">{t.admin_loading}</span>
+      </div>
+    )
   }
 
   if (!user) {
     return (
-      <div className="mx-auto max-w-md p-8">
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">UAOS Admin</h1>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-          Protected console for applications and content.
-        </p>
-        <form onSubmit={onLogin} className="mt-6 space-y-3">
-          <input
-            className="w-full rounded border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="username"
-          />
-          <input
-            className="w-full rounded border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900"
-            placeholder="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-          />
-          <input
-            className="w-full rounded border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-900"
-            placeholder="MFA code (if enabled)"
-            value={mfaCode}
-            onChange={(e) => setMfaCode(e.target.value)}
-            autoComplete="one-time-code"
-          />
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          <button className="w-full rounded bg-cyan-700 px-3 py-2 text-white" type="submit">
-            Sign in
-          </button>
-        </form>
+      <div className="mx-auto max-w-md px-4 py-16 sm:px-6">
+        <div className="mb-8 flex items-center justify-between gap-3">
+          <BrandLogo />
+          {toolbar}
+        </div>
+        <div className={`${adminPanelClass} space-y-6`}>
+          <div>
+            <p className="text-[11px] font-mono font-bold uppercase tracking-widest text-brand-blue-500 dark:text-brand-sky-300">
+              UAOS
+            </p>
+            <h1 className="mt-2 font-display text-2xl font-semibold tracking-tight text-brand-slate-900 dark:text-white">
+              {t.admin_login_title}
+            </h1>
+            <p className="mt-2 text-sm text-brand-slate-600 dark:text-brand-slate-300">
+              {t.admin_login_subtitle}
+            </p>
+          </div>
+          <form onSubmit={onLogin} className="space-y-4">
+            <label className="block space-y-1.5">
+              <span className={adminLabelClass}>{t.admin_email}</span>
+              <input
+                className={adminInputClass}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="username"
+                type="email"
+                required
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className={adminLabelClass}>{t.admin_password}</span>
+              <input
+                className={adminInputClass}
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                required
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className={adminLabelClass}>{t.admin_mfa_code}</span>
+              <input
+                className={adminInputClass}
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value)}
+                autoComplete="one-time-code"
+                inputMode="numeric"
+              />
+            </label>
+            {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+            <button className={`${adminPrimaryBtnClass} w-full`} type="submit">
+              {t.admin_btn_login}
+            </button>
+          </form>
+        </div>
       </div>
     )
   }
 
   if (mfaSetupRequired) {
     return (
-      <div className="mx-auto max-w-lg p-8">
-        <h1 className="text-2xl font-semibold">Enable MFA</h1>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-          Roles with PII access require TOTP MFA before application data is available.
-        </p>
-        {!mfaSecret ? (
-          <button className="mt-4 rounded bg-cyan-700 px-3 py-2 text-white" onClick={() => void startMfa()}>
-            Generate MFA secret
-          </button>
-        ) : (
-          <form onSubmit={confirmMfa} className="mt-4 space-y-3">
-            <p className="break-all text-xs">Secret: {mfaSecret}</p>
-            {otpauthUrl ? <p className="break-all text-xs">otpauth: {otpauthUrl}</p> : null}
-            <input
-              className="w-full rounded border px-3 py-2"
-              placeholder="Enter 6-digit code"
-              value={mfaCode}
-              onChange={(e) => setMfaCode(e.target.value)}
-            />
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
-            <button className="rounded bg-cyan-700 px-3 py-2 text-white" type="submit">
-              Confirm MFA
+      <div className="mx-auto max-w-lg px-4 py-16 sm:px-6">
+        <div className="mb-8 flex items-center justify-between gap-3">
+          <BrandLogo />
+          {toolbar}
+        </div>
+        <div className={`${adminPanelClass} space-y-5`}>
+          <div>
+            <h1 className="font-display text-2xl font-semibold text-brand-slate-900 dark:text-white">
+              {t.admin_mfa_title}
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-brand-slate-600 dark:text-brand-slate-300">
+              {t.admin_mfa_help}
+            </p>
+          </div>
+          {!mfaSecret ? (
+            <button className={adminPrimaryBtnClass} type="button" onClick={() => void startMfa()}>
+              {t.admin_mfa_generate}
             </button>
-          </form>
-        )}
-        <button className="mt-6 text-sm underline" onClick={() => void onLogout()}>
-          Sign out
-        </button>
+          ) : (
+            <form onSubmit={confirmMfa} className="space-y-4">
+              <div className="rounded-xl border border-brand-slate-200 bg-brand-slate-50/80 p-3 dark:border-brand-slate-700 dark:bg-brand-slate-900/60">
+                <p className={adminLabelClass}>{t.admin_mfa_secret_label}</p>
+                <p className="mt-1 break-all font-mono text-xs text-brand-slate-800 dark:text-brand-slate-200">
+                  {mfaSecret}
+                </p>
+                {otpauthUrl ? (
+                  <p className="mt-2 break-all font-mono text-[10px] text-brand-slate-500">{otpauthUrl}</p>
+                ) : null}
+              </div>
+              <label className="block space-y-1.5">
+                <span className={adminLabelClass}>{t.admin_mfa_code_enter}</span>
+                <input
+                  className={adminInputClass}
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value)}
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                />
+              </label>
+              {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+              <button className={adminPrimaryBtnClass} type="submit">
+                {t.admin_mfa_confirm}
+              </button>
+            </form>
+          )}
+        </div>
       </div>
     )
   }
 
+  const tabs: Array<{id: typeof tab; label: string}> = [
+    {id: 'applications', label: t.admin_tab_applications},
+    {id: 'stats', label: t.admin_tab_stats},
+    {id: 'content', label: t.admin_tab_content},
+  ]
+
   return (
-    <div className="mx-auto max-w-6xl p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">UAOS Admin</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            {user.email} · {user.role}
-          </p>
+    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-3">
+          <BrandLogo />
+          <div>
+            <p className="text-[11px] font-mono font-bold uppercase tracking-widest text-brand-blue-500 dark:text-brand-sky-300">
+              Admin
+            </p>
+            <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-brand-slate-900 dark:text-white sm:text-3xl">
+              {t.admin_title}
+            </h1>
+            <p className="mt-1 text-sm text-brand-slate-600 dark:text-brand-slate-300">
+              {user.email} · {user.role}
+            </p>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <a className="rounded border px-3 py-2 text-sm" href="/">
-            Site
-          </a>
-          <button className="rounded border px-3 py-2 text-sm" onClick={() => void onLogout()}>
-            Sign out
-          </button>
-        </div>
+        {toolbar}
       </div>
 
-      <div className="mt-4 flex gap-2">
-        {(['applications', 'stats', 'content'] as const).map((name) => (
+      <div className="mt-8 flex flex-wrap gap-2">
+        {tabs.map((item) => (
           <button
-            key={name}
-            className={`rounded px-3 py-1.5 text-sm ${tab === name ? 'bg-cyan-700 text-white' : 'border'}`}
-            onClick={() => setTab(name)}
+            key={item.id}
+            type="button"
+            className={tab === item.id ? adminTabActiveClass : adminTabIdleClass}
+            onClick={() => setTab(item.id)}
           >
-            {name}
+            {item.label}
           </button>
         ))}
       </div>
 
-      {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p> : null}
 
       {tab === 'applications' ? (
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          <div>
-            <div className="mb-3 flex items-center gap-2">
-              <select
-                className="rounded border px-2 py-1 text-sm"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+          <div className={adminPanelClass}>
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2">
+                <span className="sr-only">{t.admin_tab_applications}</span>
+                <select
+                  className={`${adminInputClass} w-auto min-w-[10rem]`}
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <option value="all">{t.admin_app_status_all}</option>
+                  <option value="pending">{t.admin_app_status_pending}</option>
+                  <option value="reviewed">{t.admin_app_status_reviewed}</option>
+                  <option value="accepted">{t.admin_app_status_accepted}</option>
+                  <option value="rejected">{t.admin_app_status_rejected}</option>
+                </select>
+              </label>
+              <a
+                className="text-sm font-medium text-brand-blue-600 underline-offset-2 hover:underline dark:text-brand-sky-300"
+                href="/api/admin/applications/export"
               >
-                <option value="all">All</option>
-                <option value="pending">Pending</option>
-                <option value="reviewed">Reviewed</option>
-                <option value="accepted">Accepted</option>
-                <option value="rejected">Rejected</option>
-              </select>
-              <a className="text-sm underline" href="/api/admin/applications/export">
-                Export CSV
+                {t.admin_export_csv}
               </a>
             </div>
-            <ul className="divide-y rounded border dark:divide-slate-700 dark:border-slate-700">
-              {apps.map((item) => (
-                <li key={item.id}>
-                  <button
-                    className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
-                    onClick={() => setSelectedId(item.id)}
-                  >
-                    <div className="font-medium">{item.companyName}</div>
-                    <div className="text-xs text-slate-500">
-                      {item.status} · {item.applicantKind || 'untyped'} · {item.submittedAt.slice(0, 10)}
-                    </div>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            {apps.length === 0 ? (
+              <p className="text-sm text-brand-slate-500 dark:text-brand-slate-400">
+                {t.admin_empty_applications}
+              </p>
+            ) : (
+              <ul className="divide-y divide-brand-slate-200 dark:divide-brand-slate-700">
+                {apps.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      className={`w-full rounded-xl px-3 py-3 text-left transition ${
+                        selectedId === item.id
+                          ? 'bg-brand-blue-50 dark:bg-brand-blue-950/40'
+                          : 'hover:bg-brand-slate-50 dark:hover:bg-brand-slate-800/60'
+                      }`}
+                      onClick={() => setSelectedId(item.id)}
+                    >
+                      <div className="font-medium text-brand-slate-900 dark:text-white">
+                        {item.companyName}
+                      </div>
+                      <div className="mt-0.5 text-xs text-brand-slate-500 dark:text-brand-slate-400">
+                        {statusLabel(t, item.status)} · {item.applicantKind || '—'} ·{' '}
+                        {item.submittedAt.slice(0, 10)}
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-          <div className="rounded border p-4 dark:border-slate-700">
+
+          <div className={adminPanelClass}>
             {selected ? (
-              <div className="space-y-2 text-sm">
-                <h2 className="text-lg font-semibold">{selected.companyName}</h2>
-                <p>Contact: {selected.contactPerson}</p>
-                <p>Email: {selected.email}</p>
-                <p>Phone: {selected.phone}</p>
-                <p>Activity: {selected.activityField}</p>
-                <p>Sectors: {selected.sectors.join(', ') || '—'}</p>
-                <p className="whitespace-pre-wrap">Message: {selected.message || '—'}</p>
-                <div className="flex flex-wrap gap-2 pt-2">
-                  {['pending', 'reviewed', 'accepted', 'rejected'].map((status) => (
+              <div className="space-y-3 text-sm text-brand-slate-700 dark:text-brand-slate-200">
+                <h2 className="font-display text-xl font-semibold text-brand-slate-900 dark:text-white">
+                  {selected.companyName}
+                </h2>
+                <p>
+                  <span className={adminLabelClass}>{t.admin_field_contact}</span>
+                  <span className="mt-1 block">{selected.contactPerson}</span>
+                </p>
+                <p>
+                  <span className={adminLabelClass}>{t.admin_field_email}</span>
+                  <span className="mt-1 block">{selected.email}</span>
+                </p>
+                <p>
+                  <span className={adminLabelClass}>{t.admin_field_phone}</span>
+                  <span className="mt-1 block">{selected.phone}</span>
+                </p>
+                <p>
+                  <span className={adminLabelClass}>{t.admin_field_activity}</span>
+                  <span className="mt-1 block">{selected.activityField}</span>
+                </p>
+                <p>
+                  <span className={adminLabelClass}>{t.admin_field_sectors}</span>
+                  <span className="mt-1 block">{selected.sectors.join(', ') || '—'}</span>
+                </p>
+                <p>
+                  <span className={adminLabelClass}>{t.admin_field_message}</span>
+                  <span className="mt-1 block whitespace-pre-wrap">{selected.message || '—'}</span>
+                </p>
+                <div className="flex flex-wrap gap-2 border-t border-brand-slate-200 pt-4 dark:border-brand-slate-700">
+                  {(['pending', 'reviewed', 'accepted', 'rejected'] as const).map((status) => (
                     <button
                       key={status}
-                      className="rounded border px-2 py-1"
+                      type="button"
+                      className={
+                        selected.status === status ? adminPrimaryBtnClass : adminSecondaryBtnClass
+                      }
                       onClick={() => void setStatus(status).catch((err) => setError(err.message))}
                     >
-                      {status}
+                      {statusLabel(t, status)}
                     </button>
                   ))}
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-slate-500">Select an application</p>
+              <p className="text-sm text-brand-slate-500 dark:text-brand-slate-400">
+                {t.admin_select_application}
+              </p>
             )}
           </div>
         </div>
       ) : null}
 
       {tab === 'stats' && stats ? (
-        <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded border p-4 dark:border-slate-700">
-            <div className="text-sm text-slate-500">Applications (period)</div>
-            <div className="text-3xl font-semibold">{stats.total}</div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className={adminPanelClass}>
+            <div className={adminLabelClass}>{t.admin_stats_total}</div>
+            <div className="mt-2 font-display text-3xl font-semibold text-brand-slate-900 dark:text-white">
+              {stats.total}
+            </div>
           </div>
           {[
-            ['By status', stats.byStatus],
-            ['By kind', stats.byApplicantKind],
-            ['By sector', stats.bySector],
+            [t.admin_stats_by_status, stats.byStatus],
+            [t.admin_stats_by_kind, stats.byApplicantKind],
+            [t.admin_stats_by_sector, stats.bySector],
           ].map(([title, rows]) => (
-            <div key={String(title)} className="rounded border p-4 dark:border-slate-700">
-              <h3 className="font-medium">{String(title)}</h3>
-              <ul className="mt-2 space-y-1 text-sm">
+            <div key={String(title)} className={adminPanelClass}>
+              <h3 className="font-display text-base font-semibold text-brand-slate-900 dark:text-white">
+                {String(title)}
+              </h3>
+              <ul className="mt-3 space-y-1.5 text-sm text-brand-slate-600 dark:text-brand-slate-300">
                 {(rows as Array<{key: string; count: number}>).map((row) => (
                   <li key={row.key} className="flex justify-between gap-3">
-                    <span>{row.key}</span>
-                    <span>{row.count}</span>
+                    <span>{row.key || '—'}</span>
+                    <span className="font-medium tabular-nums text-brand-slate-900 dark:text-white">
+                      {row.count}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -351,7 +508,7 @@ export default function AdminApp() {
         </div>
       ) : null}
 
-      {tab === 'content' ? <ContentEditors /> : null}
+      {tab === 'content' ? <ContentEditors currentLang={currentLang} /> : null}
     </div>
   )
 }

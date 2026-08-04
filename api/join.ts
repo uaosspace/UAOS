@@ -4,19 +4,19 @@
  * and optionally sends a low-PII Brevo notification.
  */
 import type {VercelRequest, VercelResponse} from '@vercel/node'
-import {createApplication} from './_lib/applicationsRepo'
-import {writeAuditEvent} from './_lib/audit'
-import {notifyJoinApplicationByEmail} from './_lib/brevoNotify'
-import {isDatabaseConfigured} from './_lib/db'
-import {getClientIp, parseJsonBody, requireJsonContentType, requireMethod, sendJsonError} from './_lib/http'
+import {createApplication} from './_lib/applicationsRepo.js'
+import {writeAuditEvent} from './_lib/audit.js'
+import {notifyJoinApplicationByEmail} from './_lib/brevoNotify.js'
+import {isDatabaseConfigured} from './_lib/db.js'
+import {getClientIp, parseJsonBody, requireJsonContentType, requireMethod, sendJsonError} from './_lib/http.js'
 import {
   normalizeJoinApplication,
   normalizeJoinWebsite,
   validateJoinApplication,
-} from './_lib/joinApplication'
-import {isRateLimited} from './_lib/rateLimitStore'
-import {verifyTurnstileToken} from './_lib/turnstile'
-import {isRecord, readStringOr} from '../src/lib/contentGuards'
+} from './_lib/joinApplication.js'
+import {isRateLimited} from './_lib/rateLimitStore.js'
+import {verifyTurnstileToken} from './_lib/turnstile.js'
+import {isRecord, readStringOr} from '../src/lib/contentGuards.js'
 
 const PRIVACY_POLICY_VERSION = process.env.PRIVACY_POLICY_VERSION?.trim() || '2026-08-03'
 

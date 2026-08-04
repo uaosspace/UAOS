@@ -25,9 +25,9 @@ export default function EventDetails({ event, currentLang }: EventDetailsProps) 
   const past = isPastEvent(event);
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] bg-white dark:bg-brand-slate-900 rounded-2xl overflow-hidden">
-      {/* Cover + text scroll; actions stay in bottom row */}
-      <div className="min-h-0 overflow-y-auto overscroll-contain custom-scrollbar">
+    <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] rounded-2xl bg-white dark:bg-brand-slate-900">
+      {/* Cover + text scroll; actions stay in bottom row (no card-level overflow — dropdowns must escape) */}
+      <div className="min-h-0 overflow-y-auto overscroll-contain custom-scrollbar rounded-t-2xl">
         {event.coverImageUrl && (
           <div className="w-full bg-brand-slate-50 dark:bg-brand-slate-800/80 border-b border-brand-slate-100 dark:border-brand-slate-700">
             <img
@@ -108,7 +108,7 @@ export default function EventDetails({ event, currentLang }: EventDetailsProps) 
         </div>
       </div>
 
-      <div className="p-4 sm:p-6 bg-brand-slate-50 dark:bg-brand-slate-800/50 border-t border-brand-slate-100 dark:border-brand-slate-700 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">
+      <div className="relative z-20 flex flex-col items-stretch gap-3 rounded-b-2xl border-t border-brand-slate-100 bg-brand-slate-50 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:p-6 dark:border-brand-slate-700 dark:bg-brand-slate-800/50">
         {!past && (
           <>
             {event.registrationUrl && (

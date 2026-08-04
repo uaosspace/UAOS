@@ -17,16 +17,37 @@ cp .env.example .env.local
 npm run db:migrate
 npm run db:seed          # опційно, staging/dev
 npm run admin:create -- --email=you@example.com --password='…' --role=admin
+```
+
+### UI only (без API)
+
+```bash
 npm run dev
 ```
 
-Локально публічний контент без запущеного API в DEV може показувати seed з попередженням у консолі.
+Публічний контент без API в DEV може показувати seed з попередженням у консолі. Логін у `/admin` **не працюватиме** (немає `/api/admin`).
+
+### Повний локальний стек (UI + API + адмінка)
+
+`vercel dev` бере секрети з Vercel Environment **Development** (не з Preview/Production).
+
+```bash
+# один раз (або після зміни .env.local): синхронізувати Development на Vercel
+npm run dev:sync-env
+
+# щодня: pull Development + Vite + serverless на :3000
+npm run dev:stack
+```
+
+Відкрийте `http://localhost:3000/admin`. `SITE_URL` у Development має бути `http://localhost:3000` (скрипт sync це форсує).
 
 ## Скрипти
 
 | Команда | Призначення |
 |---------|-------------|
-| `npm run dev` | Vite на :3000 |
+| `npm run dev` | лише Vite на :3000 (без API) |
+| `npm run dev:stack` | `vercel pull` + `vercel dev` (UI + API) |
+| `npm run dev:sync-env` | `.env.local` → Vercel Development |
 | `npm run build` | Production build |
 | `npm run lint` | `tsc --noEmit` |
 | `npm test` | Vitest |
@@ -36,19 +57,19 @@ npm run dev
 
 ## Env (див. `.env.example`)
 
-| Змінна | Де | Примітка |
-|--------|-----|----------|
-| `DATABASE_URL` | server only | Neon pooled |
-| `SESSION_SECRET` | server | 32-byte hex |
-| `MFA_ENC_KEY` | server | 32-byte hex |
-| `BLOB_READ_WRITE_TOKEN` | server | Vercel Blob |
-| `SITE_URL` | server | CSRF Origin |
-| `VITE_TURNSTILE_SITE_KEY` | public | optional locally |
-| `TURNSTILE_SECRET_KEY` | server | required in prod |
-| `BREVO_API_KEY` / `NOTIFY_EMAIL_*` | server | optional notify |
+| Змінна | Development | Preview / Production | Примітка |
+|--------|-------------|----------------------|----------|
+| `SITE_URL` | `http://localhost:3000` | публічний URL сайту | CSRF Origin |
+| `DATABASE_URL` | той самий Neon (або гілка) | Neon | server only |
+| `MFA_ENC_KEY` | **той самий**, якщо спільна БД | обовʼязково | інакше MFA не розшифрується |
+| `SESSION_SECRET` | так | так | 32-byte hex |
+| `BLOB_*` | так | так | Blob |
+| `VITE_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | hostname `localhost` у віджеті | prod host | |
+| `BREVO_API_KEY` / `NOTIFY_EMAIL_*` | опційно | опційно | notify після join |
 
 ## Документація
 
+- `docs/ENV.md` — где какие секреты (без значений)
 - `CODE_MAP.md` — архітектура
 - `docs/OPS_CHECKLIST.md` — cutover / MFA / приймання
 - `docs/RUNBOOK.md` — restore / offboarding / інциденти

@@ -1,5 +1,5 @@
-import {getSql} from './db'
-import type {NormalizedJoinApplication} from './joinApplication'
+import {getSql} from './db.js'
+import type {NormalizedJoinApplication} from './joinApplication.js'
 
 export type ApplicationStatus = 'pending' | 'reviewed' | 'accepted' | 'rejected'
 

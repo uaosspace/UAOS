@@ -510,7 +510,13 @@ export function mapMember(doc: unknown): AssociationMember {
 export async function fetchMembers(): Promise<AssociationMember[]> {
   try {
     const docs = await fetchContentItems<unknown>('members')
-    return docs.map(mapMember)
+    const mapped = docs.map(mapMember)
+    // DEV + empty Neon: API returns [] (not an error). Fall back to seed so local UI is usable.
+    if (import.meta.env.DEV && mapped.length === 0) {
+      console.warn('Content API fetchMembers returned empty in DEV, using seed')
+      return INITIAL_MEMBERS
+    }
+    return mapped
   } catch (err) {
     if (import.meta.env.DEV) {
       console.warn('Content API fetchMembers unavailable in DEV, using seed:', err)

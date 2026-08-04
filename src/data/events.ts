@@ -106,7 +106,12 @@ export function mapEvent(doc: unknown): AssociationEvent {
 export async function fetchEvents(): Promise<AssociationEvent[]> {
   try {
     const docs = await fetchContentItems<unknown>('events')
-    return readArray(docs).map(mapEvent)
+    const mapped = readArray(docs).map(mapEvent)
+    if (import.meta.env.DEV && mapped.length === 0) {
+      console.warn('Content API fetchEvents returned empty in DEV, using seed')
+      return INITIAL_EVENTS
+    }
+    return mapped
   } catch (err) {
     if (import.meta.env.DEV) {
       console.warn('Content API fetchEvents unavailable in DEV, using seed:', err)

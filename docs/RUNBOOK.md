@@ -1,5 +1,20 @@
 # UAOS runbook — Neon + admin + Blob
 
+## Local full stack (admin + API)
+
+1. Ensure `.env.local` is complete (see `.env.example`).
+2. Sync into Vercel **Development** (forces `SITE_URL=http://localhost:3000`):
+   ```bash
+   npm run dev:sync-env
+   ```
+3. Run UI + serverless:
+   ```bash
+   npm run dev:stack
+   ```
+4. Open `http://localhost:3000/admin`.
+
+`npm run dev` alone serves the SPA only — `/api/admin/*` will 404.
+
 ## Database restore
 
 1. Create/restore Neon branch or restore from Neon backup UI.

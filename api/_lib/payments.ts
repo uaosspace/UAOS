@@ -1,4 +1,4 @@
-import type {OrderDraft, PaymentStatus} from '../../src/types'
+import type {OrderDraft, PaymentStatus} from '../../src/types.js'
 
 export interface CreateCheckoutSessionInput {
   orderId: string

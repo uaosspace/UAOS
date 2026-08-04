@@ -5,7 +5,7 @@ import {
   notifyJoinApplicationByEmail,
   parseNotifyFrom,
   readBrevoNotifyEnv,
-} from './brevoNotify'
+} from './brevoNotify.js'
 
 const samplePayload = {
   applicationId: '11111111-1111-1111-1111-111111111111',

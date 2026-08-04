@@ -5,11 +5,11 @@ import {
   listApplications,
   updateApplicationStatus,
   type ApplicationStatus,
-} from '../_lib/applicationsRepo.js'
-import {writeAuditEvent} from '../_lib/audit.js'
-import {getClientIp, parseJsonBody, sendJsonError} from '../_lib/http.js'
-import {isRateLimited} from '../_lib/rateLimitStore.js'
-import {roleHasPermission, type AdminPermission} from '../_lib/auth/policy.js'
+} from './_lib/applicationsRepo.js'
+import {writeAuditEvent} from './_lib/audit.js'
+import {getClientIp, parseJsonBody, sendJsonError} from './_lib/http.js'
+import {isRateLimited} from './_lib/rateLimitStore.js'
+import {roleHasPermission, type AdminPermission} from './_lib/auth/policy.js'
 import {
   assertSameOrigin,
   authenticatePassword,
@@ -24,8 +24,8 @@ import {
   setSessionCookie,
   verifyUserMfa,
   type AdminSessionContext,
-} from '../_lib/auth/session.js'
-import {isRecord, readStringOr} from '../../src/lib/contentGuards.js'
+} from './_lib/auth/session.js'
+import {isRecord, readStringOr} from '../src/lib/contentGuards.js'
 import {
   createMediaAsset,
   deleteContentDocument,
@@ -43,8 +43,9 @@ import {
   upsertContentEvent,
   upsertContentMember,
   upsertContentNews,
-} from '../_lib/contentRepo.js'
-import {getBlobByPathname, putPublicBlob, putPrivateBlob} from '../_lib/blobStore.js'
+} from './_lib/contentRepo.js'
+import {getBlobByPathname, putPublicBlob, putPrivateBlob} from './_lib/blobStore.js'
+import {fetchOgImageFromPageUrl} from './_lib/fetchOgImage.js'
 
 type RouteResult = {handled: true} | {handled: false}
 
@@ -493,6 +494,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       metadata: {visibility, mimeType},
     })
     return res.status(200).json({asset})
+  }
+
+  if (parts[0] === 'media' && parts[1] === 'fetch-og' && method === 'POST') {
+    if (!requireMutationOrigin(req, res)) return
+    const session = await requireSession(req, res, 'content.write')
+    if (!session) return
+    if (await isRateLimited(`admin:fetch-og:${session.user.id}`, 60_000, 20)) {
+      return sendJsonError(res, 429, 'Too many requests')
+    }
+    const body = parseJsonBody(req)
+    const source = isRecord(body) ? body : {}
+    const pageUrl = readStringOr(source.url, '')
+    if (!pageUrl) return sendJsonError(res, 400, 'url required')
+    try {
+      const imageUrl = await fetchOgImageFromPageUrl(pageUrl)
+      await writeAuditEvent({
+        actorType: 'admin',
+        actorId: session.user.id,
+        action: 'media.fetch_og',
+        entityType: 'media',
+        entityId: '',
+        ip,
+        metadata: {pageUrl},
+      })
+      return res.status(200).json({imageUrl})
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Fetch failed'
+      return sendJsonError(res, 400, message)
+    }
   }
 
   if (parts[0] === 'session' && parts[1] === 'revoke-all' && method === 'POST') {

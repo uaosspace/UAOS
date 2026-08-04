@@ -12,7 +12,11 @@ export const pagesTranslations = {
     members_featured_badge: 'Рекомендовано',
 
     news_page_subtitle: 'Останні події, ініціативи та новини галузевого життя асоціації UAOS.',
+    news_section_title: 'Новини',
     news_empty: 'Новин не знайдено',
+    news_page_events_intro: 'Заходи асоціації — тренінги, зустрічі та конференції.',
+    news_page_news_intro: 'Ініціативи та новини галузевого життя UAOS.',
+    news_open_external: 'Відкрити джерело',
 
     knowledge_intro:
       'Публікації, практичні матеріали та офіційні документи асоціації — відкриті для перегляду без реєстрації.',
@@ -75,7 +79,11 @@ export const pagesTranslations = {
     members_featured_badge: 'Featured',
 
     news_page_subtitle: 'The latest events, initiatives, and industry news from the UAOS association.',
+    news_section_title: 'News',
     news_empty: 'No news found',
+    news_page_events_intro: 'Association events — trainings, meetings, and conferences.',
+    news_page_news_intro: 'Initiatives and industry news from UAOS.',
+    news_open_external: 'Open source',
 
     knowledge_intro:
       'Publications, practical materials, and official association documents — open for viewing without registration.',

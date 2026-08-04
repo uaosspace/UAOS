@@ -54,6 +54,7 @@ export default function NewsSection({
       date: formatDate(item.publishedAt, currentLang),
       title: item.title[currentLang],
       desc: item.excerpt[currentLang],
+      coverImageUrl: item.coverImageUrl,
       onOpen: () => onSelectNews(item.slug),
     })),
     ...(nextEvent
@@ -64,6 +65,7 @@ export default function NewsSection({
             date: formatDate(nextEvent.startAt, currentLang),
             title: nextEvent.title[currentLang],
             desc: nextEvent.shortDescription[currentLang],
+            coverImageUrl: nextEvent.coverImageUrl,
             onOpen: () => onSelectEvent(nextEvent.id),
           },
         ]
@@ -87,16 +89,20 @@ export default function NewsSection({
             {cards.map((card) => (
               <article key={card.key} className="news-card spotlight" onPointerMove={onSpotlight}>
                 <div className="news-image">
-                  <div
-                    className="news-image-placeholder"
-                    style={{
-                      background:
-                        card.kind === 'event'
-                          ? 'linear-gradient(135deg, #1e3344 0%, #2a6080 100%)'
-                          : 'linear-gradient(135deg, #1a3a52 0%, #0d6ea8 100%)',
-                    }}
-                    aria-hidden="true"
-                  />
+                  {card.coverImageUrl ? (
+                    <img src={card.coverImageUrl} alt="" className="news-image-photo" />
+                  ) : (
+                    <div
+                      className="news-image-placeholder"
+                      style={{
+                        background:
+                          card.kind === 'event'
+                            ? 'linear-gradient(135deg, #1e3344 0%, #2a6080 100%)'
+                            : 'linear-gradient(135deg, #1a3a52 0%, #0d6ea8 100%)',
+                      }}
+                      aria-hidden="true"
+                    />
+                  )}
                 </div>
                 <div className="news-body">
                   <div className="news-date">

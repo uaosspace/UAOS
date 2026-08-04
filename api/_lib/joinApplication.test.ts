@@ -3,7 +3,7 @@ import {
   normalizeJoinApplication,
   normalizeJoinWebsite,
   validateJoinApplication,
-} from './joinApplication'
+} from './joinApplication.js'
 
 describe('joinApplication helpers', () => {
   it('normalizes incoming fields', () => {

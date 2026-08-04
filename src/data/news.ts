@@ -3,6 +3,7 @@ import {ContentApiError, fetchContentItems} from '../lib/contentApi'
 import {
   isRecord,
   readArray,
+  readHttpUrl,
   readLocalizedText,
   readString,
   readStringOr,
@@ -17,6 +18,8 @@ export interface NewsItem {
   excerpt: LocalizedText
   body: LocalizedText
   coverImageUrl?: string
+  /** When set, card opens this URL instead of on-site article. */
+  externalUrl?: string
 }
 
 export const INITIAL_NEWS: NewsItem[] = [
@@ -88,13 +91,19 @@ export function mapNews(doc: unknown): NewsItem {
     excerpt: readLocalizedText(source.excerpt),
     body: readLocalizedText(source.body),
     coverImageUrl: readStringOr(source.coverImageUrl, '') || undefined,
+    externalUrl: readHttpUrl(source.externalUrl),
   }
 }
 
 export async function fetchNews(): Promise<NewsItem[]> {
   try {
     const docs = await fetchContentItems<unknown>('news')
-    return readArray(docs).map(mapNews)
+    const mapped = readArray(docs).map(mapNews)
+    if (import.meta.env.DEV && mapped.length === 0) {
+      console.warn('Content API fetchNews returned empty in DEV, using seed')
+      return INITIAL_NEWS
+    }
+    return mapped
   } catch (err) {
     if (import.meta.env.DEV) {
       console.warn('Content API fetchNews unavailable in DEV, using seed:', err)

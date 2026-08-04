@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest'
-import {generateTotpSecret, verifyTotpCode, buildOtpAuthUrl} from './totp'
-import {hashPassword, verifyPassword, hashToken, createSessionToken} from './crypto'
-import {roleHasPermission, roleRequiresMfa} from './policy'
+import {generateTotpSecret, verifyTotpCode, buildOtpAuthUrl} from './totp.js'
+import {hashPassword, verifyPassword, hashToken, createSessionToken} from './crypto.js'
+import {roleHasPermission, roleRequiresMfa} from './policy.js'
 
 describe('admin auth primitives', () => {
   it('hashes and verifies passwords', () => {

@@ -62,11 +62,15 @@ describe('Content API data mappers', () => {
       title: {uk: 'Новина', en: 'News'},
       excerpt: {uk: 'Коротко', en: 'Short'},
       body: {uk: 'Тіло', en: 'Body'},
+      coverImageUrl: 'https://cdn.example/cover.jpg',
+      externalUrl: 'https://partner.example/article',
     })
 
     expect(document.type).toBe('link')
     expect(document.fileUrl).toBe('https://docs.example/file.pdf')
     expect(news.slug).toBe('update')
     expect(news.title.en).toBe('News')
+    expect(news.coverImageUrl).toBe('https://cdn.example/cover.jpg')
+    expect(news.externalUrl).toBe('https://partner.example/article')
   })
 })

@@ -1,8 +1,9 @@
 /**
  * Content repository — Neon tables for public CMS entities.
  */
-import {getSql} from './db'
-import {isRecord, readStringOr} from '../../src/lib/contentGuards'
+import {getSql} from './db.js'
+import {isRecord, readStringOr} from '../../src/lib/contentGuards.js'
+import {releaseOwnedMediaIfUnused} from './mediaCleanup.js'
 
 function asLocalized(uk: unknown, en: unknown) {
   return {uk: String(uk ?? ''), en: String(en ?? '')}
@@ -124,6 +125,7 @@ function mapNewsPublic(row: Record<string, unknown>) {
     excerpt: asLocalized(row.excerpt_uk, row.excerpt_en),
     body: asLocalized(row.body_uk, row.body_en),
     coverImageUrl: String(row.cover_url ?? ''),
+    externalUrl: String(row.external_url ?? ''),
   }
 }
 
@@ -309,6 +311,21 @@ export async function upsertContentNews(body: unknown) {
   const bodyLoc = isRecord(source.body) ? source.body : {}
   const publishedAt = readStringOr(source.publishedAt, '') || null
 
+  const externalUrlRaw = readStringOr(source.externalUrl, '').trim()
+  let externalUrl = ''
+  if (externalUrlRaw) {
+    try {
+      const parsed = new URL(externalUrlRaw)
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error('externalUrl must be http(s)')
+      }
+      externalUrl = parsed.toString()
+    } catch (err) {
+      if (err instanceof Error && err.message === 'externalUrl must be http(s)') throw err
+      throw new Error('externalUrl must be a valid http(s) URL')
+    }
+  }
+
   if (id) {
     const rows = await sql`
       UPDATE content_news SET
@@ -316,7 +333,9 @@ export async function upsertContentNews(body: unknown) {
         title_uk = ${readStringOr(title.uk, '')}, title_en = ${readStringOr(title.en, '')},
         excerpt_uk = ${readStringOr(excerpt.uk, '')}, excerpt_en = ${readStringOr(excerpt.en, '')},
         body_uk = ${readStringOr(bodyLoc.uk, '')}, body_en = ${readStringOr(bodyLoc.en, '')},
-        cover_url = ${readStringOr(source.coverImageUrl, '')}, updated_at = now()
+        cover_url = ${readStringOr(source.coverImageUrl, '')},
+        external_url = ${externalUrl},
+        updated_at = now()
       WHERE id = ${id}::uuid
       RETURNING *
     `
@@ -324,13 +343,14 @@ export async function upsertContentNews(body: unknown) {
   }
   const rows = await sql`
     INSERT INTO content_news (
-      slug, status, published_at, title_uk, title_en, excerpt_uk, excerpt_en, body_uk, body_en, cover_url
+      slug, status, published_at, title_uk, title_en, excerpt_uk, excerpt_en, body_uk, body_en, cover_url, external_url
     ) VALUES (
       ${slug}, ${status}, ${publishedAt},
       ${readStringOr(title.uk, '')}, ${readStringOr(title.en, '')},
       ${readStringOr(excerpt.uk, '')}, ${readStringOr(excerpt.en, '')},
       ${readStringOr(bodyLoc.uk, '')}, ${readStringOr(bodyLoc.en, '')},
-      ${readStringOr(source.coverImageUrl, '')}
+      ${readStringOr(source.coverImageUrl, '')},
+      ${externalUrl}
     )
     RETURNING *
   `
@@ -354,8 +374,15 @@ export async function upsertContentEvent(body: unknown) {
   const fullDescription = isRecord(source.fullDescription) ? source.fullDescription : {}
   const startAt = readStringOr(source.startAt, '')
   if (!startAt) throw new Error('startAt required')
+  const nextCoverUrl = readStringOr(source.coverImageUrl, '')
 
   if (id) {
+    const previous = await sql`
+      SELECT cover_url FROM content_events WHERE id = ${id}::uuid LIMIT 1
+    `
+    const previousCoverUrl = String(
+      (previous[0] as {cover_url?: unknown} | undefined)?.cover_url ?? '',
+    )
     const rows = await sql`
       UPDATE content_events SET
         slug = ${slug}, status = ${status},
@@ -373,11 +400,14 @@ export async function upsertContentEvent(body: unknown) {
         online_url = ${readStringOr(source.onlineUrl, '')},
         registration_url = ${readStringOr(source.registrationUrl, '')},
         organizer = ${readStringOr(source.organizer, '')},
-        cover_url = ${readStringOr(source.coverImageUrl, '')},
+        cover_url = ${nextCoverUrl},
         updated_at = now()
       WHERE id = ${id}::uuid
       RETURNING *
     `
+    if (previousCoverUrl && previousCoverUrl !== nextCoverUrl) {
+      await releaseOwnedMediaIfUnused(previousCoverUrl)
+    }
     return rows[0]
   }
   const rows = await sql`
@@ -395,7 +425,7 @@ export async function upsertContentEvent(body: unknown) {
       ${readStringOr(source.timeZone, 'Europe/Kyiv')},
       ${readStringOr(source.location, '')}, ${readStringOr(source.onlineUrl, '')},
       ${readStringOr(source.registrationUrl, '')}, ${readStringOr(source.organizer, '')},
-      ${readStringOr(source.coverImageUrl, '')}
+      ${nextCoverUrl}
     )
     RETURNING *
   `
@@ -404,7 +434,14 @@ export async function upsertContentEvent(body: unknown) {
 
 export async function deleteContentEvent(id: string) {
   const sql = getSql()
+  const existing = await sql`
+    SELECT cover_url FROM content_events WHERE id = ${id}::uuid LIMIT 1
+  `
+  const coverUrl = String((existing[0] as {cover_url?: unknown} | undefined)?.cover_url ?? '')
   await sql`DELETE FROM content_events WHERE id = ${id}::uuid`
+  if (coverUrl) {
+    await releaseOwnedMediaIfUnused(coverUrl)
+  }
 }
 
 export async function upsertContentDocument(body: unknown) {

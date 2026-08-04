@@ -2,7 +2,7 @@ import type {Locale} from '../data/locales'
 import {TRANSLATIONS} from '../data/translations'
 import {useDocumentMeta} from '../hooks/useDocumentMeta'
 import type {NewsItem} from '../data/news'
-import {ArrowLeft} from 'lucide-react'
+import {ArrowLeft, ExternalLink} from 'lucide-react'
 
 interface NewsDetailPageProps {
   currentLang: Locale
@@ -54,9 +54,21 @@ export default function NewsDetailPage({currentLang, item, onBack}: NewsDetailPa
           <p className="text-lg text-brand-slate-700 dark:text-brand-slate-200 font-medium mb-6">
             {item.excerpt[currentLang]}
           </p>
-          <div className="text-brand-slate-600 dark:text-brand-slate-200 whitespace-pre-line leading-relaxed">
-            {item.body[currentLang]}
-          </div>
+          {item.externalUrl ? (
+            <a
+              href={item.externalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg bg-brand-blue-600 px-5 py-3 text-sm font-semibold text-white no-underline hover:bg-brand-blue-700"
+            >
+              {t.news_open_external}
+              <ExternalLink className="h-4 w-4" aria-hidden />
+            </a>
+          ) : (
+            <div className="text-brand-slate-600 dark:text-brand-slate-200 whitespace-pre-line leading-relaxed">
+              {item.body[currentLang]}
+            </div>
+          )}
         </div>
       </div>
     </article>
