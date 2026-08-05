@@ -235,3 +235,4 @@ api/_lib/fetchOgImage.ts
 api/_lib/fetchOgImage.test.ts
 db/migrations/004_news_external_url.sql
 src/data/mappers.test.ts
+vite.config.ts

@@ -43,14 +43,25 @@ describe('brevoNotify helpers', () => {
     expect(parseNotifyFrom('broken')).toBeNull()
   })
 
-  it('builds low-PII notify email', () => {
+  it('builds low-PII notify email with Ukrainian labels', () => {
     const email = buildJoinNotifyEmail(samplePayload)
     expect(email.subject).toContain('ACME LLC')
-    expect(email.textContent).toContain('producer-supplier')
-    expect(email.textContent).toContain('retail, construction')
-    expect(email.textContent).toContain('pending')
+    expect(email.textContent).toContain('Виробники та постачальники')
+    expect(email.textContent).toContain('Роздрібна торгівля, Будівництво')
+    expect(email.textContent).toContain('Очікує розгляду')
+    expect(email.textContent).not.toContain('producer-supplier')
     expect(email.textContent).not.toContain('@')
     expect(email.textContent).toContain('/admin')
+  })
+
+  it('falls back to raw ids when label is unknown', () => {
+    const email = buildJoinNotifyEmail({
+      ...samplePayload,
+      applicantKind: 'mystery-kind',
+      sectors: ['mystery-sector'],
+    })
+    expect(email.textContent).toContain('mystery-kind')
+    expect(email.textContent).toContain('mystery-sector')
   })
 
   it('skips send when env is missing', async () => {

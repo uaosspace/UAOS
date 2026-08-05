@@ -7,6 +7,7 @@
  */
 import {spawnSync} from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
@@ -54,20 +55,36 @@ function parseEnvFile(filePath) {
 }
 
 function upsertEnv(name, value) {
-  // Development cannot use --sensitive (Vercel API restriction); encrypted instead.
-  const result = spawnSync(
-    process.platform === 'win32' ? 'npx.cmd' : 'npx',
-    ['vercel', 'env', 'add', name, TARGET, '--force', '--yes'],
-    {
+  // Windows: shell:true + --value breaks on `&` inside Neon URLs (channel_binding=…).
+  // Pipe the value via a temp file so metacharacters never hit cmd.exe parsing.
+  const tmp = path.join(os.tmpdir(), `uaos-vercel-env-${process.pid}-${name}.txt`)
+  fs.writeFileSync(tmp, value, 'utf8')
+  try {
+    const quotedTmp = `"${tmp.replace(/"/g, '')}"`
+    const command =
+      process.platform === 'win32'
+        ? `type ${quotedTmp} | npx vercel env add ${name} ${TARGET} --force --yes`
+        : `npx vercel env add ${name} ${TARGET} --force --yes < ${JSON.stringify(tmp)}`
+    const result = spawnSync(command, {
       cwd: ROOT,
-      input: `${value}\n`,
       encoding: 'utf8',
-      shell: false,
-    },
-  )
-  if (result.status !== 0) {
-    const err = (result.stderr || result.stdout || '').trim()
-    throw new Error(`Failed to set ${name} (${TARGET}): ${err || `exit ${result.status}`}`)
+      shell: true,
+    })
+    const out = `${result.stdout || ''}\n${result.stderr || ''}`
+    const ok =
+      result.status === 0 ||
+      /\b(Overrode|Added|Saved)\b/i.test(out)
+    if (!ok) {
+      const spawnErr = result.error ? String(result.error.message || result.error) : ''
+      const err = (result.stderr || result.stdout || spawnErr || '').trim()
+      throw new Error(`Failed to set ${name} (${TARGET}): ${err || `exit ${result.status}`}`)
+    }
+  } finally {
+    try {
+      fs.unlinkSync(tmp)
+    } catch {
+      // ignore cleanup errors
+    }
   }
 }
 
