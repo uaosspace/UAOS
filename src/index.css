@@ -145,6 +145,12 @@
   cursor: pointer;
 }
 
+/* Повертає типографіку посилань футера: сброс вище скидає font/color через inherit. */
+.footer-col button {
+  color: var(--muted);
+  font-size: 10px;
+}
+
 .desktop-nav button {
   position: relative;
   padding: 30px 0 27px;
