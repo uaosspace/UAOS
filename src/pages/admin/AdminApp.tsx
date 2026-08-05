@@ -8,6 +8,12 @@ import {
   adminTabActiveClass,
   adminTabIdleClass,
 } from './adminUi'
+import {
+  applicantKindLabel,
+  sectorLabel,
+  statsKeyLabel,
+  statusLabel,
+} from './adminLabels'
 import {useCallback, useEffect, useMemo, useState, type FormEvent} from 'react'
 import type {Locale} from '../../data/locales'
 import {TRANSLATIONS} from '../../data/translations'
@@ -44,6 +50,10 @@ type Stats = {
   bySector: Array<{key: string; count: number}>
 }
 
+type ConfirmDialog =
+  | {kind: 'delete-one'; id: string; companyName: string}
+  | {kind: 'purge-closed'}
+
 type AdminAppProps = {
   currentLang: Locale
   setCurrentLang: (lang: Locale) => void
@@ -62,19 +72,8 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T
 }
 
-function statusLabel(t: (typeof TRANSLATIONS)[Locale], status: string): string {
-  switch (status) {
-    case 'pending':
-      return t.admin_app_status_pending
-    case 'reviewed':
-      return t.admin_app_status_reviewed
-    case 'accepted':
-      return t.admin_app_status_accepted
-    case 'rejected':
-      return t.admin_app_status_rejected
-    default:
-      return status
-  }
+function canDeleteApplication(status: string): boolean {
+  return status === 'accepted' || status === 'rejected'
 }
 
 export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
@@ -97,11 +96,17 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [listLoading, setListLoading] = useState(false)
+  const [statsLoading, setStatsLoading] = useState(false)
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog | null>(null)
+  const [flash, setFlash] = useState<string | null>(null)
 
   const selected = useMemo(
     () => apps.find((item) => item.id === selectedId) || null,
     [apps, selectedId],
   )
+  const isBusy = Boolean(busy)
 
   const refreshMe = useCallback(async () => {
     try {
@@ -120,14 +125,24 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
   }, [refreshMe])
 
   const loadApps = useCallback(async () => {
-    const query = statusFilter === 'all' ? '' : `?status=${encodeURIComponent(statusFilter)}`
-    const data = await api<{items: ApplicationItem[]}>(`applications${query}`)
-    setApps(data.items)
+    setListLoading(true)
+    try {
+      const query = statusFilter === 'all' ? '' : `?status=${encodeURIComponent(statusFilter)}`
+      const data = await api<{items: ApplicationItem[]}>(`applications${query}`)
+      setApps(data.items)
+    } finally {
+      setListLoading(false)
+    }
   }, [statusFilter])
 
   const loadStats = useCallback(async () => {
-    const data = await api<Stats>('applications/stats?period=month')
-    setStats(data)
+    setStatsLoading(true)
+    try {
+      const data = await api<Stats>('applications/stats?period=month')
+      setStats(data)
+    } finally {
+      setStatsLoading(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -139,6 +154,7 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
   async function onLogin(event: FormEvent) {
     event.preventDefault()
     setError(null)
+    setBusy('login')
     try {
       const data = await api<{user: AdminUser; mfaSetupRequired?: boolean}>('auth/login', {
         method: 'POST',
@@ -150,14 +166,21 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
       setMfaCode('')
     } catch (err) {
       setError(err instanceof Error ? err.message : t.admin_invalid_credentials)
+    } finally {
+      setBusy(null)
     }
   }
 
   async function onLogout() {
-    await api('auth/logout', {method: 'POST'})
-    setUser(null)
-    setApps([])
-    setStats(null)
+    setBusy('logout')
+    try {
+      await api('auth/logout', {method: 'POST'})
+      setUser(null)
+      setApps([])
+      setStats(null)
+    } finally {
+      setBusy(null)
+    }
   }
 
   async function onChangePassword(event: FormEvent) {
@@ -168,6 +191,7 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
       setError(t.admin_password_mismatch)
       return
     }
+    setBusy('password')
     try {
       await api('auth/change-password', {
         method: 'POST',
@@ -179,18 +203,30 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
       setPasswordMessage(t.admin_password_changed)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Password change failed')
+    } finally {
+      setBusy(null)
     }
   }
 
   async function startMfa() {
-    const data = await api<{secret: string; otpauthUrl: string}>('auth/mfa/setup', {method: 'POST'})
-    setMfaSecret(data.secret)
-    setOtpauthUrl(data.otpauthUrl)
+    setBusy('mfa-setup')
+    try {
+      const data = await api<{secret: string; otpauthUrl: string}>('auth/mfa/setup', {
+        method: 'POST',
+      })
+      setMfaSecret(data.secret)
+      setOtpauthUrl(data.otpauthUrl)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'MFA setup failed')
+    } finally {
+      setBusy(null)
+    }
   }
 
   async function confirmMfa(event: FormEvent) {
     event.preventDefault()
     setError(null)
+    setBusy('mfa-confirm')
     try {
       await api('auth/mfa/confirm', {method: 'POST', body: JSON.stringify({code: mfaCode})})
       setMfaSetupRequired(false)
@@ -200,16 +236,63 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
       await refreshMe()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'MFA confirm failed')
+    } finally {
+      setBusy(null)
     }
   }
 
   async function setStatus(status: string) {
-    if (!selected) return
-    const data = await api<{item: ApplicationItem}>(`applications/${selected.id}/status`, {
-      method: 'POST',
-      body: JSON.stringify({status}),
-    })
-    setApps((prev) => prev.map((item) => (item.id === data.item.id ? {...item, ...data.item} : item)))
+    if (!selected || isBusy) return
+    setBusy(`status:${status}`)
+    setError(null)
+    try {
+      const data = await api<{item: ApplicationItem}>(`applications/${selected.id}/status`, {
+        method: 'POST',
+        body: JSON.stringify({status}),
+      })
+      setApps((prev) =>
+        prev.map((item) => (item.id === data.item.id ? {...item, ...data.item} : item)),
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Status update failed')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function runConfirmedAction() {
+    if (!confirmDialog || isBusy) return
+    setError(null)
+    setFlash(null)
+    if (confirmDialog.kind === 'delete-one') {
+      setBusy('delete')
+      try {
+        await api(`applications/${confirmDialog.id}`, {method: 'DELETE'})
+        setApps((prev) => prev.filter((item) => item.id !== confirmDialog.id))
+        if (selectedId === confirmDialog.id) setSelectedId(null)
+        setConfirmDialog(null)
+        if (tab === 'stats') await loadStats()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Delete failed')
+      } finally {
+        setBusy(null)
+      }
+      return
+    }
+
+    setBusy('purge')
+    try {
+      const data = await api<{deleted: number}>('applications/closed', {method: 'DELETE'})
+      setFlash(`${t.admin_stats_cleared}: ${data.deleted}`)
+      setConfirmDialog(null)
+      await loadStats()
+      if (tab === 'applications') await loadApps()
+      setSelectedId(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Purge failed')
+    } finally {
+      setBusy(null)
+    }
   }
 
   const toolbar = (
@@ -220,8 +303,17 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
         {t.admin_site_link}
       </a>
       {user ? (
-        <button type="button" className={adminSecondaryBtnClass} onClick={() => void onLogout()}>
-          <LogOut size={16} className="mr-1.5 opacity-70" aria-hidden />
+        <button
+          type="button"
+          className={adminSecondaryBtnClass}
+          disabled={isBusy}
+          onClick={() => void onLogout()}
+        >
+          {busy === 'logout' ? (
+            <Loader2 size={16} className="mr-1.5 animate-spin opacity-70" aria-hidden />
+          ) : (
+            <LogOut size={16} className="mr-1.5 opacity-70" aria-hidden />
+          )}
           {t.admin_sign_out}
         </button>
       ) : null}
@@ -290,8 +382,19 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
               />
             </label>
             {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
-            <button className={`${adminPrimaryBtnClass} w-full`} type="submit">
-              {t.admin_btn_login}
+            <button
+              className={`${adminPrimaryBtnClass} w-full`}
+              type="submit"
+              disabled={busy === 'login'}
+            >
+              {busy === 'login' ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  {t.admin_busy}
+                </span>
+              ) : (
+                t.admin_btn_login
+              )}
             </button>
           </form>
         </div>
@@ -392,6 +495,21 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
       </div>
 
       {error ? <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+      {flash ? (
+        <p className="mt-4 text-sm text-emerald-700 dark:text-emerald-400" role="status">
+          {flash}
+        </p>
+      ) : null}
+      {isBusy ? (
+        <p
+          className="mt-3 inline-flex items-center gap-2 text-sm text-brand-slate-500 dark:text-brand-slate-400"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 className="h-4 w-4 animate-spin text-brand-blue-500" aria-hidden />
+          {t.admin_working}
+        </p>
+      ) : null}
 
       {tab === 'applications' ? (
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -402,6 +520,7 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
                 <select
                   className={`${adminInputClass} w-auto min-w-[10rem]`}
                   value={statusFilter}
+                  disabled={isBusy || listLoading}
                   onChange={(e) => setStatusFilter(e.target.value)}
                 >
                   <option value="all">{t.admin_app_status_all}</option>
@@ -418,7 +537,12 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
                 {t.admin_export_csv}
               </a>
             </div>
-            {apps.length === 0 ? (
+            {listLoading ? (
+              <p className="inline-flex items-center gap-2 text-sm text-brand-slate-500 dark:text-brand-slate-400">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                {t.admin_loading}
+              </p>
+            ) : apps.length === 0 ? (
               <p className="text-sm text-brand-slate-500 dark:text-brand-slate-400">
                 {t.admin_empty_applications}
               </p>
@@ -439,7 +563,8 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
                         {item.companyName}
                       </div>
                       <div className="mt-0.5 text-xs text-brand-slate-500 dark:text-brand-slate-400">
-                        {statusLabel(t, item.status)} · {item.applicantKind || '—'} ·{' '}
+                        {statusLabel(t, item.status)} ·{' '}
+                        {applicantKindLabel(currentLang, t, item.applicantKind)} ·{' '}
                         {item.submittedAt.slice(0, 10)}
                       </div>
                     </button>
@@ -473,7 +598,13 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
                 </p>
                 <p>
                   <span className={adminLabelClass}>{t.admin_field_sectors}</span>
-                  <span className="mt-1 block">{selected.sectors.join(', ') || '—'}</span>
+                  <span className="mt-1 block">
+                    {selected.sectors.length
+                      ? selected.sectors
+                          .map((sector) => sectorLabel(currentLang, t, sector))
+                          .join(', ')
+                      : '—'}
+                  </span>
                 </p>
                 <p>
                   <span className={adminLabelClass}>{t.admin_field_message}</span>
@@ -484,14 +615,38 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
                     <button
                       key={status}
                       type="button"
+                      disabled={isBusy}
                       className={
                         selected.status === status ? adminPrimaryBtnClass : adminSecondaryBtnClass
                       }
-                      onClick={() => void setStatus(status).catch((err) => setError(err.message))}
+                      onClick={() => void setStatus(status)}
                     >
-                      {statusLabel(t, status)}
+                      {busy === `status:${status}` ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                          {statusLabel(t, status)}
+                        </span>
+                      ) : (
+                        statusLabel(t, status)
+                      )}
                     </button>
                   ))}
+                  {canDeleteApplication(selected.status) ? (
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      className={adminSecondaryBtnClass}
+                      onClick={() =>
+                        setConfirmDialog({
+                          kind: 'delete-one',
+                          id: selected.id,
+                          companyName: selected.companyName,
+                        })
+                      }
+                    >
+                      {t.admin_delete_application}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ) : (
@@ -503,35 +658,56 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
         </div>
       ) : null}
 
-      {tab === 'stats' && stats ? (
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className={adminPanelClass}>
-            <div className={adminLabelClass}>{t.admin_stats_total}</div>
-            <div className="mt-2 font-display text-3xl font-semibold text-brand-slate-900 dark:text-white">
-              {stats.total}
-            </div>
+      {tab === 'stats' ? (
+        <div className="mt-6 space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className={adminSecondaryBtnClass}
+              disabled={isBusy || statsLoading}
+              onClick={() => setConfirmDialog({kind: 'purge-closed'})}
+            >
+              {t.admin_stats_clear_closed}
+            </button>
           </div>
-          {[
-            [t.admin_stats_by_status, stats.byStatus],
-            [t.admin_stats_by_kind, stats.byApplicantKind],
-            [t.admin_stats_by_sector, stats.bySector],
-          ].map(([title, rows]) => (
-            <div key={String(title)} className={adminPanelClass}>
-              <h3 className="font-display text-base font-semibold text-brand-slate-900 dark:text-white">
-                {String(title)}
-              </h3>
-              <ul className="mt-3 space-y-1.5 text-sm text-brand-slate-600 dark:text-brand-slate-300">
-                {(rows as Array<{key: string; count: number}>).map((row) => (
-                  <li key={row.key} className="flex justify-between gap-3">
-                    <span>{row.key || '—'}</span>
-                    <span className="font-medium tabular-nums text-brand-slate-900 dark:text-white">
-                      {row.count}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+          {statsLoading && !stats ? (
+            <p className="inline-flex items-center gap-2 text-sm text-brand-slate-500 dark:text-brand-slate-400">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              {t.admin_loading}
+            </p>
+          ) : stats ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className={adminPanelClass}>
+                <div className={adminLabelClass}>{t.admin_stats_total}</div>
+                <div className="mt-2 font-display text-3xl font-semibold text-brand-slate-900 dark:text-white">
+                  {stats.total}
+                </div>
+              </div>
+              {(
+                [
+                  ['status', t.admin_stats_by_status, stats.byStatus],
+                  ['applicantKind', t.admin_stats_by_kind, stats.byApplicantKind],
+                  ['sector', t.admin_stats_by_sector, stats.bySector],
+                ] as const
+              ).map(([kind, title, rows]) => (
+                <div key={kind} className={adminPanelClass}>
+                  <h3 className="font-display text-base font-semibold text-brand-slate-900 dark:text-white">
+                    {title}
+                  </h3>
+                  <ul className="mt-3 space-y-1.5 text-sm text-brand-slate-600 dark:text-brand-slate-300">
+                    {rows.map((row) => (
+                      <li key={row.key} className="flex justify-between gap-3">
+                        <span>{statsKeyLabel(kind, row.key, currentLang, t)}</span>
+                        <span className="font-medium tabular-nums text-brand-slate-900 dark:text-white">
+                          {row.count}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
-          ))}
+          ) : null}
         </div>
       ) : null}
 
@@ -584,10 +760,71 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
             {passwordMessage ? (
               <p className="text-sm text-emerald-700 dark:text-emerald-400">{passwordMessage}</p>
             ) : null}
-            <button type="submit" className={adminPrimaryBtnClass}>
-              {t.admin_change_password_submit}
+            <button
+              type="submit"
+              className={adminPrimaryBtnClass}
+              disabled={busy === 'password'}
+            >
+              {busy === 'password' ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  {t.admin_busy}
+                </span>
+              ) : (
+                t.admin_change_password_submit
+              )}
             </button>
           </form>
+        </div>
+      ) : null}
+
+      {confirmDialog ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-confirm-title"
+        >
+          <div className={`${adminPanelClass} max-w-md space-y-4 shadow-xl`}>
+            <h2
+              id="admin-confirm-title"
+              className="font-display text-lg font-semibold text-brand-slate-900 dark:text-white"
+            >
+              {confirmDialog.kind === 'delete-one'
+                ? t.admin_delete_application
+                : t.admin_stats_clear_closed}
+            </h2>
+            <p className="text-sm text-brand-slate-600 dark:text-brand-slate-300">
+              {confirmDialog.kind === 'delete-one'
+                ? `${t.admin_delete_application_confirm} (${confirmDialog.companyName})`
+                : t.admin_stats_clear_closed_confirm}
+            </p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className={adminSecondaryBtnClass}
+                disabled={isBusy}
+                onClick={() => setConfirmDialog(null)}
+              >
+                {t.admin_cancel}
+              </button>
+              <button
+                type="button"
+                className={adminPrimaryBtnClass}
+                disabled={isBusy}
+                onClick={() => void runConfirmedAction()}
+              >
+                {busy === 'delete' || busy === 'purge' ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    {t.admin_busy}
+                  </span>
+                ) : (
+                  t.admin_confirm_action
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </div>

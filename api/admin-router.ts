@@ -1,5 +1,7 @@
 import type {VercelRequest, VercelResponse} from '@vercel/node'
 import {
+  deleteClosedApplication,
+  deleteClosedApplications,
   getApplicationById,
   getApplicationStats,
   listApplications,
@@ -339,6 +341,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         metadata: {status},
       })
       return res.status(200).json({item})
+    }
+
+    if (parts[1] === 'closed' && method === 'DELETE') {
+      if (!requireMutationOrigin(req, res)) return
+      const session = await requireSession(req, res, 'applications.write')
+      if (!session) return
+      if (await isRateLimited(`admin:apps-purge:${session.user.id}`, 15 * 60 * 1000, 10)) {
+        return sendJsonError(res, 429, 'Too many requests')
+      }
+      const deleted = await deleteClosedApplications()
+      await writeAuditEvent({
+        actorType: 'admin',
+        actorId: session.user.id,
+        action: 'applications.purge_closed',
+        ip,
+        metadata: {deleted},
+      })
+      return res.status(200).json({ok: true, deleted})
+    }
+
+    if (parts[1] && parts.length === 2 && method === 'DELETE') {
+      if (!requireMutationOrigin(req, res)) return
+      const session = await requireSession(req, res, 'applications.write')
+      if (!session) return
+      if (await isRateLimited(`admin:apps-delete:${session.user.id}`, 15 * 60 * 1000, 30)) {
+        return sendJsonError(res, 429, 'Too many requests')
+      }
+      try {
+        const item = await deleteClosedApplication(parts[1])
+        if (!item) return sendJsonError(res, 404, 'Not found')
+        await writeAuditEvent({
+          actorType: 'admin',
+          actorId: session.user.id,
+          action: 'application.deleted',
+          entityType: 'application',
+          entityId: item.id,
+          ip,
+          metadata: {status: item.status, companyName: item.companyName},
+        })
+        return res.status(200).json({ok: true, id: item.id})
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Delete failed'
+        return sendJsonError(res, 400, message)
+      }
     }
 
     return sendJsonError(res, 404, 'Not found')

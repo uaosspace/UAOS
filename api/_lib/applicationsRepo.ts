@@ -182,6 +182,31 @@ export async function updateApplicationStatus(
   return mapRow(rows[0] as Record<string, unknown>)
 }
 
+const DELETABLE_STATUSES: ApplicationStatus[] = ['accepted', 'rejected']
+
+/** Deletes one accepted/rejected application. Consents keep a null application_id. */
+export async function deleteClosedApplication(id: string): Promise<ApplicationRecord | null> {
+  const sql = getSql()
+  const existing = await getApplicationById(id)
+  if (!existing) return null
+  if (!DELETABLE_STATUSES.includes(existing.status)) {
+    throw new Error('Only accepted or rejected applications can be deleted')
+  }
+  await sql`DELETE FROM applications WHERE id = ${id}::uuid`
+  return existing
+}
+
+/** Deletes all accepted and rejected applications. Returns deleted count. */
+export async function deleteClosedApplications(): Promise<number> {
+  const sql = getSql()
+  const rows = await sql`
+    DELETE FROM applications
+    WHERE status IN ('accepted', 'rejected')
+    RETURNING id
+  `
+  return rows.length
+}
+
 export async function getApplicationStats(fromIso: string | null): Promise<ApplicationStats> {
   const sql = getSql()
   const totalRows = await sql`
