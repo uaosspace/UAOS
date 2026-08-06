@@ -1,4 +1,5 @@
 import {isRecord, readStringArray, readStringOr} from '../../src/lib/contentGuards.js'
+import {isPrivacyNoticeLanguage, type PrivacyNoticeLanguage} from '../../src/lib/privacyPolicy.js'
 
 const APPLICANT_KINDS = ['producer-supplier', 'consumer-enterprise', 'expert-org', 'other'] as const
 type ApplicantKind = (typeof APPLICANT_KINDS)[number]
@@ -25,6 +26,10 @@ export interface NormalizedJoinApplication {
   consentGiven: boolean
   honeypot: string
   consentTimestamp: string
+  /** Мова повідомлення про конфіденційність, яку бачив заявник (журнал згод). */
+  noticeLanguage: PrivacyNoticeLanguage
+  /** Підтвердження достовірності даних та ознайомлення з умовами участі. */
+  termsConsentGiven: boolean
   /** Опціональна класифікація заявника (розділ 12/16 ТЗ) — не впливає на існуючі обов'язкові поля. */
   applicantKind: ApplicantKind | ''
   sectors: string[]
@@ -51,6 +56,10 @@ export function normalizeJoinApplication(body: unknown): NormalizedJoinApplicati
     consentGiven: source.privacyConsent === true || source.consent === true,
     honeypot: normalizeWhitespace(readStringOr(source.hp, '')),
     consentTimestamp: new Date().toISOString(),
+    // Відсутнє або невідоме значення (наприклад, застарілий кешований bundle) зводиться до 'uk' —
+    // це default колонки consents.notice_language і поведінка до появи поля.
+    noticeLanguage: isPrivacyNoticeLanguage(source.noticeLanguage) ? source.noticeLanguage : 'uk',
+    termsConsentGiven: source.termsConsent === true,
     applicantKind: (APPLICANT_KINDS as readonly string[]).includes(readStringOr(source.applicantKind, ''))
       ? (source.applicantKind as ApplicantKind)
       : '',
@@ -72,6 +81,10 @@ export function validateJoinApplication(payload: NormalizedJoinApplication): str
 
   if (!payload.consentGiven) {
     return 'Privacy consent is required'
+  }
+
+  if (!payload.termsConsentGiven) {
+    return 'Terms consent is required'
   }
 
   if (payload.companyName.length > 120) return 'Company name is too long'

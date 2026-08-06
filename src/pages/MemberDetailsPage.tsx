@@ -1,4 +1,5 @@
 import type {Locale} from '../data/locales'
+import {resolveLocalized} from '../data/locales'
 import MemberProfile from '../components/MemberProfile'
 import type {AssociationMember} from '../types'
 import {TRANSLATIONS} from '../data/translations'
@@ -16,8 +17,8 @@ interface MemberDetailsPageProps {
 export default function MemberDetailsPage({currentLang, member, onBack}: MemberDetailsPageProps) {
   const t = TRANSLATIONS[currentLang]
   useDocumentMeta({
-    title: `${member.name[currentLang]} — ${t.brand_name}`,
-    description: member.shortDescription[currentLang],
+    title: `${resolveLocalized(member.name, currentLang)} — ${t.brand_name}`,
+    description: resolveLocalized(member.shortDescription, currentLang),
     ogImage: member.coverImageUrl || member.logoUrl,
     ogType: 'profile',
   })

@@ -1,3 +1,4 @@
+import {LOCALES} from '../data/locales'
 import type {DocumentItem, EventFormat, EventType, LocalizedText, MemberProfileLevel} from '../types'
 
 type UnknownRecord = Record<string, unknown>
@@ -24,17 +25,22 @@ export function readStringOr(value: unknown, fallback: string): string {
 }
 
 /**
- * Нормализует локализованный текст в безопасную структуру с двумя языками.
+ * Нормализует локализованный текст: `uk`/`en` всегда строки, остальные локали остаются
+ * undefined, если перевода нет — `resolveLocalized` в таком случае даёт fallback.
  */
 export function readLocalizedText(value: unknown): LocalizedText {
-  if (!isRecord(value)) {
-    return {uk: '', en: ''}
+  const source = isRecord(value) ? value : {}
+  const result: LocalizedText = {
+    uk: readString(source.uk) ?? '',
+    en: readString(source.en) ?? '',
   }
 
-  return {
-    uk: readString(value.uk) ?? '',
-    en: readString(value.en) ?? '',
+  for (const locale of LOCALES) {
+    const text = readString(source[locale])
+    if (text) result[locale] = text
   }
+
+  return result
 }
 
 /**

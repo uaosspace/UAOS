@@ -1,4 +1,5 @@
 import type {Locale} from '../../data/locales'
+import {resolveLocalized} from '../../data/locales'
 import React from 'react';
 import { AssociationEvent } from '../../types';
 import { TRANSLATIONS } from '../../data/translations';
@@ -18,6 +19,9 @@ export default function EventCard({ event, currentLang, onOpenDetails }: EventCa
   
   const formatKey = `events_${event.format}` as keyof typeof t;
   const formatText = t[formatKey] || event.format;
+
+  const titleText = resolveLocalized(event.title, currentLang);
+  const locationText = event.location ? resolveLocalized(event.location, currentLang) : '';
 
   const day = formatEventDay(event, currentLang);
   const month = formatEventMonth(event, currentLang);
@@ -64,15 +68,15 @@ export default function EventCard({ event, currentLang, onOpenDetails }: EventCa
           </div>
           
           <h4 className="text-base font-display font-bold text-brand-slate-900 dark:text-white leading-snug mb-2 line-clamp-2 group-hover:text-brand-blue-600 dark:group-hover:text-brand-sky-300 transition-colors">
-            {event.title[currentLang]}
+            {titleText}
           </h4>
           
           <div className="text-xs text-brand-slate-600 dark:text-brand-slate-200 line-clamp-1 mb-4">
             <span className="font-semibold">{formatText}</span>
-            {event.location && event.location[currentLang] && (
+            {locationText && (
               <>
                 <span className="mx-1 text-brand-slate-400">/</span>
-                <span className="truncate">{event.location[currentLang]}</span>
+                <span className="truncate">{locationText}</span>
               </>
             )}
           </div>

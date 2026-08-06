@@ -17,8 +17,19 @@ import {
 import {isRateLimited} from './_lib/rateLimitStore.js'
 import {verifyTurnstileToken} from './_lib/turnstile.js'
 import {isRecord, readStringOr} from '../src/lib/contentGuards.js'
+import {PRIVACY_POLICY_VERSION as PUBLISHED_POLICY_VERSION} from '../src/lib/privacyPolicy.js'
+import {SITE_TERMS_VERSION} from '../src/lib/siteTerms.js'
 
-const PRIVACY_POLICY_VERSION = process.env.PRIVACY_POLICY_VERSION?.trim() || '2026-08-03'
+const policyVersionOverride = process.env.PRIVACY_POLICY_VERSION?.trim() || ''
+const PRIVACY_POLICY_VERSION = policyVersionOverride || PUBLISHED_POLICY_VERSION
+
+// Розходження override і опублікованої версії означає, що в consents потрапить не той текст,
+// який бачив користувач, тому воно має бути помітним у логах, а не тихим.
+if (policyVersionOverride && policyVersionOverride !== PUBLISHED_POLICY_VERSION) {
+  console.warn(
+    `[join] PRIVACY_POLICY_VERSION override "${policyVersionOverride}" differs from published policy "${PUBLISHED_POLICY_VERSION}"`
+  )
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const correlationId = crypto.randomUUID()
@@ -70,7 +81,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       website,
       consentIp,
       policyVersion: PRIVACY_POLICY_VERSION,
-      noticeLanguage: 'uk',
+      termsVersion: SITE_TERMS_VERSION,
+      noticeLanguage: payload.noticeLanguage,
       userAgent,
     })
 

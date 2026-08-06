@@ -1,8 +1,21 @@
-import type {Locale} from '../../data/locales'
+import {LOCALE_META, type Locale} from '../../data/locales'
 import {PARTICIPANT_TYPES, SECTORS} from '../../data/referenceLists'
 import {TRANSLATIONS} from '../../data/translations'
 
 type T = (typeof TRANSLATIONS)[Locale]
+
+/**
+ * Content field labels are locale-suffixed ("Заголовок UK *"). The six-locale editor reuses the
+ * base label and appends the locale code from LOCALE_META instead of introducing per-locale keys.
+ */
+export function localizedFieldLabel(suffixedLabel: string, locale: Locale): string {
+  const required = /\*\s*$/.test(suffixedLabel)
+  const base = suffixedLabel
+    .replace(/\s*\*\s*$/, '')
+    .replace(/\s+(UK|EN)$/i, '')
+    .trim()
+  return `${base} ${LOCALE_META[locale].label}${required ? ' *' : ''}`
+}
 
 export function statusLabel(t: T, status: string): string {
   switch (status) {

@@ -11,11 +11,13 @@ interface JoinPageProps {
   currentLang: Locale
   /** Якір з URL (#join-form) — скрол до форми після CTA «Стати учасником». */
   anchor?: string
+  onOpenPrivacy: () => void
+  onOpenTerms: () => void
 }
 
 const STEP_ICONS = [FileCheck, ClipboardCheck, Mail, BadgeCheck]
 
-export default function JoinPage({currentLang, anchor}: JoinPageProps) {
+export default function JoinPage({currentLang, anchor, onOpenPrivacy, onOpenTerms}: JoinPageProps) {
   const t = TRANSLATIONS[currentLang]
   useDocumentMeta({
     title: `${t.join_title_before} ${t.join_title_underlit} — ${t.brand_name}`,
@@ -113,7 +115,11 @@ export default function JoinPage({currentLang, anchor}: JoinPageProps) {
           <h2 className="text-center text-2xl font-display font-bold text-brand-slate-900 dark:text-white mb-6">
             {t.join_form_title}
           </h2>
-          <JoinApplicationForm currentLang={currentLang} />
+          <JoinApplicationForm
+            currentLang={currentLang}
+            onOpenPrivacy={onOpenPrivacy}
+            onOpenTerms={onOpenTerms}
+          />
         </div>
       </section>
     </article>

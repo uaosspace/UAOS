@@ -22,6 +22,8 @@ describe('submitJoinRequest', () => {
       phone: '+380670000000',
       message: '',
       edrpou: '',
+      noticeLanguage: 'en',
+      termsConsent: true,
     })
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -30,6 +32,11 @@ describe('submitJoinRequest', () => {
         method: 'POST',
       })
     )
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body)
+    expect(body.noticeLanguage).toBe('en')
+    expect(body.privacyConsent).toBe(true)
+    expect(body.termsConsent).toBe(true)
   })
 
   it('throws a normalized error for rejected responses', async () => {
@@ -51,6 +58,8 @@ describe('submitJoinRequest', () => {
         phone: '+380670000000',
         message: '',
         edrpou: '',
+        noticeLanguage: 'uk',
+        termsConsent: true,
       })
     ).rejects.toThrow('Rejected')
   })

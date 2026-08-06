@@ -1,4 +1,5 @@
 import type {Locale} from '../data/locales'
+import {resolveLocalized} from '../data/locales'
 import React, { useState } from 'react';
 import { Search, FileText, Download, Globe, Calendar, FileType, Check } from 'lucide-react';
 import { TRANSLATIONS } from '../data/translations';
@@ -26,8 +27,8 @@ export default function DocumentsSection({
   const t = TRANSLATIONS[currentLang];
 
   const filteredDocs = documents.filter((doc) => {
-    const titleMatch = doc.title[currentLang]?.toLowerCase().includes(searchQuery.toLowerCase());
-    const descMatch = doc.description[currentLang]?.toLowerCase().includes(searchQuery.toLowerCase());
+    const titleMatch = resolveLocalized(doc.title, currentLang).toLowerCase().includes(searchQuery.toLowerCase());
+    const descMatch = resolveLocalized(doc.description, currentLang).toLowerCase().includes(searchQuery.toLowerCase());
     return titleMatch || descMatch;
   });
 
@@ -112,10 +113,10 @@ export default function DocumentsSection({
                   {/* Title & Desc */}
                   <div className="space-y-1.5 text-left">
                     <h3 className="text-base font-display font-bold text-brand-slate-900 dark:text-white leading-snug group-hover:text-brand-blue-500 dark:group-hover:text-brand-sky-300 transition-colors">
-                      {doc.title[currentLang]}
+                      {resolveLocalized(doc.title, currentLang)}
                     </h3>
                     <p className="text-xs text-brand-slate-600 dark:text-brand-slate-300 leading-relaxed">
-                      {doc.description[currentLang]}
+                      {resolveLocalized(doc.description, currentLang)}
                     </p>
                   </div>
 

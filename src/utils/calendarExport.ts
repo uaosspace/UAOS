@@ -1,4 +1,5 @@
 import type {Locale} from '../data/locales'
+import {resolveLocalized} from '../data/locales'
 import { AssociationEvent } from '../types';
 import { DateTime } from 'luxon';
 
@@ -18,9 +19,9 @@ export function getGoogleCalendarUrl(event: AssociationEvent, lang: Locale): str
   const start = DateTime.fromISO(event.startAt, {zone: 'utc'}).toFormat("yyyyMMdd'T'HHmmss'Z'")
   const end = DateTime.fromISO(eventEndIso(event), {zone: 'utc'}).toFormat("yyyyMMdd'T'HHmmss'Z'")
 
-  const title = event.title[lang] || event.title.uk || event.title.en || 'UAOS event'
-  const desc = `${event.shortDescription[lang] || event.shortDescription.uk || ''}\n\n${buildPublicUrl(event.id)}`
-  const location = event.location ? event.location[lang] || event.location.uk || '' : ''
+  const title = resolveLocalized(event.title, lang) || 'UAOS event'
+  const desc = `${resolveLocalized(event.shortDescription, lang)}\n\n${buildPublicUrl(event.id)}`
+  const location = event.location ? resolveLocalized(event.location, lang) : ''
 
   const params = new URLSearchParams({
     action: 'TEMPLATE',
@@ -38,9 +39,9 @@ export function getOutlookCalendarUrl(event: AssociationEvent, lang: Locale): st
   const start = DateTime.fromISO(event.startAt, {zone: 'utc'}).toFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
   const end = DateTime.fromISO(eventEndIso(event), {zone: 'utc'}).toFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
 
-  const title = event.title[lang] || event.title.uk || event.title.en || 'UAOS event'
-  const desc = `${event.shortDescription[lang] || event.shortDescription.uk || ''}\n\n${buildPublicUrl(event.id)}`
-  const location = event.location ? event.location[lang] || event.location.uk || '' : ''
+  const title = resolveLocalized(event.title, lang) || 'UAOS event'
+  const desc = `${resolveLocalized(event.shortDescription, lang)}\n\n${buildPublicUrl(event.id)}`
+  const location = event.location ? resolveLocalized(event.location, lang) : ''
 
   const params = new URLSearchParams({
     path: '/calendar/action/compose',
@@ -66,11 +67,11 @@ export function generateIcsBlob(event: AssociationEvent, lang: Locale): Blob {
   const now = DateTime.utc().toFormat("yyyyMMdd'T'HHmmss'Z'")
   const uid = `${event.id}@uaos`
 
-  const title = escapeIcsText(event.title[lang] || event.title.uk || event.title.en || 'UAOS event')
+  const title = escapeIcsText(resolveLocalized(event.title, lang) || 'UAOS event')
   const desc = escapeIcsText(
-    `${event.shortDescription[lang] || event.shortDescription.uk || ''}\n\n${buildPublicUrl(event.id)}`,
+    `${resolveLocalized(event.shortDescription, lang)}\n\n${buildPublicUrl(event.id)}`,
   )
-  const location = escapeIcsText(event.location ? event.location[lang] || event.location.uk || '' : '')
+  const location = escapeIcsText(event.location ? resolveLocalized(event.location, lang) : '')
   const url = buildPublicUrl(event.id)
 
   const icsContent = [
@@ -120,7 +121,7 @@ export function copyEventLink(event: AssociationEvent): Promise<void> {
 
 export function getTelegramShareUrl(event: AssociationEvent, lang: Locale): string {
   const url = encodeURIComponent(buildPublicUrl(event.id));
-  const text = encodeURIComponent(event.title[lang]);
+  const text = encodeURIComponent(resolveLocalized(event.title, lang));
   return `https://t.me/share/url?url=${url}&text=${text}`;
 }
 
@@ -136,26 +137,26 @@ export function getLinkedInShareUrl(event: AssociationEvent, lang: Locale): stri
 
 export function getViberShareUrl(event: AssociationEvent, lang: Locale): string {
   const url = encodeURIComponent(buildPublicUrl(event.id));
-  const text = encodeURIComponent(`${event.title[lang]} ${buildPublicUrl(event.id)}`);
+  const text = encodeURIComponent(`${resolveLocalized(event.title, lang)} ${buildPublicUrl(event.id)}`);
   return `viber://forward?text=${text}`;
 }
 
 export function getTwitterShareUrl(event: AssociationEvent, lang: Locale): string {
   const url = encodeURIComponent(buildPublicUrl(event.id));
-  const text = encodeURIComponent(event.title[lang]);
+  const text = encodeURIComponent(resolveLocalized(event.title, lang));
   return `https://twitter.com/intent/tweet?url=${url}&text=${text}`;
 }
 
 export function getWhatsAppShareUrl(event: AssociationEvent, lang: Locale): string {
   const url = encodeURIComponent(buildPublicUrl(event.id));
-  const text = encodeURIComponent(`${event.title[lang]} `);
+  const text = encodeURIComponent(`${resolveLocalized(event.title, lang)} `);
   return `https://api.whatsapp.com/send?text=${text}${url}`;
 }
 
 export function getEmailShareUrl(event: AssociationEvent, lang: Locale): string {
   const url = buildPublicUrl(event.id);
-  const subject = encodeURIComponent(event.title[lang]);
-  const body = encodeURIComponent(`${event.shortDescription[lang]}\n\n${url}`);
+  const subject = encodeURIComponent(resolveLocalized(event.title, lang));
+  const body = encodeURIComponent(`${resolveLocalized(event.shortDescription, lang)}\n\n${url}`);
   return `mailto:?subject=${subject}&body=${body}`;
 }
 
@@ -164,8 +165,8 @@ export async function shareEvent(event: AssociationEvent, lang: Locale): Promise
   if (navigator.share) {
     try {
       await navigator.share({
-        title: event.title[lang],
-        text: event.shortDescription[lang],
+        title: resolveLocalized(event.title, lang),
+        text: resolveLocalized(event.shortDescription, lang),
         url: url
       });
       return;

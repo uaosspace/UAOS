@@ -15,10 +15,18 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   address: {
     uk: '04119, Україна, м. Київ, вул. Юрія Іллєнка, 83д',
     en: '04119, Ukraine, Kyiv, Yuria Illienka street, 83d',
+    de: '04119, Ukraine, Kyjiw, Jurij-Illjenko-Straße 83d',
+    es: '04119, Ucrania, Kyiv, calle Yuriya Illienka, 83d',
+    kk: '04119, Украина, Киев қ., Юрий Илленко көшесі, 83д',
+    fr: '04119, Ukraine, Kyiv, rue Yuriya Illienka, 83d',
   },
   brandTagline: {
     uk: 'Українська Асоціація Професійної Безпеки',
     en: 'Ukrainian Association of Occupational Safety',
+    de: 'Ukrainischer Verband für Arbeitssicherheit',
+    es: 'Asociación Ucraniana de Seguridad Laboral',
+    kk: 'Украина Кәсіптік Қауіпсіздік Қауымдастығы',
+    fr: 'Association ukrainienne de la sécurité au travail',
   },
 }
 

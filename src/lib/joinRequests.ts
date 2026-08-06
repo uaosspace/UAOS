@@ -1,4 +1,5 @@
 import type {ApplicantKind} from '../types'
+import type {PrivacyNoticeLanguage} from './privacyPolicy'
 
 export interface JoinRequestSubmission {
   companyName: string
@@ -16,6 +17,10 @@ export interface JoinRequestSubmission {
   sectors?: string[]
   productCategories?: string[]
   competencies?: string[]
+  /** Мова повідомлення про конфіденційність, показаного заявнику (журнал згод). */
+  noticeLanguage: PrivacyNoticeLanguage
+  /** Підтвердження достовірності даних та ознайомлення з умовами. */
+  termsConsent: boolean
 }
 
 /**
@@ -29,6 +34,7 @@ export async function submitJoinRequest(payload: JoinRequestSubmission): Promise
       ...payload,
       privacyConsent: true,
       consent: true,
+      termsConsent: payload.termsConsent,
       hp: payload.hp ?? '',
       turnstileToken: payload.turnstileToken ?? '',
     }),

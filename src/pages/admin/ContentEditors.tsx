@@ -1,8 +1,11 @@
 import {useCallback, useEffect, useState, type FormEvent} from 'react'
 import {DateTime} from 'luxon'
-import type {Locale} from '../../data/locales'
+import {DEFAULT_LOCALE, LOCALES, LOCALE_META, type Locale} from '../../data/locales'
 import {TRANSLATIONS} from '../../data/translations'
+import {readLocalizedText} from '../../lib/contentGuards'
+import type {LocalizedText} from '../../types'
 import {resolveContentSlug} from '../../utils/slugify'
+import {localizedFieldLabel} from './adminLabels'
 import {
   adminInputClass,
   adminLabelClass,
@@ -37,12 +40,9 @@ type NewsDraft = {
   slug: string
   status: 'draft' | 'published'
   publishedAt: string
-  titleUk: string
-  titleEn: string
-  excerptUk: string
-  excerptEn: string
-  bodyUk: string
-  bodyEn: string
+  title: LocalizedText
+  excerpt: LocalizedText
+  body: LocalizedText
   coverUrl: string
   kind: 'internal' | 'link'
   externalUrl: string
@@ -52,13 +52,11 @@ type MemberDraft = {
   id?: string
   slug: string
   status: 'draft' | 'published'
-  nameUk: string
-  nameEn: string
-  shortNameUk: string
-  categoryUk: string
-  categoryEn: string
-  shortDescriptionUk: string
-  shortDescriptionEn: string
+  name: LocalizedText
+  /** Brand abbreviation — stays a single value, the public model keeps it a plain string. */
+  shortName: string
+  category: LocalizedText
+  shortDescription: LocalizedText
   websiteUrl: string
   logoUrl: string
   coverUrl: string
@@ -70,16 +68,12 @@ type EventDraft = {
   id?: string
   slug: string
   status: 'draft' | 'published'
-  titleUk: string
-  titleEn: string
-  shortDescriptionUk: string
-  shortDescriptionEn: string
+  title: LocalizedText
+  shortDescription: LocalizedText
   type: string
   format: string
   startAt: string
   endAt: string
-  locationUk: string
-  locationEn: string
   coverUrl: string
 }
 
@@ -87,10 +81,8 @@ type DocumentDraft = {
   id?: string
   slug: string
   status: 'draft' | 'published'
-  titleUk: string
-  titleEn: string
-  descriptionUk: string
-  descriptionEn: string
+  title: LocalizedText
+  description: LocalizedText
   type: string
   language: string
   accessLevel: 'public' | 'members'
@@ -100,10 +92,8 @@ type DocumentDraft = {
 type SettingsDraft = {
   phone: string
   email: string
-  addressUk: string
-  addressEn: string
-  brandTaglineUk: string
-  brandTaglineEn: string
+  address: LocalizedText
+  brandTagline: LocalizedText
 }
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -119,16 +109,15 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T
 }
 
+const emptyLocalized = (): LocalizedText => ({uk: '', en: ''})
+
 const emptyNews = (): NewsDraft => ({
   slug: '',
   status: 'draft',
   publishedAt: new Date().toISOString().slice(0, 10),
-  titleUk: '',
-  titleEn: '',
-  excerptUk: '',
-  excerptEn: '',
-  bodyUk: '',
-  bodyEn: '',
+  title: emptyLocalized(),
+  excerpt: emptyLocalized(),
+  body: emptyLocalized(),
   coverUrl: '',
   kind: 'internal',
   externalUrl: '',
@@ -137,13 +126,10 @@ const emptyNews = (): NewsDraft => ({
 const emptyMember = (): MemberDraft => ({
   slug: '',
   status: 'draft',
-  nameUk: '',
-  nameEn: '',
-  shortNameUk: '',
-  categoryUk: '',
-  categoryEn: '',
-  shortDescriptionUk: '',
-  shortDescriptionEn: '',
+  name: emptyLocalized(),
+  shortName: '',
+  category: emptyLocalized(),
+  shortDescription: emptyLocalized(),
   websiteUrl: '',
   logoUrl: '',
   coverUrl: '',
@@ -154,31 +140,42 @@ const emptyMember = (): MemberDraft => ({
 const emptyEvent = (): EventDraft => ({
   slug: '',
   status: 'draft',
-  titleUk: '',
-  titleEn: '',
-  shortDescriptionUk: '',
-  shortDescriptionEn: '',
+  title: emptyLocalized(),
+  shortDescription: emptyLocalized(),
   type: 'meeting',
   format: 'offline',
   startAt: '',
   endAt: '',
-  locationUk: '',
-  locationEn: '',
   coverUrl: '',
 })
 
 const emptyDocument = (): DocumentDraft => ({
   slug: '',
   status: 'draft',
-  titleUk: '',
-  titleEn: '',
-  descriptionUk: '',
-  descriptionEn: '',
+  title: emptyLocalized(),
+  description: emptyLocalized(),
   type: 'link',
   language: 'uk',
   accessLevel: 'public',
   fileUrl: '',
 })
+
+function withLocale(value: LocalizedText, locale: Locale, text: string): LocalizedText {
+  return {...value, [locale]: text}
+}
+
+function isFilled(value: LocalizedText, locale: Locale): boolean {
+  return Boolean((value[locale] ?? '').trim())
+}
+
+/** Locales with at least one empty field in the current form — drives the tab markers. */
+function incompleteLocales(fields: LocalizedText[]): Set<Locale> {
+  const incomplete = new Set<Locale>()
+  for (const locale of LOCALES) {
+    if (fields.some((field) => !isFilled(field, locale))) incomplete.add(locale)
+  }
+  return incomplete
+}
 
 function Field({
   label,
@@ -203,6 +200,97 @@ function Field({
         />
       ) : (
         <input className={adminInputClass} value={value} onChange={(e) => onChange(e.target.value)} />
+      )}
+    </label>
+  )
+}
+
+/** One locale switcher per form; a hollow marker means that locale still has empty fields. */
+function LocaleTabs({
+  active,
+  incomplete,
+  onChange,
+}: {
+  active: Locale
+  incomplete: Set<Locale>
+  onChange: (locale: Locale) => void
+}) {
+  return (
+    <div className="md:col-span-2 flex flex-wrap gap-2">
+      {LOCALES.map((locale) => {
+        const isActive = locale === active
+        return (
+          <button
+            key={locale}
+            type="button"
+            aria-pressed={isActive}
+            title={LOCALE_META[locale].nativeName}
+            className={`${isActive ? adminTabActiveClass : adminTabIdleClass} inline-flex items-center gap-2`}
+            onClick={() => onChange(locale)}
+          >
+            {LOCALE_META[locale].label}
+            <span
+              aria-hidden
+              className={
+                incomplete.has(locale)
+                  ? 'h-2 w-2 rounded-full border border-current opacity-70'
+                  : 'h-2 w-2 rounded-full bg-emerald-500'
+              }
+            />
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Text field for the active locale; the code row shows which locales are already translated. */
+function LocalizedField({
+  label,
+  value,
+  locale,
+  onChange,
+  multiline,
+}: {
+  label: string
+  value: LocalizedText
+  locale: Locale
+  onChange: (next: LocalizedText) => void
+  multiline?: boolean
+}) {
+  const text = value[locale] ?? ''
+  return (
+    <label className="block space-y-1.5 text-sm">
+      <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span className={adminLabelClass}>{localizedFieldLabel(label, locale)}</span>
+        <span aria-hidden className="flex gap-1.5 font-mono text-[10px] uppercase tracking-widest">
+          {LOCALES.map((item) => (
+            <span
+              key={item}
+              className={
+                isFilled(value, item)
+                  ? 'text-brand-blue-600 dark:text-brand-sky-300'
+                  : 'text-brand-slate-300 line-through dark:text-brand-slate-600'
+              }
+            >
+              {LOCALE_META[item].label}
+            </span>
+          ))}
+        </span>
+      </span>
+      {multiline ? (
+        <textarea
+          className={adminInputClass}
+          rows={4}
+          value={text}
+          onChange={(e) => onChange(withLocale(value, locale, e.target.value))}
+        />
+      ) : (
+        <input
+          className={adminInputClass}
+          value={text}
+          onChange={(e) => onChange(withLocale(value, locale, e.target.value))}
+        />
       )}
     </label>
   )
@@ -268,13 +356,12 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
   const [member, setMember] = useState<MemberDraft>(emptyMember())
   const [eventItem, setEventItem] = useState<EventDraft>(emptyEvent())
   const [documentItem, setDocumentItem] = useState<DocumentDraft>(emptyDocument())
+  const [fieldLocale, setFieldLocale] = useState<Locale>(DEFAULT_LOCALE)
   const [settings, setSettings] = useState<SettingsDraft>({
     phone: '',
     email: '',
-    addressUk: '',
-    addressEn: '',
-    brandTaglineUk: '',
-    brandTaglineEn: '',
+    address: emptyLocalized(),
+    brandTagline: emptyLocalized(),
   })
 
   const load = useCallback(async () => {
@@ -282,15 +369,11 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
     if (kind === 'settings') {
       const data = await api<{item: Record<string, unknown>}>('content/settings')
       const item = data.item || {}
-      const address = (item.address as {uk?: string; en?: string}) || {}
-      const brand = (item.brandTagline as {uk?: string; en?: string}) || {}
       setSettings({
         phone: String(item.phone || ''),
         email: String(item.email || ''),
-        addressUk: address.uk || '',
-        addressEn: address.en || '',
-        brandTaglineUk: brand.uk || '',
-        brandTaglineEn: brand.en || '',
+        address: readLocalizedText(item.address),
+        brandTagline: readLocalizedText(item.brandTagline),
       })
       setItems([])
       return
@@ -332,7 +415,7 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
       if (news.kind === 'link' && !/^https?:\/\//i.test(externalUrl)) {
         throw new Error(t.admin_news_external_url_required)
       }
-      const slug = resolveContentSlug(news.slug, news.titleUk, 'news')
+      const slug = resolveContentSlug(news.slug, news.title.uk, 'news')
       await api('content/news', {
         method: 'POST',
         body: JSON.stringify({
@@ -340,12 +423,9 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
           slug,
           status: news.status,
           publishedAt: news.publishedAt,
-          title: {uk: news.titleUk, en: news.titleEn},
-          excerpt: {uk: news.excerptUk, en: news.excerptEn},
-          body: {
-            uk: news.kind === 'internal' ? news.bodyUk : '',
-            en: news.kind === 'internal' ? news.bodyEn : '',
-          },
+          title: news.title,
+          excerpt: news.excerpt,
+          body: news.kind === 'internal' ? news.body : emptyLocalized(),
           coverImageUrl: news.coverUrl,
           externalUrl,
         }),
@@ -363,8 +443,8 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
     setError(null)
     setMessage(null)
     try {
-      if (!member.nameUk.trim()) throw new Error(t.admin_member_name_required)
-      const slug = resolveContentSlug(member.slug, member.nameUk, 'member')
+      if (!member.name.uk.trim()) throw new Error(t.admin_member_name_required)
+      const slug = resolveContentSlug(member.slug, member.name.uk, 'member')
       await api('content/members', {
         method: 'POST',
         body: JSON.stringify({
@@ -373,10 +453,10 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
           status: member.status,
           order: member.order,
           featured: member.featured,
-          name: {uk: member.nameUk, en: member.nameEn},
-          shortName: {uk: member.shortNameUk, en: member.shortNameUk},
-          category: {uk: member.categoryUk, en: member.categoryEn},
-          shortDescription: {uk: member.shortDescriptionUk, en: member.shortDescriptionEn},
+          name: member.name,
+          shortName: member.shortName,
+          category: member.category,
+          shortDescription: member.shortDescription,
           websiteUrl: member.websiteUrl.trim(),
           logoUrl: member.logoUrl.trim(),
           coverImageUrl: member.coverUrl.trim(),
@@ -410,20 +490,20 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
     setError(null)
     setMessage(null)
     try {
-      const slug = resolveContentSlug(eventItem.slug, eventItem.titleUk, 'event')
+      const slug = resolveContentSlug(eventItem.slug, eventItem.title.uk, 'event')
+      // location/organizer have no inputs here; omitting them keeps the stored translations.
       await api('content/events', {
         method: 'POST',
         body: JSON.stringify({
           id: eventItem.id,
           slug,
           status: eventItem.status,
-          title: {uk: eventItem.titleUk, en: eventItem.titleEn},
-          shortDescription: {uk: eventItem.shortDescriptionUk, en: eventItem.shortDescriptionEn},
+          title: eventItem.title,
+          shortDescription: eventItem.shortDescription,
           type: eventItem.type,
           format: eventItem.format,
           startAt: eventItem.startAt,
           endAt: eventItem.endAt,
-          location: eventItem.locationUk || eventItem.locationEn,
           coverImageUrl: eventItem.coverUrl,
         }),
       })
@@ -461,8 +541,8 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
           id: documentItem.id,
           slug: documentItem.slug,
           status: documentItem.status,
-          title: {uk: documentItem.titleUk, en: documentItem.titleEn},
-          description: {uk: documentItem.descriptionUk, en: documentItem.descriptionEn},
+          title: documentItem.title,
+          description: documentItem.description,
           type: documentItem.type,
           language: documentItem.language,
           accessLevel: documentItem.accessLevel,
@@ -487,8 +567,8 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
         body: JSON.stringify({
           phone: settings.phone,
           email: settings.email,
-          address: {uk: settings.addressUk, en: settings.addressEn},
-          brandTagline: {uk: settings.brandTaglineUk, en: settings.brandTaglineEn},
+          address: settings.address,
+          brandTagline: settings.brandTagline,
         }),
       })
       setMessage(t.admin_saved)
@@ -498,21 +578,15 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
   }
 
   function pickNews(raw: Record<string, unknown>) {
-    const title = (raw.title as {uk?: string; en?: string}) || {}
-    const excerpt = (raw.excerpt as {uk?: string; en?: string}) || {}
-    const body = (raw.body as {uk?: string; en?: string}) || {}
     const externalUrl = String(raw.externalUrl || '')
     setNews({
       id: String(raw.id || ''),
       slug: String(raw.slug || ''),
       status: raw.status === 'published' ? 'published' : 'draft',
       publishedAt: String(raw.publishedAt || '').slice(0, 10),
-      titleUk: title.uk || '',
-      titleEn: title.en || '',
-      excerptUk: excerpt.uk || '',
-      excerptEn: excerpt.en || '',
-      bodyUk: body.uk || '',
-      bodyEn: body.en || '',
+      title: readLocalizedText(raw.title),
+      excerpt: readLocalizedText(raw.excerpt),
+      body: readLocalizedText(raw.body),
       coverUrl: String(raw.coverUrl || raw.coverImageUrl || ''),
       kind: externalUrl ? 'link' : 'internal',
       externalUrl,
@@ -520,20 +594,14 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
   }
 
   function pickMember(raw: Record<string, unknown>) {
-    const name = (raw.name as {uk?: string; en?: string}) || {}
-    const category = (raw.category as {uk?: string; en?: string}) || {}
-    const shortDescription = (raw.shortDescription as {uk?: string; en?: string}) || {}
     setMember({
       id: String(raw.id || ''),
       slug: String(raw.slug || ''),
       status: raw.status === 'published' ? 'published' : 'draft',
-      nameUk: name.uk || '',
-      nameEn: name.en || '',
-      shortNameUk: String(raw.shortName || ''),
-      categoryUk: category.uk || '',
-      categoryEn: category.en || '',
-      shortDescriptionUk: shortDescription.uk || '',
-      shortDescriptionEn: shortDescription.en || '',
+      name: readLocalizedText(raw.name),
+      shortName: String(raw.shortName || ''),
+      category: readLocalizedText(raw.category),
+      shortDescription: readLocalizedText(raw.shortDescription),
       websiteUrl: String(raw.websiteUrl || ''),
       logoUrl: String(raw.logoUrl || ''),
       coverUrl: String(raw.coverUrl || raw.coverImageUrl || ''),
@@ -543,37 +611,27 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
   }
 
   function pickEvent(raw: Record<string, unknown>) {
-    const title = (raw.title as {uk?: string; en?: string}) || {}
-    const shortDescription = (raw.shortDescription as {uk?: string; en?: string}) || {}
     setEventItem({
       id: String(raw.id || ''),
       slug: String(raw.slug || ''),
       status: raw.status === 'published' ? 'published' : 'draft',
-      titleUk: title.uk || '',
-      titleEn: title.en || '',
-      shortDescriptionUk: shortDescription.uk || '',
-      shortDescriptionEn: shortDescription.en || '',
+      title: readLocalizedText(raw.title),
+      shortDescription: readLocalizedText(raw.shortDescription),
       type: String(raw.type || 'meeting'),
       format: String(raw.format || 'offline'),
       startAt: String(raw.startAt || ''),
       endAt: String(raw.endAt || ''),
-      locationUk: String(raw.location || ''),
-      locationEn: '',
       coverUrl: String(raw.coverUrl || raw.coverImageUrl || ''),
     })
   }
 
   function pickDocument(raw: Record<string, unknown>) {
-    const title = (raw.title as {uk?: string; en?: string}) || {}
-    const description = (raw.description as {uk?: string; en?: string}) || {}
     setDocumentItem({
       id: String(raw.id || ''),
       slug: String(raw.slug || raw.id || ''),
       status: raw.status === 'published' ? 'published' : 'draft',
-      titleUk: title.uk || '',
-      titleEn: title.en || '',
-      descriptionUk: description.uk || '',
-      descriptionEn: description.en || '',
+      title: readLocalizedText(raw.title),
+      description: readLocalizedText(raw.description),
       type: String(raw.type || 'link'),
       language: String(raw.language || 'uk'),
       accessLevel: raw.accessLevel === 'members' ? 'members' : 'public',
@@ -675,10 +733,28 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
           </label>
           <Field label={t.admin_field_slug} value={news.slug} onChange={(v) => setNews({...news, slug: v})} />
           {statusSelect(news.status, (v) => setNews({...news, status: v}))}
-          <Field label={t.admin_field_title_uk} value={news.titleUk} onChange={(v) => setNews({...news, titleUk: v})} />
-          <Field label={t.admin_field_title_en} value={news.titleEn} onChange={(v) => setNews({...news, titleEn: v})} />
-          <Field label={t.admin_field_excerpt_uk} value={news.excerptUk} onChange={(v) => setNews({...news, excerptUk: v})} multiline />
-          <Field label={t.admin_field_excerpt_en} value={news.excerptEn} onChange={(v) => setNews({...news, excerptEn: v})} multiline />
+          <LocaleTabs
+            active={fieldLocale}
+            incomplete={incompleteLocales(
+              news.kind === 'internal'
+                ? [news.title, news.excerpt, news.body]
+                : [news.title, news.excerpt],
+            )}
+            onChange={setFieldLocale}
+          />
+          <LocalizedField
+            label={t.admin_field_title_uk}
+            value={news.title}
+            locale={fieldLocale}
+            onChange={(v) => setNews({...news, title: v})}
+          />
+          <LocalizedField
+            label={t.admin_field_excerpt_uk}
+            value={news.excerpt}
+            locale={fieldLocale}
+            onChange={(v) => setNews({...news, excerpt: v})}
+            multiline
+          />
           {news.kind === 'link' ? (
             <div className="md:col-span-2 grid gap-3 md:grid-cols-2">
               <Field
@@ -711,10 +787,15 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
               </p>
             </div>
           ) : (
-            <>
-              <Field label={t.admin_field_body_uk} value={news.bodyUk} onChange={(v) => setNews({...news, bodyUk: v})} multiline />
-              <Field label={t.admin_field_body_en} value={news.bodyEn} onChange={(v) => setNews({...news, bodyEn: v})} multiline />
-            </>
+            <div className="md:col-span-2">
+              <LocalizedField
+                label={t.admin_field_body_uk}
+                value={news.body}
+                locale={fieldLocale}
+                onChange={(v) => setNews({...news, body: v})}
+                multiline
+              />
+            </div>
           )}
           <Field label={t.admin_field_cover_url} value={news.coverUrl} onChange={(v) => setNews({...news, coverUrl: v})} />
           <label className="block space-y-1.5 text-sm">
@@ -757,29 +838,40 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
             />
             {t.admin_field_featured}
           </label>
-          <Field label={t.admin_field_name_uk} value={member.nameUk} onChange={(v) => setMember({...member, nameUk: v})} />
-          <Field label={t.admin_field_name_en} value={member.nameEn} onChange={(v) => setMember({...member, nameEn: v})} />
-          <Field label={t.admin_field_short_name} value={member.shortNameUk} onChange={(v) => setMember({...member, shortNameUk: v})} />
+          <Field label={t.admin_field_short_name} value={member.shortName} onChange={(v) => setMember({...member, shortName: v})} />
           <Field
             label={t.admin_field_order}
             value={String(member.order)}
             onChange={(v) => setMember({...member, order: Number(v.replace(/\D/g, '')) || 0})}
           />
-          <Field label={t.admin_field_category_uk} value={member.categoryUk} onChange={(v) => setMember({...member, categoryUk: v})} />
-          <Field label={t.admin_field_category_en} value={member.categoryEn} onChange={(v) => setMember({...member, categoryEn: v})} />
           <Field label={t.admin_field_website} value={member.websiteUrl} onChange={(v) => setMember({...member, websiteUrl: v})} />
-          <Field
-            label={t.admin_field_short_desc_uk}
-            value={member.shortDescriptionUk}
-            onChange={(v) => setMember({...member, shortDescriptionUk: v})}
-            multiline
+          <div className="hidden md:block" aria-hidden />
+          <LocaleTabs
+            active={fieldLocale}
+            incomplete={incompleteLocales([member.name, member.category, member.shortDescription])}
+            onChange={setFieldLocale}
           />
-          <Field
-            label={t.admin_field_short_desc_en}
-            value={member.shortDescriptionEn}
-            onChange={(v) => setMember({...member, shortDescriptionEn: v})}
-            multiline
+          <LocalizedField
+            label={t.admin_field_name_uk}
+            value={member.name}
+            locale={fieldLocale}
+            onChange={(v) => setMember({...member, name: v})}
           />
+          <LocalizedField
+            label={t.admin_field_category_uk}
+            value={member.category}
+            locale={fieldLocale}
+            onChange={(v) => setMember({...member, category: v})}
+          />
+          <div className="md:col-span-2">
+            <LocalizedField
+              label={t.admin_field_short_desc_uk}
+              value={member.shortDescription}
+              locale={fieldLocale}
+              onChange={(v) => setMember({...member, shortDescription: v})}
+              multiline
+            />
+          </div>
           <Field label={t.admin_field_logo_url} value={member.logoUrl} onChange={(v) => setMember({...member, logoUrl: v})} />
           <label className="block space-y-1.5 text-sm">
             <span className={adminLabelClass}>{t.admin_upload_logo}</span>
@@ -838,8 +930,19 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
         <form className={`${adminPanelClass} grid gap-3 md:grid-cols-2`} onSubmit={saveEvent}>
           {statusSelect(eventItem.status, (v) => setEventItem({...eventItem, status: v}))}
           <div className="hidden md:block" aria-hidden />
-          <Field label={t.admin_field_title_uk} value={eventItem.titleUk} onChange={(v) => setEventItem({...eventItem, titleUk: v})} />
-          <Field label={t.admin_field_title_en} value={eventItem.titleEn} onChange={(v) => setEventItem({...eventItem, titleEn: v})} />
+          <LocaleTabs
+            active={fieldLocale}
+            incomplete={incompleteLocales([eventItem.title, eventItem.shortDescription])}
+            onChange={setFieldLocale}
+          />
+          <div className="md:col-span-2">
+            <LocalizedField
+              label={t.admin_field_title_uk}
+              value={eventItem.title}
+              locale={fieldLocale}
+              onChange={(v) => setEventItem({...eventItem, title: v})}
+            />
+          </div>
           <p className="md:col-span-2 text-xs text-brand-slate-500 dark:text-brand-slate-400">
             {t.admin_field_event_tz_hint}
           </p>
@@ -856,18 +959,15 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
             isoValue={eventItem.endAt}
             onChange={(iso) => setEventItem({...eventItem, endAt: iso})}
           />
-          <Field
-            label={t.admin_field_short_uk}
-            value={eventItem.shortDescriptionUk}
-            onChange={(v) => setEventItem({...eventItem, shortDescriptionUk: v})}
-            multiline
-          />
-          <Field
-            label={t.admin_field_short_en}
-            value={eventItem.shortDescriptionEn}
-            onChange={(v) => setEventItem({...eventItem, shortDescriptionEn: v})}
-            multiline
-          />
+          <div className="md:col-span-2">
+            <LocalizedField
+              label={t.admin_field_short_uk}
+              value={eventItem.shortDescription}
+              locale={fieldLocale}
+              onChange={(v) => setEventItem({...eventItem, shortDescription: v})}
+              multiline
+            />
+          </div>
           <Field
             label={t.admin_field_cover_url}
             value={eventItem.coverUrl}
@@ -921,8 +1021,24 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
         <form className={`${adminPanelClass} grid gap-3 md:grid-cols-2`} onSubmit={saveDocument}>
           <Field label={t.admin_field_slug} value={documentItem.slug} onChange={(v) => setDocumentItem({...documentItem, slug: v})} />
           {statusSelect(documentItem.status, (v) => setDocumentItem({...documentItem, status: v}))}
-          <Field label={t.admin_field_title_uk} value={documentItem.titleUk} onChange={(v) => setDocumentItem({...documentItem, titleUk: v})} />
-          <Field label={t.admin_field_title_en} value={documentItem.titleEn} onChange={(v) => setDocumentItem({...documentItem, titleEn: v})} />
+          <LocaleTabs
+            active={fieldLocale}
+            incomplete={incompleteLocales([documentItem.title, documentItem.description])}
+            onChange={setFieldLocale}
+          />
+          <LocalizedField
+            label={t.admin_field_title_uk}
+            value={documentItem.title}
+            locale={fieldLocale}
+            onChange={(v) => setDocumentItem({...documentItem, title: v})}
+          />
+          <LocalizedField
+            label={t.admin_field_short_desc_uk}
+            value={documentItem.description}
+            locale={fieldLocale}
+            onChange={(v) => setDocumentItem({...documentItem, description: v})}
+            multiline
+          />
           <Field label={t.admin_field_file_url} value={documentItem.fileUrl} onChange={(v) => setDocumentItem({...documentItem, fileUrl: v})} />
           <label className="block space-y-1.5 text-sm">
             <span className={adminLabelClass}>{t.admin_upload_file}</span>
@@ -974,17 +1090,22 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
         <form className={`${adminPanelClass} grid gap-3 md:grid-cols-2`} onSubmit={saveSettings}>
           <Field label={t.admin_field_phone} value={settings.phone} onChange={(v) => setSettings({...settings, phone: v})} />
           <Field label={t.admin_field_email} value={settings.email} onChange={(v) => setSettings({...settings, email: v})} />
-          <Field label={t.admin_field_address_uk} value={settings.addressUk} onChange={(v) => setSettings({...settings, addressUk: v})} />
-          <Field label={t.admin_field_address_en} value={settings.addressEn} onChange={(v) => setSettings({...settings, addressEn: v})} />
-          <Field
-            label={t.admin_field_tagline_uk}
-            value={settings.brandTaglineUk}
-            onChange={(v) => setSettings({...settings, brandTaglineUk: v})}
+          <LocaleTabs
+            active={fieldLocale}
+            incomplete={incompleteLocales([settings.address, settings.brandTagline])}
+            onChange={setFieldLocale}
           />
-          <Field
-            label={t.admin_field_tagline_en}
-            value={settings.brandTaglineEn}
-            onChange={(v) => setSettings({...settings, brandTaglineEn: v})}
+          <LocalizedField
+            label={t.admin_field_address_uk}
+            value={settings.address}
+            locale={fieldLocale}
+            onChange={(v) => setSettings({...settings, address: v})}
+          />
+          <LocalizedField
+            label={t.admin_field_tagline_uk}
+            value={settings.brandTagline}
+            locale={fieldLocale}
+            onChange={(v) => setSettings({...settings, brandTagline: v})}
           />
           <div className="md:col-span-2">
             <button className={adminPrimaryBtnClass} type="submit">

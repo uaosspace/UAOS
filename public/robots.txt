@@ -1,0 +1,9 @@
+# UAOS — public crawler policy.
+# Production origin must match SITE_URL / PUBLIC_SITE_ORIGIN (https://uaos.space).
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://uaos.space/sitemap.xml

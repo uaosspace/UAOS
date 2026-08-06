@@ -4,7 +4,6 @@ import {TRANSLATIONS} from '../data/translations'
 import {SITE_VISUAL} from '../data/siteVisual'
 import ScribbleLink from './ScribbleLink'
 import OutlineLink from './OutlineLink'
-import HeroVyshyvankaCorner from './HeroVyshyvankaCorner'
 import {APP_ROUTES, type AppRoute} from '../routes/appRoutes'
 
 interface HeroSectionProps {
@@ -60,20 +59,17 @@ export default function HeroSection({
       </div>
       <div className="container hero-grid">
         <div className="hero-copy">
-          <div className="hero-copy-ornament-scope">
-            <HeroVyshyvankaCorner />
-            <div className="eyebrow">
-              <svg className="eyebrow-check" aria-hidden="true">
-                <use href="#icon-check-mark" />
-              </svg>
-              <span className="eyebrow-copy">
-                <span className="eyebrow-line">{t.brand_line_primary}</span>
-                <span className="eyebrow-line eyebrow-line-secondary">{t.brand_line_secondary}</span>
-              </span>
-            </div>
-            <h1>{t.hero_title}</h1>
-            <p className="hero-lead">{t.hero_lead}</p>
+          <div className="eyebrow">
+            <svg className="eyebrow-check" aria-hidden="true">
+              <use href="#icon-check-mark" />
+            </svg>
+            <span className="eyebrow-copy">
+              <span className="eyebrow-line">{t.brand_line_primary}</span>
+              <span className="eyebrow-line eyebrow-line-secondary">{t.brand_line_secondary}</span>
+            </span>
           </div>
+          <h1>{t.hero_title}</h1>
+          <p className="hero-lead">{t.hero_lead}</p>
           <div className="hero-actions">
             <ScribbleLink
               href="/join#join-form"

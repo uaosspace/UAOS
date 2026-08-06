@@ -80,7 +80,7 @@ export default function MembersCatalogPage({currentLang, members, onSelectMember
                     <MemberLogoBadge
                       logoUrl={member.logoUrl}
                       shortName={member.shortName}
-                      name={member.name[currentLang]}
+                      name={resolveLocalized(member.name, currentLang)}
                     />
                     {member.featured && (
                       <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-brand-yellow-500 bg-brand-yellow-50 dark:bg-brand-yellow-950/30 px-2 py-0.5 rounded">
@@ -90,7 +90,7 @@ export default function MembersCatalogPage({currentLang, members, onSelectMember
                   </div>
 
                   <h2 className="text-base font-display font-bold text-brand-slate-900 dark:text-white leading-snug group-hover:text-brand-blue-500 dark:group-hover:text-brand-sky-300 transition-colors">
-                    {member.name[currentLang]}
+                    {resolveLocalized(member.name, currentLang)}
                   </h2>
 
                   <div className="flex flex-wrap gap-1.5">
@@ -113,7 +113,7 @@ export default function MembersCatalogPage({currentLang, members, onSelectMember
                   </div>
 
                   <p className="text-xs text-brand-slate-600 dark:text-brand-slate-200 leading-relaxed line-clamp-3">
-                    {member.shortDescription[currentLang]}
+                    {resolveLocalized(member.shortDescription, currentLang)}
                   </p>
                 </div>
 

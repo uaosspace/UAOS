@@ -1,19 +1,19 @@
 ---
-description: "Использовать при добавлении, удалении или обновлении npm-зависимостей, package.json, package-lock.json, Studio packages и внешних SDK."
+description: "Использовать при добавлении, удалении или обновлении npm-зависимостей, package.json, package-lock.json и внешних SDK."
 alwaysApply: false
 ---
 
 # UAOS: зависимости
 
 - Корневой package manager: npm, источник фиксации версий — `package-lock.json`.
-- Sanity Studio имеет отдельный `studio/package.json`; не смешивай root и Studio dependencies.
+- `studio/package.json` — legacy placeholder удалённого Sanity; не добавляй туда рабочие CMS-зависимости и не смешивай с root.
 - Версии определяй только по manifest и lock-файлам.
 
 Перед изменением зависимости:
 
 1. Проверь стандартные средства и уже установленный аналог.
 2. Назови конкретную проблему, которую решает пакет.
-3. Проверь совместимость с React, Vite, Node и Sanity текущих версий.
+3. Проверь совместимость с React, Vite и Node текущих версий.
 4. Используй официальную документацию соответствующей версии.
 5. Проверь лицензию, поддержку и известные security-риски.
 6. Оцени transitive dependencies и влияние на bundle/runtime.

@@ -1,4 +1,4 @@
-image.png# UAOS — файлы, изменённые в сессиях (для синка в AI Studio)
+# UAOS — файлы, изменённые в сессиях (для синка в AI Studio)
 # Правило: новый изменённый файл → добавить строкой ниже.
 # Уже есть в списке → НЕ дублировать.
 # Формат: путь от корня репо, один файл = одна строка.
@@ -238,3 +238,39 @@ src/data/mappers.test.ts
 vite.config.ts
 src/pages/admin/adminLabels.ts
 src/pages/admin/adminLabels.test.ts
+src/lib/privacyPolicy.ts
+src/lib/privacyPolicy.test.ts
+src/lib/siteTerms.ts
+src/lib/siteTerms.test.ts
+src/components/TermsPage.tsx
+src/pages/TermsRoutePage.tsx
+scripts/_check-i18n-coverage.mjs
+src/data/translations/admin.ts
+src/data/translations/events.ts
+src/data/translations.test.ts
+db/migrations/005_content_i18n_jsonb.sql
+api/_lib/contentRepo.test.ts
+src/data/locales.test.ts
+src/data/seedLocales.test.ts
+src/data/activityDirections.ts
+src/components/events/EventCard.tsx
+src/pages/EventsDetailPage.tsx
+src/pages/NewsListPage.tsx
+src/pages/NewsDetailPage.tsx
+src/pages/MembersCatalogPage.tsx
+src/pages/MemberDetailsPage.tsx
+src/utils/calendarExport.ts
+scripts/_check-content-i18n.mjs
+scripts/_check-content-i18n-roundtrip.mjs
+src/routes/localizedRouting.ts
+src/routes/localizedRouting.test.ts
+src/routes/appRoutes.test.ts
+src/hooks/useAppNavigation.test.ts
+src/lib/siteOrigin.ts
+src/lib/documentMeta.ts
+src/lib/documentMeta.test.ts
+src/hooks/useDocumentMeta.ts
+public/robots.txt
+public/sitemap.xml
+scripts/generate-sitemap.mjs
+index.html

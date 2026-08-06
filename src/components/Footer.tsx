@@ -8,6 +8,7 @@ interface FooterProps {
   currentRoute?: AppRoute
   onNavigate: (route: AppRoute) => void
   onOpenPrivacy?: () => void
+  onOpenTerms?: () => void
 }
 
 const FOOTER_NAV = [
@@ -30,6 +31,7 @@ export default function Footer({
   currentLang,
   onNavigate,
   onOpenPrivacy,
+  onOpenTerms,
 }: FooterProps) {
   const t = TRANSLATIONS[currentLang]
   const year = new Date().getFullYear()
@@ -98,7 +100,7 @@ export default function Footer({
           <button type="button" onClick={onOpenPrivacy}>
             {t.footer_privacy}
           </button>
-          <button type="button" onClick={() => onNavigate(APP_ROUTES.join)}>
+          <button type="button" onClick={onOpenTerms ?? (() => onNavigate(APP_ROUTES.terms))}>
             {t.footer_terms}
           </button>
         </span>

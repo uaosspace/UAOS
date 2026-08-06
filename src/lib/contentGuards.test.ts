@@ -18,6 +18,21 @@ describe('contentGuards', () => {
     expect(readLocalizedText(null)).toEqual({uk: '', en: ''})
   })
 
+  it('keeps every supported locale and leaves untranslated ones undefined', () => {
+    const text = readLocalizedText({
+      uk: 'Привіт',
+      en: 'Hello',
+      de: ' Hallo ',
+      kk: 'Сәлем',
+      fr: '   ',
+      ru: 'Привет',
+    })
+
+    expect(text).toEqual({uk: 'Привіт', en: 'Hello', de: 'Hallo', kk: 'Сәлем'})
+    expect(text.es).toBeUndefined()
+    expect(text.fr).toBeUndefined()
+  })
+
   it('accepts only http urls', () => {
     expect(readHttpUrl('https://example.com/path')).toBe('https://example.com/path')
     expect(readHttpUrl('javascript:alert(1)')).toBeUndefined()

@@ -1,16 +1,14 @@
 import type {Locale} from '../data/locales'
 import {resolveLocalized} from '../data/locales'
-import {ShieldAlert, ArrowLeft} from 'lucide-react'
+import {ShieldAlert, ArrowLeft, Info} from 'lucide-react'
 import {DEFAULT_SITE_SETTINGS} from '../data/siteSettings'
+import {TRANSLATIONS} from '../data/translations'
+import {PRIVACY_POLICY_UPDATED, PRIVACY_POLICY_VERSION} from '../lib/privacyPolicy'
 
 interface PrivacyPageProps {
   currentLang: Locale
   onBack: () => void
 }
-
-const POLICY_UPDATED_UK = '5 серпня 2026 року'
-const POLICY_UPDATED_EN = '5 August 2026'
-const POLICY_VERSION = '2026-08-05'
 
 /**
  * Політика конфіденційності (робочий текст для публікації).
@@ -23,6 +21,9 @@ export default function PrivacyPage({currentLang, onBack}: PrivacyPageProps) {
   const privacyEmail = DEFAULT_SITE_SETTINGS.email
   const phone = DEFAULT_SITE_SETTINGS.phone
   const edrpou = isUk ? 'буде уточнено' : 'to be confirmed'
+  const t = TRANSLATIONS[currentLang]
+  /** Автентичні версії документа існують лише uk/en — інші локалі бачать англійський текст. */
+  const showLangNotice = currentLang !== 'uk' && currentLang !== 'en'
 
   return (
     <article className="pt-24 pb-20 bg-transparent min-h-screen transition-colors duration-300">
@@ -35,6 +36,21 @@ export default function PrivacyPage({currentLang, onBack}: PrivacyPageProps) {
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           <span>{isUk ? 'Повернутися' : 'Back'}</span>
         </button>
+
+        {showLangNotice && (
+          <div
+            role="note"
+            className="rounded-2xl border border-brand-slate-200 bg-brand-slate-50 dark:border-brand-slate-700 dark:bg-brand-slate-900/40 px-4 py-3 sm:px-5 flex gap-3"
+          >
+            <Info className="w-4 h-4 text-brand-blue-500 shrink-0 mt-0.5" aria-hidden />
+            <div className="space-y-1 text-sm text-brand-slate-600 dark:text-brand-slate-300 leading-relaxed">
+              <p className="font-mono uppercase tracking-wide text-[10px] font-bold text-brand-slate-500 dark:text-brand-slate-400">
+                {t.legal_lang_notice_title}
+              </p>
+              <p>{t.legal_lang_notice_body}</p>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-3 border-b border-brand-slate-100 dark:border-brand-slate-800 pb-4">
           <div className="inline-flex items-center space-x-2 text-brand-blue-500 bg-brand-blue-50 dark:bg-brand-blue-950/40 px-3 py-1.5 rounded-full">
@@ -50,8 +66,8 @@ export default function PrivacyPage({currentLang, onBack}: PrivacyPageProps) {
           </h1>
           <p className="text-xs font-mono text-brand-slate-400">
             {isUk
-              ? `Останнє оновлення: ${POLICY_UPDATED_UK} · Версія: ${POLICY_VERSION}`
-              : `Last updated: ${POLICY_UPDATED_EN} · Version: ${POLICY_VERSION}`}
+              ? `Останнє оновлення: ${PRIVACY_POLICY_UPDATED.uk} · Версія: ${PRIVACY_POLICY_VERSION}`
+              : `Last updated: ${PRIVACY_POLICY_UPDATED.en} · Version: ${PRIVACY_POLICY_VERSION}`}
           </p>
         </div>
 

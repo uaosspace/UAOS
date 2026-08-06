@@ -7,35 +7,37 @@ alwaysApply: true
 
 ## Потоки
 
-- Сайт: `src/main.tsx` → `src/App.tsx` → pages/components → hooks → `src/data/*` → `src/lib/sanity.ts` или локальный seed.
-- Заявка: UI → `src/lib/joinRequests.ts` → `POST /api/join` → `api/_lib/*` → Sanity и, при настройке, Formspree.
-- Studio: `studio/sanity.config.ts` → `studio/schemaTypes/*`.
+- Сайт: `src/main.tsx` → `src/App.tsx` → pages/components → hooks → `src/data/*` → `src/lib/contentApi.ts` → `GET /api/public/*` → Neon (в DEV при сбое API — локальный seed с предупреждением).
+- Заявка: UI → `src/lib/joinRequests.ts` → `POST /api/join` → `api/_lib/*` → Neon (`applications`, `consents`) и, при настройке, Brevo (low-PII).
+- Админка: SPA `/admin` → `src/pages/admin/*` → `/api/admin/*` → `api/admin-router.ts` → Neon (+ Blob).
 
 ## Роли
 
-- `src/App.tsx`, `useAppNavigation`, `useSiteContent` и `api/join.ts` координируют сценарии.
+- `src/App.tsx`, `useAppNavigation`, content-resource hooks и `api/join.ts` координируют сценарии.
 - `src/data/*` загружает и преобразует внешние данные во внутренние UI-модели.
 - Адаптеры могут выполнять mapping и нормализацию, но не определяют бизнес-политику и не становятся вторым источником истины.
 - `api/_lib/*` содержит серверную валидацию, HTTP-обработку и инфраструктурные механизмы (префикс `_` — не Serverless Function на Vercel Hobby).
-- React state и hooks владеют состоянием интерфейса; Sanity владеет контентом и заявками.
-- Локальный seed — только контролируемый fallback при отсутствии конфигурации CMS.
+- React state и hooks владеют состоянием интерфейса; Neon владеет контентом и заявками.
+- Локальный seed — только контролируемый DEV fallback при недоступности API.
 
 ## Разрешённые направления
 
 - UI → hooks.
 - hooks → data/lib.
-- data adapters → Sanity client и типы.
+- data adapters → `contentApi` / guards / типы.
 - join UI → `joinRequests.ts` → `/api/join`.
-- `/api/join` → `api/_lib/*` → внешние server-side интеграции.
+- `/api/join` → `api/_lib/*` → Neon и server-side интеграции.
+- admin UI → `/api/admin/*` → `api/admin-router.ts` → `api/_lib/*`.
 
 ## Запрещённые направления
 
-- UI не обращается напрямую к Sanity write API, write token или Formspree.
+- UI не обращается напрямую к write-пути БД, write-секретам сессий/Blob или внешним notify API.
 - Клиентский код не импортирует server-only секреты.
 - UI-валидация не заменяет серверную проверку.
 - Инфраструктурные модули не определяют правила членства.
 - Оркестраторы не содержат mapping, предметные алгоритмы и низкоуровневую реализацию интеграций.
 - Не создавай второй механизм загрузки, валидации, навигации или хранения при наличии действующего.
+- Не дублируй handler-логику `/api/admin/*` и `/api/public/*` вне `api/admin-router.ts` / `api/public-router.ts` (catch-all — только re-export).
 
 ## Публичные контракты
 
@@ -43,8 +45,8 @@ alwaysApply: true
 
 - `POST /api/join`, его JSON-ответы и ошибки;
 - типы и модели `src/types/*` и `src/data/*`;
-- Sanity schemas;
-- маршруты и hash/query-навигация;
+- схема Neon / `db/migrations/*` и форматы `*_i18n` JSONB;
+- маршруты и path/query-навигация (включая языковой префикс);
 - ключи переводов;
 - env-переменные;
 - формат cookie consent в `localStorage`;
@@ -55,7 +57,7 @@ alwaysApply: true
 ## Инварианты
 
 - Запись заявок выполняется только server-side после валидации и rate limit.
-- `SANITY_API_WRITE_TOKEN` никогда не попадает в клиентский bundle.
-- При настроенной CMS seed не подменяет актуальные данные молча.
+- Write-секреты БД/Blob/сессий никогда не попадают в клиентский bundle.
+- При настроенной CMS/API seed не подменяет актуальные данные молча в production.
 - Analytics запускается только после consent.
 - Визуальные изменения наследуют действующую дизайн-систему.

@@ -9,9 +9,9 @@ alwaysApply: true
 
 - TypeScript/TSX, React 19, Vite 6.
 - Tailwind CSS v4.
-- Sanity Studio 3.
-- Node.js для Vercel serverless, Studio и scripts.
-- npm; root и `studio/` имеют отдельные manifests.
+- Neon Postgres + Vercel Blob; админка `/admin` вместо CMS Studio.
+- Node.js для Vercel serverless и scripts.
+- npm; корневой manifest — основной. `studio/package.json` — только legacy placeholder «removed».
 - Версии определяются по manifest и lock-файлам; стек не обновляется без отдельной задачи.
 
 ## Структура
@@ -21,9 +21,9 @@ alwaysApply: true
 - Типы: `src/types/`.
 - Загрузка, guards и mapping контента: `src/data/`.
 - Клиентская инфраструктура: `src/lib/`.
-- Serverless entry: `api/join.ts`.
+- Serverless entry: `api/join.ts`, `api/admin-router.ts`, `api/public-router.ts`.
 - Серверная логика и инфраструктура: `api/_lib/` (underscore — helpers не считаются Vercel Serverless Functions).
-- Sanity Studio и schemas: `studio/`.
+- `studio/` — placeholder удалённого Sanity (не рабочий CMS).
 - Assets: `public/`.
 - Generated output: `dist/`.
 

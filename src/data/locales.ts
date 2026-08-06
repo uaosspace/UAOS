@@ -29,12 +29,14 @@ export function nextLocale(current: Locale): Locale {
   return LOCALES[(index + 1) % LOCALES.length]
 }
 
-/** CMS-поля зараз uk/en; інші локалі падають на en. */
+/**
+ * CMS-поля зберігаються для всіх локалей, але обов'язкова лише `uk`.
+ * Порядок fallback: запрошена локаль → en → uk, щоб неперекладене поле не давало пустий текст.
+ */
 export function resolveLocalized(
   text: {uk: string; en: string} & Partial<Record<Locale, string>>,
   locale: Locale,
 ): string {
   if (locale === 'uk') return text.uk
-  if (locale === 'en') return text.en
-  return text[locale] || text.en
+  return text[locale] || text.en || text.uk
 }

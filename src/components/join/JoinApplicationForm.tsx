@@ -5,10 +5,13 @@ import {TRANSLATIONS} from '../../data/translations'
 import {PARTICIPANT_TYPES, SECTORS, PRODUCT_CATEGORIES, COMPETENCY_AREAS} from '../../data/referenceLists'
 import type {ApplicantKind} from '../../types'
 import {submitJoinRequest} from '../../lib/joinRequests'
+import {resolveNoticeLanguage} from '../../lib/privacyPolicy'
 import {Loader2, CheckCircle2, AlertCircle} from 'lucide-react'
 
 interface JoinApplicationFormProps {
   currentLang: Locale
+  onOpenPrivacy: () => void
+  onOpenTerms: () => void
 }
 
 interface FormState {
@@ -53,7 +56,11 @@ function toggleListValue(list: string[], value: string): string[] {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value]
 }
 
-export default function JoinApplicationForm({currentLang}: JoinApplicationFormProps) {
+export default function JoinApplicationForm({
+  currentLang,
+  onOpenPrivacy,
+  onOpenTerms,
+}: JoinApplicationFormProps) {
   const t = TRANSLATIONS[currentLang]
   const [form, setForm] = useState<FormState>(INITIAL_STATE)
   const [status, setStatus] = useState<SubmitStatus>('idle')
@@ -129,6 +136,8 @@ export default function JoinApplicationForm({currentLang}: JoinApplicationFormPr
         sectors: form.sectors.length ? form.sectors : undefined,
         productCategories: form.productCategories.length ? form.productCategories : undefined,
         competencies: form.competencies.length ? form.competencies : undefined,
+        noticeLanguage: resolveNoticeLanguage(currentLang),
+        termsConsent: true,
       })
       setStatus('success')
     } catch (err) {
@@ -363,7 +372,21 @@ export default function JoinApplicationForm({currentLang}: JoinApplicationFormPr
             onChange={(event) => update('privacyConsent', event.target.checked)}
             className="mt-0.5 shrink-0"
           />
-          {t.join_form_consent}
+          <span>
+            {t.join_form_consent_before}
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                onOpenPrivacy()
+              }}
+              className="underline underline-offset-2 text-brand-blue-600 dark:text-brand-sky-300 hover:text-brand-blue-500"
+            >
+              {t.footer_privacy}
+            </button>
+            {t.join_form_consent_after}
+          </span>
         </label>
         <label className="flex items-start gap-2.5 text-xs text-brand-slate-600 dark:text-brand-slate-300 cursor-pointer">
           <input
@@ -373,7 +396,21 @@ export default function JoinApplicationForm({currentLang}: JoinApplicationFormPr
             onChange={(event) => update('termsConsent', event.target.checked)}
             className="mt-0.5 shrink-0"
           />
-          {t.join_form_terms_consent}
+          <span>
+            {t.join_form_terms_consent_before}
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                onOpenTerms()
+              }}
+              className="underline underline-offset-2 text-brand-blue-600 dark:text-brand-sky-300 hover:text-brand-blue-500"
+            >
+              {t.footer_terms}
+            </button>
+            {t.join_form_terms_consent_after}
+          </span>
         </label>
       </div>
 

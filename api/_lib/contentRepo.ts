@@ -6,16 +6,17 @@ import {isRecord, readStringOr} from '../../src/lib/contentGuards.js'
 import {releaseOwnedMediaIfUnused} from './mediaCleanup.js'
 import {
   clampOptionalText,
+  normalizeLocalizedText,
   normalizeOptionalHttpUrl,
   normalizeOptionalMediaUrl,
   normalizeOptionalPublicEmail,
   normalizeOptionalPublicPhone,
   requireNonEmptyText,
+  type LocalizedInput,
 } from './contentValidation.js'
 
-function asLocalized(uk: unknown, en: unknown) {
-  return {uk: String(uk ?? ''), en: String(en ?? '')}
-}
+/** Localized payload sent to clients: `uk`/`en` always present, extra locales when translated. */
+type LocalizedOutput = {uk: string; en: string} & Record<string, string>
 
 function readJsonArray(value: unknown): unknown[] {
   if (Array.isArray(value)) return value
@@ -28,6 +29,65 @@ function readJsonArray(value: unknown): unknown[] {
     }
   }
   return []
+}
+
+function readJsonObject(value: unknown): Record<string, unknown> {
+  if (isRecord(value) && !Array.isArray(value)) return value
+  if (typeof value === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(value)
+      return isRecord(parsed) && !Array.isArray(parsed) ? parsed : {}
+    } catch {
+      return {}
+    }
+  }
+  return {}
+}
+
+/**
+ * Localized field read. The `*_i18n` JSONB column is authoritative; the legacy `*_uk`/`*_en`
+ * columns are the fallback for rows written before migration 005 or by an older deployment
+ * that still only knows about the text columns.
+ */
+export function readLocalizedColumn(
+  jsonValue: unknown,
+  legacyUk: unknown,
+  legacyEn: unknown,
+): LocalizedOutput {
+  const localized: Record<string, string> = {}
+  for (const [locale, value] of Object.entries(readJsonObject(jsonValue))) {
+    if (typeof value === 'string' && value.trim()) localized[locale] = value
+  }
+  return {
+    ...localized,
+    uk: localized.uk || String(legacyUk ?? ''),
+    en: localized.en || String(legacyEn ?? ''),
+  }
+}
+
+/** Same fallback rule for list fields stored as `[{uk, en, …}]` next to a legacy TEXT[] column. */
+function readLocalizedArrayColumn(jsonValue: unknown, legacyValue: unknown): unknown[] {
+  const items = readJsonArray(jsonValue)
+  if (items.length) return items
+  return Array.isArray(legacyValue) ? legacyValue.map(String) : []
+}
+
+/**
+ * Values bound into an upsert. `null` means "field absent from the payload": UPDATE keeps the stored
+ * value via COALESCE. Without this a form that does not render every locale-aware field (admin has
+ * no fullDescription/location inputs) would erase translations it never loaded.
+ */
+type LocalizedWrite = {json: string | null; uk: string | null; en: string | null}
+
+function localizedWrite(
+  raw: unknown,
+  fieldName: string,
+  maxLen: number,
+  options: {required?: boolean} = {},
+): LocalizedWrite {
+  if (raw === undefined && !options.required) return {json: null, uk: null, en: null}
+  const value: LocalizedInput = normalizeLocalizedText(raw, fieldName, maxLen, options)
+  return {json: JSON.stringify(value), uk: value.uk ?? '', en: value.en ?? ''}
 }
 
 export async function listPublishedMembers() {
@@ -86,23 +146,37 @@ export async function getPublishedSiteSettings() {
   return {
     phone: String(row.phone ?? ''),
     email: String(row.email ?? ''),
-    address: asLocalized(row.address_uk, row.address_en),
-    brandTagline: asLocalized(row.brand_tagline_uk, row.brand_tagline_en),
+    address: readLocalizedColumn(row.address_i18n, row.address_uk, row.address_en),
+    brandTagline: readLocalizedColumn(
+      row.brand_tagline_i18n,
+      row.brand_tagline_uk,
+      row.brand_tagline_en,
+    ),
   }
 }
 
 function mapMemberPublic(row: Record<string, unknown>) {
+  const shortName = readLocalizedColumn(row.short_name_i18n, row.short_name_uk, row.short_name_en)
   return {
     id: String(row.id),
     slug: String(row.slug),
     published: true,
     order: Number(row.sort_order ?? 0),
     profileLevel: String(row.profile_level ?? 'basic'),
-    name: asLocalized(row.name_uk, row.name_en),
-    shortName: String(row.short_name_uk || row.short_name_en || ''),
-    category: asLocalized(row.category_uk, row.category_en),
-    shortDescription: asLocalized(row.short_description_uk, row.short_description_en),
-    fullDescription: asLocalized(row.full_description_uk, row.full_description_en),
+    name: readLocalizedColumn(row.name_i18n, row.name_uk, row.name_en),
+    // Brand abbreviation, not translated: the client model keeps `shortName` a plain string.
+    shortName: shortName.uk || shortName.en,
+    category: readLocalizedColumn(row.category_i18n, row.category_uk, row.category_en),
+    shortDescription: readLocalizedColumn(
+      row.short_description_i18n,
+      row.short_description_uk,
+      row.short_description_en,
+    ),
+    fullDescription: readLocalizedColumn(
+      row.full_description_i18n,
+      row.full_description_uk,
+      row.full_description_en,
+    ),
     logoUrl: String(row.logo_url ?? ''),
     coverImageUrl: String(row.cover_url ?? ''),
     websiteUrl: String(row.website_url ?? ''),
@@ -113,7 +187,7 @@ function mapMemberPublic(row: Record<string, unknown>) {
     productCategories: Array.isArray(row.product_categories)
       ? row.product_categories.map(String)
       : [],
-    competencies: Array.isArray(row.competencies) ? row.competencies.map(String) : [],
+    competencies: readLocalizedArrayColumn(row.competencies_i18n, row.competencies),
     region: String(row.region ?? ''),
     featured: Boolean(row.featured),
     services: readJsonArray(row.services),
@@ -129,9 +203,9 @@ function mapNewsPublic(row: Record<string, unknown>) {
     slug: String(row.slug),
     published: true,
     publishedAt: row.published_at ? new Date(String(row.published_at)).toISOString() : '',
-    title: asLocalized(row.title_uk, row.title_en),
-    excerpt: asLocalized(row.excerpt_uk, row.excerpt_en),
-    body: asLocalized(row.body_uk, row.body_en),
+    title: readLocalizedColumn(row.title_i18n, row.title_uk, row.title_en),
+    excerpt: readLocalizedColumn(row.excerpt_i18n, row.excerpt_uk, row.excerpt_en),
+    body: readLocalizedColumn(row.body_i18n, row.body_uk, row.body_en),
     coverImageUrl: String(row.cover_url ?? ''),
     externalUrl: String(row.external_url ?? ''),
   }
@@ -141,18 +215,26 @@ function mapEventPublic(row: Record<string, unknown>) {
   return {
     id: String(row.slug || row.id),
     published: true,
-    title: asLocalized(row.title_uk, row.title_en),
-    shortDescription: asLocalized(row.short_description_uk, row.short_description_en),
-    fullDescription: asLocalized(row.full_description_uk, row.full_description_en),
+    title: readLocalizedColumn(row.title_i18n, row.title_uk, row.title_en),
+    shortDescription: readLocalizedColumn(
+      row.short_description_i18n,
+      row.short_description_uk,
+      row.short_description_en,
+    ),
+    fullDescription: readLocalizedColumn(
+      row.full_description_i18n,
+      row.full_description_uk,
+      row.full_description_en,
+    ),
     type: String(row.event_type ?? 'meeting'),
     format: String(row.event_format ?? 'online'),
     startAt: new Date(String(row.start_at)).toISOString(),
     endAt: row.end_at ? new Date(String(row.end_at)).toISOString() : null,
     timeZone: String(row.time_zone ?? 'Europe/Kyiv'),
-    location: String(row.location ?? ''),
+    location: readLocalizedColumn(row.location_i18n, row.location, row.location),
     onlineUrl: String(row.online_url ?? ''),
     registrationUrl: String(row.registration_url ?? ''),
-    organizer: String(row.organizer ?? ''),
+    organizer: readLocalizedColumn(row.organizer_i18n, row.organizer, row.organizer),
     coverImageUrl: String(row.cover_url ?? ''),
   }
 }
@@ -160,8 +242,8 @@ function mapEventPublic(row: Record<string, unknown>) {
 function mapDocumentPublic(row: Record<string, unknown>) {
   return {
     id: String(row.id),
-    title: asLocalized(row.title_uk, row.title_en),
-    description: asLocalized(row.description_uk, row.description_en),
+    title: readLocalizedColumn(row.title_i18n, row.title_uk, row.title_en),
+    description: readLocalizedColumn(row.description_i18n, row.description_uk, row.description_en),
     type: String(row.doc_type ?? 'pdf'),
     size: String(row.size_label ?? ''),
     language: String(row.language ?? 'UA'),
@@ -221,14 +303,12 @@ export async function upsertContentMember(body: unknown) {
   const source = isRecord(body) ? body : {}
   const sql = getSql()
   const id = readStringOr(source.id, '')
-  const name = isRecord(source.name) ? source.name : {}
-  const shortName = isRecord(source.shortName) ? source.shortName : {}
-  const category = isRecord(source.category) ? source.category : {}
-  const shortDescription = isRecord(source.shortDescription) ? source.shortDescription : {}
-  const fullDescription = isRecord(source.fullDescription) ? source.fullDescription : {}
+  const name = localizedWrite(source.name, 'name', 200, {required: true})
+  const shortName = localizedWrite(source.shortName, 'shortName', 120)
+  const category = localizedWrite(source.category, 'category', 120)
+  const shortDescription = localizedWrite(source.shortDescription, 'shortDescription', 2000)
+  const fullDescription = localizedWrite(source.fullDescription, 'fullDescription', 20000)
 
-  const nameUk = requireNonEmptyText(name.uk, 'name.uk', 200)
-  const nameEn = clampOptionalText(name.en, 200)
   const slug = requireNonEmptyText(source.slug, 'slug', 80)
   const status = readStringOr(source.status, 'draft') === 'published' ? 'published' : 'draft'
   const profileLevel = readStringOr(source.profileLevel, 'basic') === 'extended' ? 'extended' : 'basic'
@@ -240,21 +320,6 @@ export async function upsertContentMember(body: unknown) {
   const publicEmail = normalizeOptionalPublicEmail(source.publicEmail)
   const publicPhone = normalizeOptionalPublicPhone(source.publicPhone)
 
-  const shortNameUk = clampOptionalText(
-    typeof shortName.uk === 'string'
-      ? shortName.uk
-      : typeof source.shortName === 'string'
-        ? source.shortName
-        : '',
-    120,
-  )
-  const shortNameEn = clampOptionalText(shortName.en, 120)
-  const categoryUk = clampOptionalText(category.uk, 120)
-  const categoryEn = clampOptionalText(category.en, 120)
-  const shortDescriptionUk = clampOptionalText(shortDescription.uk, 2000)
-  const shortDescriptionEn = clampOptionalText(shortDescription.en, 2000)
-  const fullDescriptionUk = clampOptionalText(fullDescription.uk, 20000)
-  const fullDescriptionEn = clampOptionalText(fullDescription.en, 20000)
   const region = clampOptionalText(source.region, 120)
   const featured = Boolean(source.featured)
 
@@ -271,16 +336,21 @@ export async function upsertContentMember(body: unknown) {
         status = ${status},
         sort_order = ${sortOrder},
         profile_level = ${profileLevel},
-        name_uk = ${nameUk},
-        name_en = ${nameEn},
-        short_name_uk = ${shortNameUk},
-        short_name_en = ${shortNameEn},
-        category_uk = ${categoryUk},
-        category_en = ${categoryEn},
-        short_description_uk = ${shortDescriptionUk},
-        short_description_en = ${shortDescriptionEn},
-        full_description_uk = ${fullDescriptionUk},
-        full_description_en = ${fullDescriptionEn},
+        name_i18n = COALESCE(${name.json}::jsonb, name_i18n),
+        short_name_i18n = COALESCE(${shortName.json}::jsonb, short_name_i18n),
+        category_i18n = COALESCE(${category.json}::jsonb, category_i18n),
+        short_description_i18n = COALESCE(${shortDescription.json}::jsonb, short_description_i18n),
+        full_description_i18n = COALESCE(${fullDescription.json}::jsonb, full_description_i18n),
+        name_uk = COALESCE(${name.uk}::text, name_uk),
+        name_en = COALESCE(${name.en}::text, name_en),
+        short_name_uk = COALESCE(${shortName.uk}::text, short_name_uk),
+        short_name_en = COALESCE(${shortName.en}::text, short_name_en),
+        category_uk = COALESCE(${category.uk}::text, category_uk),
+        category_en = COALESCE(${category.en}::text, category_en),
+        short_description_uk = COALESCE(${shortDescription.uk}::text, short_description_uk),
+        short_description_en = COALESCE(${shortDescription.en}::text, short_description_en),
+        full_description_uk = COALESCE(${fullDescription.uk}::text, full_description_uk),
+        full_description_en = COALESCE(${fullDescription.en}::text, full_description_en),
         logo_url = ${logoUrl},
         cover_url = ${coverImageUrl},
         website_url = ${websiteUrl},
@@ -302,6 +372,7 @@ export async function upsertContentMember(body: unknown) {
   const rows = await sql`
     INSERT INTO content_members (
       slug, status, sort_order, profile_level,
+      name_i18n, short_name_i18n, category_i18n, short_description_i18n, full_description_i18n,
       name_uk, name_en, short_name_uk, short_name_en, category_uk, category_en,
       short_description_uk, short_description_en, full_description_uk, full_description_en,
       logo_url, cover_url, website_url, public_email, public_phone,
@@ -309,11 +380,16 @@ export async function upsertContentMember(body: unknown) {
       services, certificates, cases, products
     ) VALUES (
       ${slug}, ${status}, ${sortOrder}, ${profileLevel},
-      ${nameUk}, ${nameEn},
-      ${shortNameUk}, ${shortNameEn},
-      ${categoryUk}, ${categoryEn},
-      ${shortDescriptionUk}, ${shortDescriptionEn},
-      ${fullDescriptionUk}, ${fullDescriptionEn},
+      ${name.json ?? '{}'}::jsonb,
+      ${shortName.json ?? '{}'}::jsonb,
+      ${category.json ?? '{}'}::jsonb,
+      ${shortDescription.json ?? '{}'}::jsonb,
+      ${fullDescription.json ?? '{}'}::jsonb,
+      ${name.uk ?? ''}, ${name.en ?? ''},
+      ${shortName.uk ?? ''}, ${shortName.en ?? ''},
+      ${category.uk ?? ''}, ${category.en ?? ''},
+      ${shortDescription.uk ?? ''}, ${shortDescription.en ?? ''},
+      ${fullDescription.uk ?? ''}, ${fullDescription.en ?? ''},
       ${logoUrl}, ${coverImageUrl},
       ${websiteUrl}, ${publicEmail},
       ${publicPhone},
@@ -345,9 +421,9 @@ export async function upsertContentNews(body: unknown) {
   const slug = readStringOr(source.slug, '')
   if (!slug) throw new Error('slug required')
   const status = readStringOr(source.status, 'draft') === 'published' ? 'published' : 'draft'
-  const title = isRecord(source.title) ? source.title : {}
-  const excerpt = isRecord(source.excerpt) ? source.excerpt : {}
-  const bodyLoc = isRecord(source.body) ? source.body : {}
+  const title = localizedWrite(source.title, 'title', 300)
+  const excerpt = localizedWrite(source.excerpt, 'excerpt', 2000)
+  const bodyLoc = localizedWrite(source.body, 'body', 40000)
   const publishedAt = readStringOr(source.publishedAt, '') || null
 
   const externalUrlRaw = readStringOr(source.externalUrl, '').trim()
@@ -369,9 +445,15 @@ export async function upsertContentNews(body: unknown) {
     const rows = await sql`
       UPDATE content_news SET
         slug = ${slug}, status = ${status}, published_at = ${publishedAt},
-        title_uk = ${readStringOr(title.uk, '')}, title_en = ${readStringOr(title.en, '')},
-        excerpt_uk = ${readStringOr(excerpt.uk, '')}, excerpt_en = ${readStringOr(excerpt.en, '')},
-        body_uk = ${readStringOr(bodyLoc.uk, '')}, body_en = ${readStringOr(bodyLoc.en, '')},
+        title_i18n = COALESCE(${title.json}::jsonb, title_i18n),
+        excerpt_i18n = COALESCE(${excerpt.json}::jsonb, excerpt_i18n),
+        body_i18n = COALESCE(${bodyLoc.json}::jsonb, body_i18n),
+        title_uk = COALESCE(${title.uk}::text, title_uk),
+        title_en = COALESCE(${title.en}::text, title_en),
+        excerpt_uk = COALESCE(${excerpt.uk}::text, excerpt_uk),
+        excerpt_en = COALESCE(${excerpt.en}::text, excerpt_en),
+        body_uk = COALESCE(${bodyLoc.uk}::text, body_uk),
+        body_en = COALESCE(${bodyLoc.en}::text, body_en),
         cover_url = ${readStringOr(source.coverImageUrl, '')},
         external_url = ${externalUrl},
         updated_at = now()
@@ -382,12 +464,17 @@ export async function upsertContentNews(body: unknown) {
   }
   const rows = await sql`
     INSERT INTO content_news (
-      slug, status, published_at, title_uk, title_en, excerpt_uk, excerpt_en, body_uk, body_en, cover_url, external_url
+      slug, status, published_at,
+      title_i18n, excerpt_i18n, body_i18n,
+      title_uk, title_en, excerpt_uk, excerpt_en, body_uk, body_en, cover_url, external_url
     ) VALUES (
       ${slug}, ${status}, ${publishedAt},
-      ${readStringOr(title.uk, '')}, ${readStringOr(title.en, '')},
-      ${readStringOr(excerpt.uk, '')}, ${readStringOr(excerpt.en, '')},
-      ${readStringOr(bodyLoc.uk, '')}, ${readStringOr(bodyLoc.en, '')},
+      ${title.json ?? '{}'}::jsonb,
+      ${excerpt.json ?? '{}'}::jsonb,
+      ${bodyLoc.json ?? '{}'}::jsonb,
+      ${title.uk ?? ''}, ${title.en ?? ''},
+      ${excerpt.uk ?? ''}, ${excerpt.en ?? ''},
+      ${bodyLoc.uk ?? ''}, ${bodyLoc.en ?? ''},
       ${readStringOr(source.coverImageUrl, '')},
       ${externalUrl}
     )
@@ -408,9 +495,11 @@ export async function upsertContentEvent(body: unknown) {
   const slug = readStringOr(source.slug, readStringOr(source.id, ''))
   if (!slug) throw new Error('slug required')
   const status = readStringOr(source.status, 'draft') === 'published' ? 'published' : 'draft'
-  const title = isRecord(source.title) ? source.title : {}
-  const shortDescription = isRecord(source.shortDescription) ? source.shortDescription : {}
-  const fullDescription = isRecord(source.fullDescription) ? source.fullDescription : {}
+  const title = localizedWrite(source.title, 'title', 300)
+  const shortDescription = localizedWrite(source.shortDescription, 'shortDescription', 2000)
+  const fullDescription = localizedWrite(source.fullDescription, 'fullDescription', 20000)
+  const location = localizedWrite(source.location, 'location', 300)
+  const organizer = localizedWrite(source.organizer, 'organizer', 200)
   const startAt = readStringOr(source.startAt, '')
   if (!startAt) throw new Error('startAt required')
   const nextCoverUrl = readStringOr(source.coverImageUrl, '')
@@ -425,20 +514,26 @@ export async function upsertContentEvent(body: unknown) {
     const rows = await sql`
       UPDATE content_events SET
         slug = ${slug}, status = ${status},
-        title_uk = ${readStringOr(title.uk, '')}, title_en = ${readStringOr(title.en, '')},
-        short_description_uk = ${readStringOr(shortDescription.uk, '')},
-        short_description_en = ${readStringOr(shortDescription.en, '')},
-        full_description_uk = ${readStringOr(fullDescription.uk, '')},
-        full_description_en = ${readStringOr(fullDescription.en, '')},
+        title_i18n = COALESCE(${title.json}::jsonb, title_i18n),
+        short_description_i18n = COALESCE(${shortDescription.json}::jsonb, short_description_i18n),
+        full_description_i18n = COALESCE(${fullDescription.json}::jsonb, full_description_i18n),
+        location_i18n = COALESCE(${location.json}::jsonb, location_i18n),
+        organizer_i18n = COALESCE(${organizer.json}::jsonb, organizer_i18n),
+        title_uk = COALESCE(${title.uk}::text, title_uk),
+        title_en = COALESCE(${title.en}::text, title_en),
+        short_description_uk = COALESCE(${shortDescription.uk}::text, short_description_uk),
+        short_description_en = COALESCE(${shortDescription.en}::text, short_description_en),
+        full_description_uk = COALESCE(${fullDescription.uk}::text, full_description_uk),
+        full_description_en = COALESCE(${fullDescription.en}::text, full_description_en),
         event_type = ${readStringOr(source.type, 'meeting')},
         event_format = ${readStringOr(source.format, 'online')},
         start_at = ${startAt},
         end_at = ${readStringOr(source.endAt, '') || null},
         time_zone = ${readStringOr(source.timeZone, 'Europe/Kyiv')},
-        location = ${readStringOr(source.location, '')},
+        location = COALESCE(${location.uk}::text, location),
         online_url = ${readStringOr(source.onlineUrl, '')},
         registration_url = ${readStringOr(source.registrationUrl, '')},
-        organizer = ${readStringOr(source.organizer, '')},
+        organizer = COALESCE(${organizer.uk}::text, organizer),
         cover_url = ${nextCoverUrl},
         updated_at = now()
       WHERE id = ${id}::uuid
@@ -451,19 +546,26 @@ export async function upsertContentEvent(body: unknown) {
   }
   const rows = await sql`
     INSERT INTO content_events (
-      slug, status, title_uk, title_en, short_description_uk, short_description_en,
+      slug, status,
+      title_i18n, short_description_i18n, full_description_i18n, location_i18n, organizer_i18n,
+      title_uk, title_en, short_description_uk, short_description_en,
       full_description_uk, full_description_en, event_type, event_format, start_at, end_at,
       time_zone, location, online_url, registration_url, organizer, cover_url
     ) VALUES (
       ${slug}, ${status},
-      ${readStringOr(title.uk, '')}, ${readStringOr(title.en, '')},
-      ${readStringOr(shortDescription.uk, '')}, ${readStringOr(shortDescription.en, '')},
-      ${readStringOr(fullDescription.uk, '')}, ${readStringOr(fullDescription.en, '')},
+      ${title.json ?? '{}'}::jsonb,
+      ${shortDescription.json ?? '{}'}::jsonb,
+      ${fullDescription.json ?? '{}'}::jsonb,
+      ${location.json ?? '{}'}::jsonb,
+      ${organizer.json ?? '{}'}::jsonb,
+      ${title.uk ?? ''}, ${title.en ?? ''},
+      ${shortDescription.uk ?? ''}, ${shortDescription.en ?? ''},
+      ${fullDescription.uk ?? ''}, ${fullDescription.en ?? ''},
       ${readStringOr(source.type, 'meeting')}, ${readStringOr(source.format, 'online')},
       ${startAt}, ${readStringOr(source.endAt, '') || null},
       ${readStringOr(source.timeZone, 'Europe/Kyiv')},
-      ${readStringOr(source.location, '')}, ${readStringOr(source.onlineUrl, '')},
-      ${readStringOr(source.registrationUrl, '')}, ${readStringOr(source.organizer, '')},
+      ${location.uk ?? ''}, ${readStringOr(source.onlineUrl, '')},
+      ${readStringOr(source.registrationUrl, '')}, ${organizer.uk ?? ''},
       ${nextCoverUrl}
     )
     RETURNING *
@@ -488,16 +590,19 @@ export async function upsertContentDocument(body: unknown) {
   const sql = getSql()
   const id = readStringOr(source.id, '')
   const status = readStringOr(source.status, 'draft') === 'published' ? 'published' : 'draft'
-  const title = isRecord(source.title) ? source.title : {}
-  const description = isRecord(source.description) ? source.description : {}
+  const title = localizedWrite(source.title, 'title', 300)
+  const description = localizedWrite(source.description, 'description', 2000)
 
   if (id) {
     const rows = await sql`
       UPDATE content_documents SET
         status = ${status},
-        title_uk = ${readStringOr(title.uk, '')}, title_en = ${readStringOr(title.en, '')},
-        description_uk = ${readStringOr(description.uk, '')},
-        description_en = ${readStringOr(description.en, '')},
+        title_i18n = COALESCE(${title.json}::jsonb, title_i18n),
+        description_i18n = COALESCE(${description.json}::jsonb, description_i18n),
+        title_uk = COALESCE(${title.uk}::text, title_uk),
+        title_en = COALESCE(${title.en}::text, title_en),
+        description_uk = COALESCE(${description.uk}::text, description_uk),
+        description_en = COALESCE(${description.en}::text, description_en),
         doc_type = ${readStringOr(source.type, 'pdf')},
         language = ${readStringOr(source.language, 'UA')},
         access_level = ${readStringOr(source.accessLevel, 'public')},
@@ -513,12 +618,15 @@ export async function upsertContentDocument(body: unknown) {
   }
   const rows = await sql`
     INSERT INTO content_documents (
-      status, title_uk, title_en, description_uk, description_en, doc_type, language,
+      status, title_i18n, description_i18n,
+      title_uk, title_en, description_uk, description_en, doc_type, language,
       access_level, size_label, date_updated, external_url, file_url
     ) VALUES (
       ${status},
-      ${readStringOr(title.uk, '')}, ${readStringOr(title.en, '')},
-      ${readStringOr(description.uk, '')}, ${readStringOr(description.en, '')},
+      ${title.json ?? '{}'}::jsonb,
+      ${description.json ?? '{}'}::jsonb,
+      ${title.uk ?? ''}, ${title.en ?? ''},
+      ${description.uk ?? ''}, ${description.en ?? ''},
       ${readStringOr(source.type, 'pdf')}, ${readStringOr(source.language, 'UA')},
       ${readStringOr(source.accessLevel, 'public')}, ${readStringOr(source.size, '')},
       ${readStringOr(source.dateUpdated, '') || null},
@@ -536,24 +644,32 @@ export async function deleteContentDocument(id: string) {
 
 export async function putSiteSettings(body: unknown) {
   const source = isRecord(body) ? body : {}
-  const address = isRecord(source.address) ? source.address : {}
-  const brand = isRecord(source.brandTagline) ? source.brandTagline : {}
+  // Settings has a single row and the form always submits both fields, so no partial-update dance.
+  const address = normalizeLocalizedText(source.address, 'address', 300)
+  const brand = normalizeLocalizedText(source.brandTagline, 'brandTagline', 300)
   const sql = getSql()
   await sql`
-    INSERT INTO site_settings (id, phone, email, address_uk, address_en, brand_tagline_uk, brand_tagline_en, updated_at)
+    INSERT INTO site_settings (
+      id, phone, email, address_i18n, brand_tagline_i18n,
+      address_uk, address_en, brand_tagline_uk, brand_tagline_en, updated_at
+    )
     VALUES (
       'siteSettings',
       ${readStringOr(source.phone, '')},
       ${readStringOr(source.email, '')},
-      ${readStringOr(address.uk, '')},
-      ${readStringOr(address.en, '')},
-      ${readStringOr(brand.uk, '')},
-      ${readStringOr(brand.en, '')},
+      ${JSON.stringify(address)}::jsonb,
+      ${JSON.stringify(brand)}::jsonb,
+      ${address.uk ?? ''},
+      ${address.en ?? ''},
+      ${brand.uk ?? ''},
+      ${brand.en ?? ''},
       now()
     )
     ON CONFLICT (id) DO UPDATE SET
       phone = EXCLUDED.phone,
       email = EXCLUDED.email,
+      address_i18n = EXCLUDED.address_i18n,
+      brand_tagline_i18n = EXCLUDED.brand_tagline_i18n,
       address_uk = EXCLUDED.address_uk,
       address_en = EXCLUDED.address_en,
       brand_tagline_uk = EXCLUDED.brand_tagline_uk,

@@ -1,4 +1,5 @@
 import type {Locale} from '../data/locales'
+import {resolveLocalized} from '../data/locales'
 import {TRANSLATIONS} from '../data/translations'
 import {useDocumentMeta} from '../hooks/useDocumentMeta'
 import type {AssociationEvent} from '../types'
@@ -14,8 +15,8 @@ interface EventsDetailPageProps {
 export default function EventsDetailPage({currentLang, event, onBack}: EventsDetailPageProps) {
   const t = TRANSLATIONS[currentLang]
   useDocumentMeta({
-    title: `${event.title[currentLang]} — ${t.brand_name}`,
-    description: event.shortDescription[currentLang],
+    title: `${resolveLocalized(event.title, currentLang)} — ${t.brand_name}`,
+    description: resolveLocalized(event.shortDescription, currentLang),
     ogImage: event.coverImageUrl,
     ogType: 'article',
   })

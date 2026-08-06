@@ -357,19 +357,11 @@
       align-items: center;
       position: relative;
     }
-    /* L-орнамент у «жолобі»: текст/кнопки зміщені на ширину рейки, щоб літери не лежали на візерунку. */
     .hero-copy {
-      --hero-ornament-x: 52px;
-      --hero-ornament-y: 52px;
       max-width: min(580px, 48vw);
       padding: 86px 0 104px;
       position: relative;
       z-index: 5;
-    }
-    .hero-copy-ornament-scope {
-      position: relative;
-      padding-top: var(--hero-ornament-y);
-      padding-left: var(--hero-ornament-x);
     }
     .hero-actions {
       display: flex;
@@ -377,41 +369,10 @@
       flex-wrap: nowrap;
       align-items: center;
       gap: 18px;
-      padding-left: var(--hero-ornament-x);
     }
     .hero-actions .scribble-link,
     .hero-actions .outline-link {
       flex: 0 0 auto;
-    }
-    .hero-vyshyvanka {
-      position: absolute;
-      z-index: 0;
-      top: 0;
-      left: 0;
-      right: -64px;
-      bottom: 2px;
-      width: auto;
-      height: auto;
-      max-width: none;
-      pointer-events: none;
-      /* Dark: трохи тихіше за текст, щоб не «відтіняти» гліфи. */
-      color: rgba(var(--yellow-rgb), .52);
-      opacity: 1;
-      filter: drop-shadow(0 0 8px rgba(var(--yellow-rgb), .1));
-      -webkit-mask-image:
-        linear-gradient(to right, #000 0%, #000 58%, rgba(0,0,0,.5) 82%, transparent 100%),
-        linear-gradient(to bottom, #000 0%, #000 78%, rgba(0,0,0,.45) 93%, transparent 100%);
-      -webkit-mask-composite: source-in;
-      mask-image:
-        linear-gradient(to right, #000 0%, #000 58%, rgba(0,0,0,.5) 82%, transparent 100%),
-        linear-gradient(to bottom, #000 0%, #000 78%, rgba(0,0,0,.45) 93%, transparent 100%);
-      mask-composite: intersect;
-    }
-    .hero-vyshyvanka svg { display: block; width: 100%; height: 100%; }
-    .hero-copy-ornament-scope > :not(.hero-vyshyvanka) { position: relative; z-index: 1; }
-    html[data-theme="light"] .hero-vyshyvanka {
-      color: rgba(67, 210, 255, .62);
-      filter: drop-shadow(0 0 8px rgba(67, 210, 255, .12));
     }
     /* Текст тримаємо в лівій зоні: наїзд на фото ≤ ~10%. */
     .eyebrow { margin-bottom: 22px; display: flex; align-items: flex-start; gap: 12px; color: var(--muted); font-size: clamp(12px, 1.1vw, 15px); font-weight: 780; letter-spacing: .12em; text-transform: uppercase; line-height: 1.28; }
@@ -445,7 +406,7 @@
     html[data-theme="light"] .outline-link { background: rgba(244, 251, 255, .54); }
     .outline-link:hover, .outline-link:focus-visible { transform: translateY(-3px); background: var(--surface-raised); box-shadow: var(--glow-soft); outline: none; }
     .outline-link span { font-size: 17px; }
-    .hero-index { position: absolute; left: var(--hero-ornament-x, 0px); bottom: 34px; display: flex; align-items: center; gap: 12px; color: var(--muted); font: 700 13.2px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .14em; text-transform: uppercase; }
+    .hero-index { position: absolute; left: 0; bottom: 34px; display: flex; align-items: center; gap: 12px; color: var(--muted); font: 700 13.2px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .14em; text-transform: uppercase; }
     .hero-index::before { content: ""; width: 62px; height: 1px; background: var(--line-strong); }
     .side-identity { position: absolute; z-index: 4; right: 25px; top: 24%; bottom: 19%; width: 92px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 5px 0; pointer-events: none; }
     .side-identity::before { content: ""; position: absolute; top: 88px; bottom: 88px; left: 50%; width: 1px; background: linear-gradient(transparent, var(--neon), transparent); box-shadow: 0 0 12px rgba(var(--neon-rgb), .56); opacity: .72; }
@@ -748,7 +709,6 @@
       }
       .hero-copy { max-width: 670px; padding: 82px 0 280px; }
       .hero-actions { flex-direction: column; flex-wrap: wrap; align-items: flex-start; gap: 10px; }
-      .hero-vyshyvanka { right: -20px; }
       .side-identity { display: none; }
       .features { margin-top: -43px; }
       .feature-grid { grid-template-columns: repeat(2, 1fr); }
@@ -780,14 +740,11 @@
       .hero-copy {
         max-width: none;
         padding: 78px 0 250px;
-        --hero-ornament-x: 0px;
-        --hero-ornament-y: 0px;
       }
       .hero-copy h1 { font-size: clamp(30px, 8.5vw, 42px); }
       .hero-lead { max-width: 92%; font-size: 14px; }
       .eyebrow { font-size: 12px; }
       .hero-actions { align-items: flex-start; flex-direction: column; gap: 10px; }
-      .hero-vyshyvanka { display: none; }
       .side-identity { display: none; }
       .features { margin-top: -30px; }
       .feature-grid { grid-template-columns: 1fr; }

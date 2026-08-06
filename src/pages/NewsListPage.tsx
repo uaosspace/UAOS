@@ -1,4 +1,5 @@
 import type {Locale} from '../data/locales'
+import {resolveLocalized} from '../data/locales'
 import {TRANSLATIONS} from '../data/translations'
 import {useDocumentMeta} from '../hooks/useDocumentMeta'
 import type {NewsItem} from '../data/news'
@@ -141,10 +142,10 @@ export default function NewsListPage({
                       {formatDate(item.publishedAt, currentLang)}
                     </span>
                     <h3 className="text-base font-display font-bold text-brand-slate-900 dark:text-white leading-snug group-hover:text-brand-blue-500 dark:group-hover:text-brand-sky-300 transition-colors">
-                      {item.title[currentLang]}
+                      {resolveLocalized(item.title, currentLang)}
                     </h3>
                     <p className="text-xs text-brand-slate-600 dark:text-brand-slate-300 leading-relaxed line-clamp-3">
-                      {item.excerpt[currentLang]}
+                      {resolveLocalized(item.excerpt, currentLang)}
                     </p>
                     <span className="mt-auto pt-2 text-xs font-bold text-brand-blue-500 group-hover:text-brand-blue-600 dark:text-brand-sky-300">
                       {t.news_read_more} →

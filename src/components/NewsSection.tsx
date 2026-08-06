@@ -1,4 +1,5 @@
 import type {Locale} from '../data/locales'
+import {resolveLocalized} from '../data/locales'
 import {TRANSLATIONS} from '../data/translations'
 import {useReveal} from '../hooks/useReveal'
 import {useSpotlightHandler} from '../hooks/useSpotlight'
@@ -52,8 +53,8 @@ export default function NewsSection({
       kind: 'news' as const,
       key: `news-${item.id}`,
       date: formatDate(item.publishedAt, currentLang),
-      title: item.title[currentLang],
-      desc: item.excerpt[currentLang],
+      title: resolveLocalized(item.title, currentLang),
+      desc: resolveLocalized(item.excerpt, currentLang),
       coverImageUrl: item.coverImageUrl,
       onOpen: () => onSelectNews(item.slug),
     })),
@@ -63,8 +64,8 @@ export default function NewsSection({
             kind: 'event' as const,
             key: `event-${nextEvent.id}`,
             date: formatDate(nextEvent.startAt, currentLang),
-            title: nextEvent.title[currentLang],
-            desc: nextEvent.shortDescription[currentLang],
+            title: resolveLocalized(nextEvent.title, currentLang),
+            desc: resolveLocalized(nextEvent.shortDescription, currentLang),
             coverImageUrl: nextEvent.coverImageUrl,
             onOpen: () => onSelectEvent(nextEvent.id),
           },

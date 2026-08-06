@@ -1,4 +1,5 @@
 import type {Locale} from '../../data/locales'
+import {resolveLocalized} from '../../data/locales'
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AssociationEvent } from '../../types';
@@ -156,7 +157,7 @@ export default function EventsCalendarModal({
                 </span>
               </div>
               <h4 className="font-display font-bold text-brand-slate-900 dark:text-white leading-snug">
-                {evt.title[currentLang]}
+                {resolveLocalized(evt.title, currentLang)}
               </h4>
             </div>
           );

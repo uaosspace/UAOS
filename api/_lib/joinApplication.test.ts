@@ -32,6 +32,7 @@ describe('joinApplication helpers', () => {
         email: 'jane@example.com',
         phone: '+380670000000',
         privacyConsent: true,
+        termsConsent: true,
       })
     )
 
@@ -57,6 +58,7 @@ describe('joinApplication helpers', () => {
       email: 'jane@example.com',
       phone: '+380670000000',
       privacyConsent: true,
+      termsConsent: true,
       applicantKind: 'producer-supplier',
       sectors: ['manufacturing', 'construction'],
       productCategories: ['ppe-clothing'],
@@ -78,11 +80,71 @@ describe('joinApplication helpers', () => {
       email: 'jane@example.com',
       phone: '+380670000000',
       privacyConsent: true,
+      termsConsent: true,
       applicantKind: 'not-a-real-kind',
     })
 
     expect(payload.applicantKind).toBe('')
     expect(validateJoinApplication(payload)).toBeNull()
+  })
+
+  it('requires privacy and terms consent on the server', () => {
+    const withoutPrivacy = normalizeJoinApplication({
+      companyName: 'ACME',
+      activityField: 'PPE',
+      contactPerson: 'Jane Doe',
+      email: 'jane@example.com',
+      phone: '+380670000000',
+      termsConsent: true,
+    })
+    expect(validateJoinApplication(withoutPrivacy)).toBe('Privacy consent is required')
+
+    const withoutTerms = normalizeJoinApplication({
+      companyName: 'ACME',
+      activityField: 'PPE',
+      contactPerson: 'Jane Doe',
+      email: 'jane@example.com',
+      phone: '+380670000000',
+      privacyConsent: true,
+    })
+    expect(validateJoinApplication(withoutTerms)).toBe('Terms consent is required')
+
+    const both = normalizeJoinApplication({
+      companyName: 'ACME',
+      activityField: 'PPE',
+      contactPerson: 'Jane Doe',
+      email: 'jane@example.com',
+      phone: '+380670000000',
+      privacyConsent: true,
+      termsConsent: true,
+    })
+    expect(validateJoinApplication(both)).toBeNull()
+    expect(both.termsConsentGiven).toBe(true)
+  })
+
+  it('records the notice language actually shown to the applicant', () => {
+    const en = normalizeJoinApplication({
+      companyName: 'ACME',
+      activityField: 'PPE',
+      contactPerson: 'Jane Doe',
+      email: 'jane@example.com',
+      phone: '+380670000000',
+      privacyConsent: true,
+      noticeLanguage: 'en',
+      termsConsent: true,
+    })
+
+    expect(en.noticeLanguage).toBe('en')
+    expect(validateJoinApplication(en)).toBeNull()
+
+    const uk = normalizeJoinApplication({noticeLanguage: 'uk', privacyConsent: true, termsConsent: true})
+    expect(uk.noticeLanguage).toBe('uk')
+  })
+
+  it('falls back to uk notice language for missing or unsupported values', () => {
+    expect(normalizeJoinApplication({}).noticeLanguage).toBe('uk')
+    expect(normalizeJoinApplication({noticeLanguage: 'de'}).noticeLanguage).toBe('uk')
+    expect(normalizeJoinApplication({noticeLanguage: 42}).noticeLanguage).toBe('uk')
   })
 
   it('caps classification arrays to a safe length and item size', () => {

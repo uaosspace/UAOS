@@ -1,5 +1,6 @@
 import {getSql} from './db.js'
 import type {NormalizedJoinApplication} from './joinApplication.js'
+import {MEMBERSHIP_TERMS_PURPOSE} from '../../src/lib/siteTerms.js'
 
 export type ApplicationStatus = 'pending' | 'reviewed' | 'accepted' | 'rejected'
 
@@ -69,6 +70,7 @@ export async function createApplication(input: {
   website: string
   consentIp: string
   policyVersion: string
+  termsVersion: string
   noticeLanguage: string
   userAgent: string
 }): Promise<{application: ApplicationRecord; duplicate: boolean}> {
@@ -123,6 +125,23 @@ export async function createApplication(input: {
       'membership_application',
       'consent',
       ${input.policyVersion},
+      ${input.noticeLanguage},
+      ${input.payload.consentTimestamp},
+      'join_form',
+      ${input.consentIp},
+      ${input.userAgent}
+    )
+  `
+
+  await sql`
+    INSERT INTO consents (
+      application_id, purpose_code, legal_basis, policy_version,
+      notice_language, accepted_at, source, ip, user_agent
+    ) VALUES (
+      ${application.id}::uuid,
+      ${MEMBERSHIP_TERMS_PURPOSE},
+      'consent',
+      ${input.termsVersion},
       ${input.noticeLanguage},
       ${input.payload.consentTimestamp},
       'join_form',

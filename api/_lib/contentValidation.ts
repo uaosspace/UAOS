@@ -2,6 +2,40 @@
  * Shared validation for admin content writes.
  * Rejects non-http(s) URLs and credentialed URLs (XSS/SSRF-ish paste hazards).
  */
+import {DEFAULT_LOCALE, LOCALES, type Locale} from '../../src/data/locales.js'
+import {isRecord} from '../../src/lib/contentGuards.js'
+
+/** Localized field payload as stored in the `*_i18n` JSONB columns. */
+export type LocalizedInput = Partial<Record<Locale, string>>
+
+/**
+ * Normalizes a LocalizedText payload for JSONB storage: keeps only supported locales, trims,
+ * drops empty locales (absent key means "not translated yet") and enforces `maxLen` per locale.
+ * A bare string is accepted as the default locale — older admin payloads sent `shortName` that way.
+ */
+export function normalizeLocalizedText(
+  raw: unknown,
+  fieldName: string,
+  maxLen: number,
+  options: {required?: boolean} = {},
+): LocalizedInput {
+  const source: Record<string, unknown> =
+    typeof raw === 'string' ? {[DEFAULT_LOCALE]: raw} : isRecord(raw) ? raw : {}
+
+  const result: LocalizedInput = {}
+  for (const locale of LOCALES) {
+    const value = source[locale]
+    const text = typeof value === 'string' ? value.trim() : ''
+    if (!text) continue
+    if (text.length > maxLen) throw new Error(`${fieldName}.${locale} is too long`)
+    result[locale] = text
+  }
+
+  if (options.required && !result[DEFAULT_LOCALE]) {
+    throw new Error(`${fieldName}.${DEFAULT_LOCALE} required`)
+  }
+  return result
+}
 
 export function normalizeOptionalHttpUrl(raw: unknown, fieldName: string): string {
   const value = typeof raw === 'string' ? raw.trim() : ''

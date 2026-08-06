@@ -1,4 +1,5 @@
 import type {Locale} from '../../data/locales'
+import {resolveLocalized} from '../../data/locales'
 import React from 'react';
 import { AssociationEvent } from '../../types';
 import { TRANSLATIONS } from '../../data/translations';
@@ -24,6 +25,14 @@ export default function EventDetails({ event, currentLang }: EventDetailsProps) 
   const dateRange = formatEventDateRange(event, currentLang);
   const past = isPastEvent(event);
 
+  const titleText = resolveLocalized(event.title, currentLang);
+  const locationText = event.location ? resolveLocalized(event.location, currentLang) : '';
+  const organizerText = event.organizer ? resolveLocalized(event.organizer, currentLang) : '';
+  const shortDescriptionText = resolveLocalized(event.shortDescription, currentLang);
+  const fullDescriptionText = event.fullDescription
+    ? resolveLocalized(event.fullDescription, currentLang)
+    : '';
+
   return (
     <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] rounded-2xl bg-white dark:bg-brand-slate-900">
       {/* Cover + text scroll; actions stay in bottom row (no card-level overflow — dropdowns must escape) */}
@@ -32,7 +41,7 @@ export default function EventDetails({ event, currentLang }: EventDetailsProps) 
           <div className="w-full bg-brand-slate-50 dark:bg-brand-slate-800/80 border-b border-brand-slate-100 dark:border-brand-slate-700">
             <img
               src={event.coverImageUrl}
-              alt={event.title[currentLang]}
+              alt={titleText}
               className="w-full max-h-[min(28vh,200px)] object-contain object-center"
             />
           </div>
@@ -58,7 +67,7 @@ export default function EventDetails({ event, currentLang }: EventDetailsProps) 
           </div>
 
           <h2 className="text-2xl sm:text-3xl font-display font-bold text-brand-slate-900 dark:text-white leading-tight mb-6">
-            {event.title[currentLang]}
+            {titleText}
           </h2>
 
           <div className="space-y-4 mb-8">
@@ -70,10 +79,10 @@ export default function EventDetails({ event, currentLang }: EventDetailsProps) 
               </div>
             </div>
 
-            {(event.format === 'offline' || event.format === 'hybrid') && event.location && event.location[currentLang] && (
+            {(event.format === 'offline' || event.format === 'hybrid') && locationText && (
               <div className="flex items-start gap-3 text-brand-slate-700 dark:text-brand-slate-200">
                 <MapPin className="w-5 h-5 text-brand-slate-400 shrink-0 mt-0.5" />
-                <p>{event.location[currentLang]}</p>
+                <p>{locationText}</p>
               </div>
             )}
 
@@ -84,12 +93,12 @@ export default function EventDetails({ event, currentLang }: EventDetailsProps) 
               </div>
             )}
 
-            {event.organizer && event.organizer[currentLang] && (
+            {organizerText && (
               <div className="flex items-start gap-3 text-brand-slate-700 dark:text-brand-slate-200">
                 <User className="w-5 h-5 text-brand-slate-400 shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm text-brand-slate-500 dark:text-brand-slate-300">{t.events_organizer}</p>
-                  <p>{event.organizer[currentLang]}</p>
+                  <p>{organizerText}</p>
                 </div>
               </div>
             )}
@@ -97,11 +106,11 @@ export default function EventDetails({ event, currentLang }: EventDetailsProps) 
 
           <div className="prose prose-slate dark:prose-invert max-w-none">
             <p className="text-lg text-brand-slate-700 dark:text-brand-slate-200 mb-6 font-medium">
-              {event.shortDescription[currentLang]}
+              {shortDescriptionText}
             </p>
-            {event.fullDescription && event.fullDescription[currentLang] && (
+            {fullDescriptionText && (
               <div className="text-brand-slate-600 dark:text-brand-slate-200 whitespace-pre-line">
-                {event.fullDescription[currentLang]}
+                {fullDescriptionText}
               </div>
             )}
           </div>

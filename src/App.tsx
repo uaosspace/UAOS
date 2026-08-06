@@ -10,7 +10,9 @@ import {useMembersResource} from './hooks/content/useMembersResource'
 import {useNewsResource} from './hooks/content/useNewsResource'
 import {useEventsResource} from './hooks/content/useEventsResource'
 import {useDocumentsResource} from './hooks/content/useDocumentsResource'
-import {LOCALE_META, parseStoredLocale, type Locale} from './data/locales'
+import {LOCALE_META} from './data/locales'
+import {buildHreflangAlternates} from './routes/localizedRouting'
+import {buildRawRoutePath} from './routes/appRoutes'
 import {TRANSLATIONS} from './data/translations'
 import HomePage from './pages/HomePage'
 import AboutPage from './pages/AboutPage'
@@ -25,16 +27,13 @@ import KnowledgePage from './pages/KnowledgePage'
 import JoinPage from './pages/JoinPage'
 import ContactsPage from './pages/ContactsPage'
 import PrivacyRoutePage from './pages/PrivacyRoutePage'
+import TermsRoutePage from './pages/TermsRoutePage'
 import NotFoundPage from './pages/NotFoundPage'
 import AdminApp from './pages/admin/AdminApp'
 import PageTransition from './components/PageTransition'
 import {APP_ROUTES} from './routes/appRoutes'
 
 export default function App() {
-  const [currentLang, setCurrentLang] = useState<Locale>(() =>
-    parseStoredLocale(localStorage.getItem('uaos_lang')),
-  )
-
   const [currentTheme, setCurrentTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('uaos_theme')
     if (saved === 'light' || saved === 'dark') return saved
@@ -45,6 +44,9 @@ export default function App() {
   const {
     currentRoute,
     routeParams,
+    currentLang,
+    changeLanguage,
+    setAdminLang,
     handleNavigation,
     handleSelectMember,
     handleBackFromMember,
@@ -83,9 +85,36 @@ export default function App() {
   const t = TRANSLATIONS[currentLang]
 
   useEffect(() => {
-    localStorage.setItem('uaos_lang', currentLang)
     window.document.documentElement.lang = LOCALE_META[currentLang].htmlLang
   }, [currentLang])
+
+  // hreflang alternate links для поточного маршруту (SEO: URL — джерело істини для мови).
+  // Не рендериться для /admin — це закритий SPA-режим без публічної мовної схеми.
+  useEffect(() => {
+    const existing = window.document.head.querySelectorAll('link[data-managed="hreflang"]')
+    existing.forEach((el) => el.remove())
+
+    if (currentRoute === APP_ROUTES.admin) return
+
+    const slug = routeParams.memberSlug ?? routeParams.newsSlug ?? routeParams.eventSlug ?? null
+    const rawPath = buildRawRoutePath(currentRoute, slug)
+    const alternates = buildHreflangAlternates(rawPath, window.location.origin)
+
+    alternates.forEach(({hrefLang, href}) => {
+      const link = window.document.createElement('link')
+      link.setAttribute('rel', 'alternate')
+      link.setAttribute('hreflang', hrefLang)
+      link.setAttribute('href', href)
+      link.setAttribute('data-managed', 'hreflang')
+      window.document.head.appendChild(link)
+    })
+
+    return () => {
+      window.document.head
+        .querySelectorAll('link[data-managed="hreflang"]')
+        .forEach((el) => el.remove())
+    }
+  }, [currentRoute, routeParams])
 
   useEffect(() => {
     const root = window.document.documentElement
@@ -212,14 +241,23 @@ export default function App() {
   } else if (currentRoute === APP_ROUTES.knowledge) {
     mainContent = <KnowledgePage currentLang={currentLang} documents={documents} />
   } else if (currentRoute === APP_ROUTES.join) {
-    mainContent = <JoinPage currentLang={currentLang} anchor={routeParams.activityAnchor} />
+    mainContent = (
+      <JoinPage
+        currentLang={currentLang}
+        anchor={routeParams.activityAnchor}
+        onOpenPrivacy={() => handleNavigation(APP_ROUTES.privacy)}
+        onOpenTerms={() => handleNavigation(APP_ROUTES.terms)}
+      />
+    )
   } else if (currentRoute === APP_ROUTES.contacts) {
     mainContent = <ContactsPage currentLang={currentLang} />
   } else if (currentRoute === APP_ROUTES.privacy) {
     mainContent = <PrivacyRoutePage currentLang={currentLang} onBack={() => handleNavigation(APP_ROUTES.home)} />
+  } else if (currentRoute === APP_ROUTES.terms) {
+    mainContent = <TermsRoutePage currentLang={currentLang} onBack={() => handleNavigation(APP_ROUTES.home)} />
   } else if (currentRoute === APP_ROUTES.admin) {
     mainContent = (
-      <AdminApp currentLang={currentLang} setCurrentLang={setCurrentLang} />
+      <AdminApp currentLang={currentLang} setCurrentLang={setAdminLang} />
     )
   } else {
     mainContent = <NotFoundPage currentLang={currentLang} onBackHome={() => handleNavigation(APP_ROUTES.home)} />
@@ -243,7 +281,7 @@ export default function App() {
       <div className="min-h-screen flex flex-col relative">
         <Header
           currentLang={currentLang}
-          setCurrentLang={setCurrentLang}
+          setCurrentLang={changeLanguage}
           currentTheme={currentTheme}
           setCurrentTheme={setCurrentTheme}
           currentRoute={currentRoute}
@@ -259,6 +297,7 @@ export default function App() {
           currentRoute={currentRoute}
           onNavigate={handleNavigation}
           onOpenPrivacy={() => handleNavigation(APP_ROUTES.privacy)}
+          onOpenTerms={() => handleNavigation(APP_ROUTES.terms)}
         />
 
         {cookieConsent === null && (

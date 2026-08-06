@@ -34,11 +34,19 @@ function buildBundle() {
   }
 }
 
+/** Keep in sync with LOCALES in src/data/locales.ts. */
+const LOCALES = ['uk', 'en', 'de', 'es', 'kk', 'fr']
+
+/** Localized field for the `*_i18n` JSONB columns: only non-empty supported locales. */
 function asText(value) {
-  if (value && typeof value === 'object' && 'uk' in value) {
-    return {uk: String(value.uk ?? ''), en: String(value.en ?? '')}
+  if (typeof value === 'string') return value.trim() ? {uk: value.trim()} : {}
+  if (!value || typeof value !== 'object') return {}
+  const result = {}
+  for (const locale of LOCALES) {
+    const text = typeof value[locale] === 'string' ? value[locale].trim() : ''
+    if (text) result[locale] = text
   }
-  return {uk: '', en: ''}
+  return result
 }
 
 function asStringArray(value) {
@@ -47,10 +55,7 @@ function asStringArray(value) {
 
 function asLocalizedArray(value) {
   if (!Array.isArray(value)) return []
-  return value.map((item) => {
-    if (typeof item === 'string') return {uk: item, en: item}
-    return asText(item)
-  })
+  return value.map((item) => asText(item))
 }
 
 async function main() {
@@ -78,7 +83,7 @@ async function main() {
     const category = asText(member.category)
     const shortDescription = asText(member.shortDescription)
     const fullDescription = asText(member.fullDescription)
-    const shortName = String(member.shortName ?? '')
+    const shortName = asText(member.shortName)
     const status = member.published === false ? 'draft' : 'published'
     const profileLevel = member.profileLevel === 'extended' ? 'extended' : 'basic'
     const order = Number.isFinite(Number(member.order)) ? Number(member.order) : 0
@@ -92,7 +97,9 @@ async function main() {
     const participantTypes = asStringArray(member.participantTypes)
     const sectors = asStringArray(member.sectors)
     const productCategories = asStringArray(member.productCategories)
-    const competencies = asLocalizedArray(member.competencies).map((item) => item.uk || item.en)
+    const competenciesLocalized = asLocalizedArray(member.competencies)
+    const competencies = competenciesLocalized.map((item) => item.uk || item.en || '')
+    const competenciesJson = JSON.stringify(competenciesLocalized)
     const services = JSON.stringify(asLocalizedArray(member.services))
     const certificates = JSON.stringify(Array.isArray(member.certificates) ? member.certificates : [])
     const cases = JSON.stringify(Array.isArray(member.cases) ? member.cases : [])
@@ -101,6 +108,8 @@ async function main() {
     await sql`
       INSERT INTO content_members (
         slug, status, sort_order, profile_level,
+        name_i18n, short_name_i18n, category_i18n, short_description_i18n, full_description_i18n,
+        competencies_i18n,
         name_uk, name_en, short_name_uk, short_name_en, category_uk, category_en,
         short_description_uk, short_description_en, full_description_uk, full_description_en,
         logo_url, cover_url, website_url, public_email, public_phone,
@@ -108,8 +117,13 @@ async function main() {
         services, certificates, cases, products
       ) VALUES (
         ${slug}, ${status}, ${order}, ${profileLevel},
-        ${name.uk}, ${name.en}, ${shortName}, ${shortName}, ${category.uk}, ${category.en},
-        ${shortDescription.uk}, ${shortDescription.en}, ${fullDescription.uk}, ${fullDescription.en},
+        ${JSON.stringify(name)}::jsonb, ${JSON.stringify(shortName)}::jsonb,
+        ${JSON.stringify(category)}::jsonb, ${JSON.stringify(shortDescription)}::jsonb,
+        ${JSON.stringify(fullDescription)}::jsonb, ${competenciesJson}::jsonb,
+        ${name.uk ?? ''}, ${name.en ?? ''}, ${shortName.uk ?? ''}, ${shortName.en ?? shortName.uk ?? ''},
+        ${category.uk ?? ''}, ${category.en ?? ''},
+        ${shortDescription.uk ?? ''}, ${shortDescription.en ?? ''},
+        ${fullDescription.uk ?? ''}, ${fullDescription.en ?? ''},
         ${logoUrl}, ${coverUrl}, ${websiteUrl}, ${publicEmail}, ${publicPhone},
         ${participantTypes}, ${sectors}, ${productCategories}, ${competencies}, ${region}, ${featured},
         ${services}::jsonb, ${certificates}::jsonb, ${cases}::jsonb, ${products}::jsonb
@@ -118,6 +132,12 @@ async function main() {
         status = EXCLUDED.status,
         sort_order = EXCLUDED.sort_order,
         profile_level = EXCLUDED.profile_level,
+        name_i18n = EXCLUDED.name_i18n,
+        short_name_i18n = EXCLUDED.short_name_i18n,
+        category_i18n = EXCLUDED.category_i18n,
+        short_description_i18n = EXCLUDED.short_description_i18n,
+        full_description_i18n = EXCLUDED.full_description_i18n,
+        competencies_i18n = EXCLUDED.competencies_i18n,
         name_uk = EXCLUDED.name_uk,
         name_en = EXCLUDED.name_en,
         short_name_uk = EXCLUDED.short_name_uk,
@@ -136,6 +156,7 @@ async function main() {
         participant_types = EXCLUDED.participant_types,
         sectors = EXCLUDED.sectors,
         product_categories = EXCLUDED.product_categories,
+        competencies = EXCLUDED.competencies,
         region = EXCLUDED.region,
         featured = EXCLUDED.featured,
         services = EXCLUDED.services,

@@ -1,4 +1,5 @@
 import type {Locale} from '../data/locales'
+import {resolveLocalized} from '../data/locales'
 import {TRANSLATIONS} from '../data/translations'
 import {useDocumentMeta} from '../hooks/useDocumentMeta'
 import type {NewsItem} from '../data/news'
@@ -20,9 +21,11 @@ function formatDate(iso: string, locale: Locale) {
 
 export default function NewsDetailPage({currentLang, item, onBack}: NewsDetailPageProps) {
   const t = TRANSLATIONS[currentLang]
+  const titleText = resolveLocalized(item.title, currentLang)
+  const excerptText = resolveLocalized(item.excerpt, currentLang)
   useDocumentMeta({
-    title: `${item.title[currentLang]} — ${t.brand_name}`,
-    description: item.excerpt[currentLang],
+    title: `${titleText} — ${t.brand_name}`,
+    description: excerptText,
     ogImage: item.coverImageUrl,
     ogType: 'article',
   })
@@ -47,12 +50,12 @@ export default function NewsDetailPage({currentLang, item, onBack}: NewsDetailPa
 
         <span className="text-xs font-mono text-brand-slate-400 uppercase">{formatDate(item.publishedAt, currentLang)}</span>
         <h1 className="text-2xl sm:text-3xl font-display font-bold text-brand-slate-900 dark:text-white leading-tight mt-2 mb-6">
-          {item.title[currentLang]}
+          {titleText}
         </h1>
 
         <div className="prose prose-slate dark:prose-invert max-w-none">
           <p className="text-lg text-brand-slate-700 dark:text-brand-slate-200 font-medium mb-6">
-            {item.excerpt[currentLang]}
+            {excerptText}
           </p>
           {item.externalUrl ? (
             <a
@@ -66,7 +69,7 @@ export default function NewsDetailPage({currentLang, item, onBack}: NewsDetailPa
             </a>
           ) : (
             <div className="text-brand-slate-600 dark:text-brand-slate-200 whitespace-pre-line leading-relaxed">
-              {item.body[currentLang]}
+              {resolveLocalized(item.body, currentLang)}
             </div>
           )}
         </div>
