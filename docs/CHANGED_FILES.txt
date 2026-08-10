@@ -274,3 +274,4 @@ public/robots.txt
 public/sitemap.xml
 scripts/generate-sitemap.mjs
 index.html
+db/migrations/006_admin_recovery.sql

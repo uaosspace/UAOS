@@ -82,6 +82,7 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
   const [mfaSetupRequired, setMfaSetupRequired] = useState(false)
   const [bootstrapping, setBootstrapping] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [recoveryNotice, setRecoveryNotice] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mfaCode, setMfaCode] = useState('')
@@ -154,6 +155,7 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
   async function onLogin(event: FormEvent) {
     event.preventDefault()
     setError(null)
+    setRecoveryNotice(null)
     setBusy('login')
     try {
       const data = await api<{user: AdminUser; mfaSetupRequired?: boolean}>('auth/login', {
@@ -166,6 +168,30 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
       setMfaCode('')
     } catch (err) {
       setError(err instanceof Error ? err.message : t.admin_invalid_credentials)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function onForgotPassword() {
+    setError(null)
+    setRecoveryNotice(null)
+    const trimmed = email.trim()
+    if (!trimmed) {
+      setError(t.admin_forgot_password_need_email)
+      return
+    }
+    setBusy('forgot')
+    try {
+      await api<{ok: boolean; message?: string}>('auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({email: trimmed}),
+      })
+      setRecoveryNotice(t.admin_forgot_password_sent)
+      setPassword('')
+      setMfaCode('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.admin_forgot_unavailable)
     } finally {
       setBusy(null)
     }
@@ -382,10 +408,15 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
               />
             </label>
             {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+            {recoveryNotice ? (
+              <p className="text-sm text-emerald-700 dark:text-emerald-400" role="status">
+                {recoveryNotice}
+              </p>
+            ) : null}
             <button
               className={`${adminPrimaryBtnClass} w-full`}
               type="submit"
-              disabled={busy === 'login'}
+              disabled={busy === 'login' || busy === 'forgot'}
             >
               {busy === 'login' ? (
                 <span className="inline-flex items-center gap-2">
@@ -396,6 +427,24 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
                 t.admin_btn_login
               )}
             </button>
+            <button
+              className={`${adminSecondaryBtnClass} w-full`}
+              type="button"
+              disabled={busy === 'login' || busy === 'forgot'}
+              onClick={() => void onForgotPassword()}
+            >
+              {busy === 'forgot' ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  {t.admin_busy}
+                </span>
+              ) : (
+                t.admin_forgot_password
+              )}
+            </button>
+            <p className="text-xs leading-relaxed text-brand-slate-500 dark:text-brand-slate-400">
+              {t.admin_forgot_password_hint}
+            </p>
           </form>
         </div>
       </div>

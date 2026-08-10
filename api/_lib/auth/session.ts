@@ -1,3 +1,4 @@
+import {randomBytes, timingSafeEqual} from 'node:crypto'
 import type {VercelRequest, VercelResponse} from '@vercel/node'
 import {getSql} from '../db.js'
 import {createSessionToken, hashToken, verifyPassword} from './crypto.js'
@@ -7,6 +8,8 @@ import {buildOtpAuthUrl, generateTotpSecret, verifyTotpCode} from './totp.js'
 
 export const SESSION_COOKIE = 'uaos_admin_session'
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000
+export const RECOVERY_MFA_TTL_MS = 30 * 60 * 1000
+export const RECOVERY_MFA_TTL_MINUTES = 30
 
 export interface AdminUserRecord {
   id: string
@@ -286,7 +289,99 @@ export async function confirmMfaSetup(userId: string, code: string): Promise<boo
   return true
 }
 
+/**
+ * Temporary password for email recovery. Meets assertValidNewPassword rules.
+ * Ambiguous characters (0/O/1/l/I) are avoided for easier typing from email.
+ */
+export function generateTempAdminPassword(bytes: () => Buffer = () => randomBytes(18)): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@$%*'
+  const raw = bytes()
+  let out = ''
+  for (let i = 0; i < raw.length; i += 1) {
+    out += alphabet[raw[i]! % alphabet.length]
+  }
+  if (out.length < PASSWORD_MIN_LEN) {
+    throw new Error('Failed to generate temporary password')
+  }
+  return out.slice(0, 20)
+}
+
+/** Six-digit one-time MFA code for email recovery (not Authenticator TOTP). */
+export function generateRecoveryMfaCode(bytes: () => Buffer = () => randomBytes(4)): string {
+  const n = bytes().readUInt32BE(0) % 1_000_000
+  return String(n).padStart(6, '0')
+}
+
+export function hashRecoveryMfaCode(code: string): string {
+  return hashToken(code.trim())
+}
+
+export function recoveryMfaHashesEqual(expectedHash: string, code: string): boolean {
+  const actual = hashRecoveryMfaCode(code)
+  const a = Buffer.from(expectedHash, 'hex')
+  const b = Buffer.from(actual, 'hex')
+  if (a.length !== b.length || a.length === 0) return false
+  return timingSafeEqual(a, b)
+}
+
+/**
+ * Resets password to a temporary value and stores a hashed one-time MFA code.
+ * Caller must email the plaintext values and revoke sessions.
+ */
+export async function applyAdminPasswordRecovery(input: {
+  userId: string
+  tempPassword: string
+  recoveryMfaCode: string | null
+}): Promise<void> {
+  assertValidNewPassword(input.tempPassword)
+  const sql = getSql()
+  const passwordHash = hashPassword(input.tempPassword)
+  const mfaHash = input.recoveryMfaCode ? hashRecoveryMfaCode(input.recoveryMfaCode) : null
+  const mfaExpires = input.recoveryMfaCode
+    ? new Date(Date.now() + RECOVERY_MFA_TTL_MS).toISOString()
+    : null
+
+  await sql`
+    UPDATE admin_users
+    SET password_hash = ${passwordHash},
+        recovery_mfa_hash = ${mfaHash},
+        recovery_mfa_expires_at = ${mfaExpires},
+        failed_login_count = 0,
+        locked_until = NULL,
+        updated_at = now()
+    WHERE id = ${input.userId}::uuid
+  `
+}
+
+export async function consumeRecoveryMfaCode(userId: string, code: string): Promise<boolean> {
+  const normalized = code.trim().replace(/\s+/g, '')
+  if (!/^\d{6}$/.test(normalized)) return false
+
+  const sql = getSql()
+  const rows = await sql`
+    SELECT recovery_mfa_hash, recovery_mfa_expires_at
+    FROM admin_users WHERE id = ${userId}::uuid LIMIT 1
+  `
+  const row = rows[0] as
+    | {recovery_mfa_hash?: unknown; recovery_mfa_expires_at?: unknown}
+    | undefined
+  if (!row?.recovery_mfa_hash || !row.recovery_mfa_expires_at) return false
+  if (new Date(String(row.recovery_mfa_expires_at)).getTime() < Date.now()) return false
+  if (!recoveryMfaHashesEqual(String(row.recovery_mfa_hash), normalized)) return false
+
+  await sql`
+    UPDATE admin_users
+    SET recovery_mfa_hash = NULL,
+        recovery_mfa_expires_at = NULL,
+        updated_at = now()
+    WHERE id = ${userId}::uuid
+  `
+  return true
+}
+
 export async function verifyUserMfa(userId: string, code: string): Promise<boolean> {
+  if (await consumeRecoveryMfaCode(userId, code)) return true
+
   const sql = getSql()
   const rows = await sql`
     SELECT mfa_secret_enc, mfa_enabled, role

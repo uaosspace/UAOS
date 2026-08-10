@@ -1,10 +1,13 @@
 import {describe, expect, it, vi} from 'vitest'
 import {
+  buildAdminRecoveryEmail,
   buildJoinNotifyEmail,
   isBrevoNotifyConfigured,
+  isBrevoSenderConfigured,
   notifyJoinApplicationByEmail,
   parseNotifyFrom,
   readBrevoNotifyEnv,
+  sendAdminRecoveryEmail,
 } from './brevoNotify.js'
 
 const samplePayload = {
@@ -31,6 +34,16 @@ describe('brevoNotify helpers', () => {
     })
   })
 
+  it('treats sender-only env as enough for admin recovery mail', () => {
+    expect(isBrevoSenderConfigured({})).toBe(false)
+    expect(
+      isBrevoSenderConfigured({
+        BREVO_API_KEY: 'key',
+        NOTIFY_EMAIL_FROM: 'UAOS <office@example.com>',
+      }),
+    ).toBe(true)
+  })
+
   it('parses Name <email> and bare email', () => {
     expect(parseNotifyFrom('UAOS <office@example.com>')).toEqual({
       name: 'UAOS',
@@ -52,6 +65,19 @@ describe('brevoNotify helpers', () => {
     expect(email.textContent).not.toContain('producer-supplier')
     expect(email.textContent).not.toContain('@')
     expect(email.textContent).toContain('/admin')
+  })
+
+  it('builds recovery email with temp password and MFA code', () => {
+    const email = buildAdminRecoveryEmail({
+      tempPassword: 'TempPass123456',
+      mfaCode: '654321',
+      mfaEnabled: true,
+      expiresMinutes: 30,
+    })
+    expect(email.subject).toContain('відновлення')
+    expect(email.textContent).toContain('TempPass123456')
+    expect(email.textContent).toContain('654321')
+    expect(email.htmlContent).toContain('TempPass123456')
   })
 
   it('falls back to raw ids when label is unknown', () => {
@@ -104,6 +130,37 @@ describe('brevoNotify helpers', () => {
     expect(body.tags).toContain('uaos-join-application')
     expect(body.subject).toContain('ACME LLC')
     expect(body.textContent).not.toMatch(/jane@/i)
+  })
+
+  it('sends recovery email to the admin account address', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => '',
+    })
+
+    await expect(
+      sendAdminRecoveryEmail(
+        'Admin@Example.com',
+        {
+          tempPassword: 'TempPass123456',
+          mfaCode: '111222',
+          mfaEnabled: true,
+          expiresMinutes: 30,
+        },
+        {
+          BREVO_API_KEY: 'key',
+          NOTIFY_EMAIL_FROM: 'UAOS <office@example.com>',
+        },
+        fetchImpl as unknown as typeof fetch,
+      ),
+    ).resolves.toBe('sent')
+
+    const body = JSON.parse(String((fetchImpl.mock.calls[0] as [string, RequestInit])[1].body)) as {
+      to: Array<{email: string}>
+      tags: string[]
+    }
+    expect(body.to[0].email).toBe('admin@example.com')
+    expect(body.tags).toContain('uaos-admin-recovery')
   })
 
   it('returns failed on non-OK Brevo response without throwing', async () => {

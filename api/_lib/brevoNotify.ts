@@ -168,6 +168,125 @@ function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;')
 }
 
+export interface BrevoSenderEnv {
+  apiKey: string
+  fromRaw: string
+}
+
+/** Sender-only config (recovery emails go to the admin account, not NOTIFY_EMAIL_TO). */
+export function readBrevoSenderEnv(env: NodeJS.ProcessEnv = process.env): BrevoSenderEnv | null {
+  const apiKey = readTrimmed(env.BREVO_API_KEY)
+  const fromRaw = readTrimmed(env.NOTIFY_EMAIL_FROM)
+  if (!apiKey || !fromRaw) return null
+  return {apiKey, fromRaw}
+}
+
+export function isBrevoSenderConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  return readBrevoSenderEnv(env) !== null
+}
+
+export interface AdminRecoveryEmailPayload {
+  tempPassword: string
+  mfaCode: string | null
+  mfaEnabled: boolean
+  expiresMinutes: number
+}
+
+export function buildAdminRecoveryEmail(payload: AdminRecoveryEmailPayload): {
+  subject: string
+  textContent: string
+  htmlContent: string
+} {
+  const subject = 'UAOS: відновлення доступу до адмін-панелі'
+  const mfaLines =
+    payload.mfaEnabled && payload.mfaCode
+      ? [
+          `Одноразовий код MFA: ${payload.mfaCode}`,
+          `(дійсний ${payload.expiresMinutes} хв; після входу можна знову користуватися Authenticator)`,
+          '',
+        ]
+      : ['MFA для цього облікового запису не увімкнено — поле коду можна залишити порожнім.', '']
+
+  const lines = [
+    'Відновлення доступу до адмін-панелі UAOS',
+    '',
+    'Поточний пароль у базі зберігається лише як хеш, тому надіслано новий тимчасовий пароль.',
+    '',
+    `Тимчасовий пароль: ${payload.tempPassword}`,
+    '',
+    ...mfaLines,
+    'Після входу змініть пароль у вкладці «Обліковий запис».',
+    'Якщо ви не запитували відновлення — негайно змініть пароль і зверніться до оператора.',
+  ]
+
+  const textContent = lines.join('\n')
+  const mfaHtml =
+    payload.mfaEnabled && payload.mfaCode
+      ? `<p style="margin:0 0 6px"><strong>Одноразовий код MFA:</strong> <code>${escapeHtml(payload.mfaCode)}</code></p>
+<p style="margin:0 0 12px;color:#475569;font-size:13px">Дійсний ${payload.expiresMinutes} хв. Після входу можна знову користуватися Authenticator.</p>`
+      : `<p style="margin:0 0 12px;color:#475569;font-size:13px">MFA не увімкнено — поле коду можна залишити порожнім.</p>`
+
+  const htmlContent = `<div style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:15px;line-height:1.5;color:#0f172a">
+<p style="margin:0 0 12px"><strong>Відновлення доступу до адмін-панелі UAOS</strong></p>
+<p style="margin:0 0 12px">Поточний пароль у базі зберігається лише як хеш, тому надіслано новий тимчасовий пароль.</p>
+<p style="margin:0 0 6px"><strong>Тимчасовий пароль:</strong> <code>${escapeHtml(payload.tempPassword)}</code></p>
+${mfaHtml}
+<p style="margin:0 0 12px">Після входу змініть пароль у вкладці «Обліковий запис».</p>
+<p style="margin:0;color:#475569;font-size:13px">Якщо ви не запитували відновлення — негайно змініть пароль і зверніться до оператора.</p>
+</div>`
+
+  return {subject, textContent, htmlContent}
+}
+
+async function sendBrevoEmail(
+  input: {
+    apiKey: string
+    sender: ParsedEmailSender
+    to: string
+    subject: string
+    textContent: string
+    htmlContent: string
+    tags: string[]
+  },
+  fetchImpl: typeof fetch,
+): Promise<'sent' | 'failed'> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), NOTIFY_TIMEOUT_MS)
+
+  try {
+    const response = await fetchImpl(BREVO_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        'api-key': input.apiKey,
+      },
+      body: JSON.stringify({
+        sender: {name: input.sender.name, email: input.sender.email},
+        to: [{email: input.to}],
+        subject: input.subject,
+        textContent: input.textContent,
+        htmlContent: input.htmlContent,
+        tags: input.tags,
+      }),
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '')
+      console.error('Brevo send failed:', response.status, body.slice(0, 500))
+      return 'failed'
+    }
+
+    return 'sent'
+  } catch (err) {
+    console.error('Brevo send error:', err)
+    return 'failed'
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 /**
  * Sends transactional email via Brevo. No-op when env is incomplete.
  * Never throws to the caller — logs and returns.
@@ -187,39 +306,53 @@ export async function notifyJoinApplicationByEmail(
   }
 
   const {subject, textContent, htmlContent} = buildJoinNotifyEmail(payload)
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), NOTIFY_TIMEOUT_MS)
+  return sendBrevoEmail(
+    {
+      apiKey: config.apiKey,
+      sender,
+      to: config.to,
+      subject,
+      textContent,
+      htmlContent,
+      tags: ['uaos-join-application'],
+    },
+    fetchImpl,
+  )
+}
 
-  try {
-    const response = await fetchImpl(BREVO_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        accept: 'application/json',
-        'content-type': 'application/json',
-        'api-key': config.apiKey,
-      },
-      body: JSON.stringify({
-        sender: {name: sender.name, email: sender.email},
-        to: [{email: config.to}],
-        subject,
-        textContent,
-        htmlContent,
-        tags: ['uaos-join-application'],
-      }),
-      signal: controller.signal,
-    })
+/**
+ * Emails temporary admin credentials to the account address.
+ * Requires BREVO_API_KEY + NOTIFY_EMAIL_FROM (recipient is the admin email).
+ */
+export async function sendAdminRecoveryEmail(
+  toEmail: string,
+  payload: AdminRecoveryEmailPayload,
+  env: NodeJS.ProcessEnv = process.env,
+  fetchImpl: typeof fetch = fetch,
+): Promise<'sent' | 'skipped' | 'failed'> {
+  const config = readBrevoSenderEnv(env)
+  if (!config) return 'skipped'
 
-    if (!response.ok) {
-      const body = await response.text().catch(() => '')
-      console.error('Brevo notify failed:', response.status, body.slice(0, 500))
-      return 'failed'
-    }
-
-    return 'sent'
-  } catch (err) {
-    console.error('Brevo notify error:', err)
+  const sender = parseNotifyFrom(config.fromRaw)
+  if (!sender) {
+    console.error('Brevo recovery skipped: invalid NOTIFY_EMAIL_FROM')
     return 'failed'
-  } finally {
-    clearTimeout(timer)
   }
+
+  const to = toEmail.trim().toLowerCase()
+  if (!to.includes('@')) return 'failed'
+
+  const {subject, textContent, htmlContent} = buildAdminRecoveryEmail(payload)
+  return sendBrevoEmail(
+    {
+      apiKey: config.apiKey,
+      sender,
+      to,
+      subject,
+      textContent,
+      htmlContent,
+      tags: ['uaos-admin-recovery'],
+    },
+    fetchImpl,
+  )
 }

@@ -2,7 +2,13 @@ import {describe, expect, it} from 'vitest'
 import {generateTotpSecret, verifyTotpCode, buildOtpAuthUrl} from './totp.js'
 import {hashPassword, verifyPassword, hashToken, createSessionToken} from './crypto.js'
 import {roleHasPermission, roleRequiresMfa} from './policy.js'
-import {assertValidNewPassword} from './session.js'
+import {
+  assertValidNewPassword,
+  generateRecoveryMfaCode,
+  generateTempAdminPassword,
+  hashRecoveryMfaCode,
+  recoveryMfaHashesEqual,
+} from './session.js'
 
 describe('admin auth primitives', () => {
   it('hashes and verifies passwords', () => {
@@ -36,5 +42,19 @@ describe('admin auth primitives', () => {
     expect(() => assertValidNewPassword('has spaces here!!')).toThrow(/whitespace/)
     expect(() => assertValidNewPassword('a'.repeat(200))).toThrow(/too long/)
     expect(() => assertValidNewPassword('LongEnoughPass1')).not.toThrow()
+  })
+
+  it('generates temporary passwords that pass policy', () => {
+    const password = generateTempAdminPassword()
+    expect(() => assertValidNewPassword(password)).not.toThrow()
+    expect(password).not.toMatch(/\s/)
+  })
+
+  it('hashes recovery MFA codes in a timing-safe comparable form', () => {
+    const code = generateRecoveryMfaCode(() => Buffer.from([0, 0, 0, 42]))
+    expect(code).toMatch(/^\d{6}$/)
+    const hash = hashRecoveryMfaCode(code)
+    expect(recoveryMfaHashesEqual(hash, code)).toBe(true)
+    expect(recoveryMfaHashesEqual(hash, '000000')).toBe(false)
   })
 })

@@ -19,6 +19,11 @@ import {
   clearSessionCookie,
   confirmMfaSetup,
   createSession,
+  findAdminByEmail,
+  applyAdminPasswordRecovery,
+  generateRecoveryMfaCode,
+  generateTempAdminPassword,
+  RECOVERY_MFA_TTL_MINUTES,
   readSessionToken,
   resolveSession,
   revokeAllUserSessions,
@@ -29,6 +34,10 @@ import {
   changeAdminPassword,
   type AdminSessionContext,
 } from './_lib/auth/session.js'
+import {
+  isBrevoSenderConfigured,
+  sendAdminRecoveryEmail,
+} from './_lib/brevoNotify.js'
 import {isRecord, readStringOr} from '../src/lib/contentGuards.js'
 import {
   createMediaAsset,
@@ -153,6 +162,71 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         user: auth.user,
         mfaSetupRequired: !auth.user.mfaEnabled && auth.user.role !== 'editor',
       })
+    }
+
+    if (parts[1] === 'forgot-password' && method === 'POST') {
+      if (!requireMutationOrigin(req, res)) return
+      if (await isRateLimited(`admin-forgot:ip:${ip}`, 15 * 60 * 1000, 8)) {
+        return sendJsonError(res, 429, 'Too many requests')
+      }
+      if (!isBrevoSenderConfigured()) {
+        return sendJsonError(res, 503, 'Recovery email is not configured')
+      }
+
+      const body = parseJsonBody(req)
+      const email = isRecord(body) ? readStringOr(body.email, '').trim().toLowerCase() : ''
+      if (!email || !email.includes('@')) {
+        return sendJsonError(res, 400, 'Email required')
+      }
+      if (await isRateLimited(`admin-forgot:email:${email}`, 15 * 60 * 1000, 3)) {
+        return sendJsonError(res, 429, 'Too many requests')
+      }
+
+      const row = await findAdminByEmail(email)
+      // Uniform success — do not reveal whether the account exists
+      const uniformOk = () =>
+        res.status(200).json({
+          ok: true,
+          message: 'If the account exists, recovery credentials were emailed',
+        })
+
+      if (!row || !row.active) return uniformOk()
+
+      const userId = String(row.id)
+      const mfaEnabled = Boolean(row.mfa_enabled)
+      const tempPassword = generateTempAdminPassword()
+      const recoveryMfaCode = mfaEnabled ? generateRecoveryMfaCode() : null
+
+      await applyAdminPasswordRecovery({
+        userId,
+        tempPassword,
+        recoveryMfaCode,
+      })
+      await revokeAllUserSessions(userId)
+
+      const mail = await sendAdminRecoveryEmail(email, {
+        tempPassword,
+        mfaCode: recoveryMfaCode,
+        mfaEnabled,
+        expiresMinutes: RECOVERY_MFA_TTL_MINUTES,
+      })
+
+      await writeAuditEvent({
+        actorType: 'admin',
+        actorId: userId,
+        action: 'admin.password_recovery',
+        entityType: 'admin_user',
+        entityId: userId,
+        ip,
+        metadata: {mail},
+      })
+
+      if (mail !== 'sent') {
+        // Do not change the HTTP shape — enumeration-safe. Ops can reset via admin:create.
+        console.error('admin recovery email was not sent:', mail)
+      }
+
+      return uniformOk()
     }
 
     if (parts[1] === 'logout' && method === 'POST') {

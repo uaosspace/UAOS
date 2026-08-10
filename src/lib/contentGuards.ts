@@ -1,4 +1,5 @@
-import {LOCALES} from '../data/locales'
+// `.js` обовʼязковий для Vercel serverless ESM: API імпортує цей модуль напряму.
+import {LOCALES} from '../data/locales.js'
 import type {DocumentItem, EventFormat, EventType, LocalizedText, MemberProfileLevel} from '../types'
 
 type UnknownRecord = Record<string, unknown>

@@ -12,6 +12,13 @@ export const adminTranslations = {
     admin_password: 'Пароль',
     admin_mfa_code: 'Код MFA (якщо увімкнено)',
     admin_btn_login: 'Увійти',
+    admin_forgot_password: 'Забули пароль?',
+    admin_forgot_password_hint:
+      'На email облікового запису надішлемо тимчасовий пароль і одноразовий код MFA (якщо MFA увімкнено). Поточний пароль листом надіслати неможливо — у базі зберігається лише хеш.',
+    admin_forgot_password_sent:
+      'Якщо обліковий запис існує, лист із даними для входу надіслано на вказаний email.',
+    admin_forgot_password_need_email: 'Спочатку введіть email',
+    admin_forgot_unavailable: 'Відновлення пароля тимчасово недоступне',
     admin_invalid_credentials: 'Невірний логін або пароль',
     admin_loading: 'Завантаження…',
     admin_sign_out: 'Вийти',
@@ -160,6 +167,13 @@ export const adminTranslations = {
     admin_password: 'Password',
     admin_mfa_code: 'MFA code (if enabled)',
     admin_btn_login: 'Sign in',
+    admin_forgot_password: 'Forgot password?',
+    admin_forgot_password_hint:
+      'We will email a temporary password and a one-time MFA code (if MFA is enabled) to this account. The current password cannot be emailed — only a hash is stored.',
+    admin_forgot_password_sent:
+      'If the account exists, recovery credentials were emailed to the address above.',
+    admin_forgot_password_need_email: 'Enter your email first',
+    admin_forgot_unavailable: 'Password recovery is temporarily unavailable',
     admin_invalid_credentials: 'Invalid username or password',
     admin_loading: 'Loading…',
     admin_sign_out: 'Sign out',
