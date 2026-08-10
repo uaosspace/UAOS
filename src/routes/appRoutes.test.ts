@@ -23,9 +23,10 @@ describe('buildRoutePath', () => {
     expect(buildRoutePath(APP_ROUTES.join, 'es')).toBe('/es/join')
   })
 
-  it('never prefixes the admin route path regardless of locale (caller must avoid using it)', () => {
-    // buildRoutePath itself is generic; the app never calls it with a non-default locale for admin.
+  it('never prefixes the admin or cabinet route path regardless of locale (caller must avoid using it)', () => {
+    // buildRoutePath itself is generic; the app never calls it with a non-default locale for these shells.
     expect(buildRawRoutePath(APP_ROUTES.admin)).toBe('/admin')
+    expect(buildRawRoutePath(APP_ROUTES.cabinet)).toBe('/cabinet')
   })
 })
 
@@ -37,6 +38,7 @@ describe('matchRoutePath (locale-agnostic, receives an already-unprefixed path)'
     expect(matchRoutePath('/news')).toEqual({route: APP_ROUTES.newsList, params: {}})
     expect(matchRoutePath('/events')).toEqual({route: APP_ROUTES.eventsList, params: {}})
     expect(matchRoutePath('/admin')).toEqual({route: APP_ROUTES.admin, params: {}})
+    expect(matchRoutePath('/cabinet')).toEqual({route: APP_ROUTES.cabinet, params: {}})
   })
 
   it('matches slug-based details routes', () => {

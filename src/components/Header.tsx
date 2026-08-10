@@ -75,6 +75,14 @@ export default function Header({
               {t[item.key]}
             </button>
           ))}
+          <button
+            type="button"
+            className="nav-cabinet-in-menu"
+            aria-current={currentRoute === APP_ROUTES.cabinet ? 'page' : undefined}
+            onClick={() => handleNavClick(APP_ROUTES.cabinet)}
+          >
+            {t.cabinet_nav}
+          </button>
         </nav>
 
         <div className="header-actions">
@@ -120,9 +128,14 @@ export default function Header({
             <span className="arrow">→</span>
           </ScribbleLink>
 
-          <a className="header-admin-link" href="/admin" title={t.nav_admin}>
-            {t.nav_admin}
-          </a>
+          <button
+            type="button"
+            className="header-admin-link"
+            title={t.cabinet_nav}
+            onClick={() => handleNavClick(APP_ROUTES.cabinet)}
+          >
+            {t.cabinet_nav}
+          </button>
 
           <button
             className="menu-button"

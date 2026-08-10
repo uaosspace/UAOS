@@ -15,7 +15,8 @@
     "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
     "db:seed": "node --env-file=.env.local scripts/seed-db.mjs",
     "db:seed-members": "node --env-file=.env.local scripts/seed-members.mjs",
-    "admin:create": "node --env-file=.env.local scripts/create-admin.mjs"
+    "admin:create": "node --env-file=.env.local scripts/create-admin.mjs",
+    "member:create": "node --env-file=.env.local scripts/create-member-user.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

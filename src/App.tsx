@@ -30,6 +30,7 @@ import PrivacyRoutePage from './pages/PrivacyRoutePage'
 import TermsRoutePage from './pages/TermsRoutePage'
 import NotFoundPage from './pages/NotFoundPage'
 import AdminApp from './pages/admin/AdminApp'
+import CabinetApp from './pages/cabinet/CabinetApp'
 import PageTransition from './components/PageTransition'
 import {APP_ROUTES} from './routes/appRoutes'
 
@@ -89,12 +90,12 @@ export default function App() {
   }, [currentLang])
 
   // hreflang alternate links для поточного маршруту (SEO: URL — джерело істини для мови).
-  // Не рендериться для /admin — це закритий SPA-режим без публічної мовної схеми.
+  // Не рендериться для /admin та /cabinet — закритий SPA-режим без публічної мовної схеми.
   useEffect(() => {
     const existing = window.document.head.querySelectorAll('link[data-managed="hreflang"]')
     existing.forEach((el) => el.remove())
 
-    if (currentRoute === APP_ROUTES.admin) return
+    if (currentRoute === APP_ROUTES.admin || currentRoute === APP_ROUTES.cabinet) return
 
     const slug = routeParams.memberSlug ?? routeParams.newsSlug ?? routeParams.eventSlug ?? null
     const rawPath = buildRawRoutePath(currentRoute, slug)
@@ -259,11 +260,19 @@ export default function App() {
     mainContent = (
       <AdminApp currentLang={currentLang} setCurrentLang={setAdminLang} />
     )
+  } else if (currentRoute === APP_ROUTES.cabinet) {
+    mainContent = (
+      <CabinetApp
+        currentLang={currentLang}
+        setCurrentLang={setAdminLang}
+        onBackToSite={() => handleNavigation(APP_ROUTES.home)}
+      />
+    )
   } else {
     mainContent = <NotFoundPage currentLang={currentLang} onBackHome={() => handleNavigation(APP_ROUTES.home)} />
   }
 
-  if (currentRoute === APP_ROUTES.admin) {
+  if (currentRoute === APP_ROUTES.admin || currentRoute === APP_ROUTES.cabinet) {
     return (
       <>
         <SvgDefs />

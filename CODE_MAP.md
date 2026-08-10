@@ -20,17 +20,23 @@ UI (`JoinPage` → `JoinApplicationForm`) → `src/lib/joinRequests.ts` → `POS
 
 Маршрут SPA `/admin` → `src/pages/admin/AdminApp.tsx` (+ `ContentEditors.tsx`) → ` /api/admin/*` (session cookie HttpOnly, CSRF Origin, роли deny-by-default, MFA для PII-ролей) → Neon (+ Blob upload).
 
+### Кабинет участника (фундамент)
+
+Маршрут SPA `/cabinet` → `src/pages/cabinet/CabinetApp.tsx` → `/api/member/*` (отдельная cookie `uaos_member_session`, CSRF Origin). Учётки в `member_users` создаёт админ/ops (`POST /api/admin/member-users` или `npm run member:create`), опционально link на `content_members`. Без публичной саморегистрации. Stub после входа — основа под будущий профиль/документы.
+
 ## Точки входа
 
 | Файл | Роль |
 |------|------|
 | `src/main.tsx` | Client bootstrap |
-| `src/App.tsx` | Theme/lang/routing shell; `/admin` без публичного chrome |
+| `src/App.tsx` | Theme/lang/routing shell; `/admin` и `/cabinet` без публичного chrome |
 | `api/join.ts` | Join endpoint |
 | `api/public-router.ts` | Публичный контент (rewrite с `/api/public/*`) |
-| `api/admin-router.ts` | Auth, заявки, контент, media (rewrite с `/api/admin/*`) |
+| `api/admin-router.ts` | Auth, заявки, контент, media, создание member users (rewrite с `/api/admin/*`) |
+| `api/member-router.ts` | Member login/logout/me + cabinet stub (rewrite с `/api/member/*`) |
 | `api/public/[...route].ts` | Thin re-export `public-router` (не дублировать логику) |
 | `api/admin/[...route].ts` | Thin re-export `admin-router` (не дублировать логику) |
+| `api/member/[...route].ts` | Thin re-export `member-router` (не дублировать логику) |
 
 ## Слои
 
@@ -59,11 +65,11 @@ UI (`JoinPage` → `JoinApplicationForm`) → `src/lib/joinRequests.ts` → `POS
 | `api/_lib/rateLimitStore.ts` | Distributed rate limit |
 | `api/_lib/turnstile.ts` | Bot check |
 | `api/_lib/brevoNotify.ts` | Low-PII mail |
-| `api/_lib/auth/*` | Password/session/MFA/policy |
+| `api/_lib/auth/*` | Password/session/MFA/policy; `memberSession.ts` — отдельный контур участников |
 | `api/_lib/contentRepo.ts` | CMS tables; локализованные поля в `*_i18n` JSONB + dual-write в legacy `*_uk`/`*_en` |
 | `api/_lib/blobStore.ts` | Vercel Blob |
 | `db/migrations/*` | SQL migrations |
-| `scripts/migrate.mjs`, `seed-db.mjs`, `create-admin.mjs` | Ops scripts |
+| `scripts/migrate.mjs`, `seed-db.mjs`, `create-admin.mjs`, `create-member-user.mjs` | Ops scripts |
 | `studio/` | Placeholder «removed» (не рабочий CMS) |
 
 ## Контракты
@@ -71,10 +77,11 @@ UI (`JoinPage` → `JoinApplicationForm`) → `src/lib/joinRequests.ts` → `POS
 - `POST /api/join` JSON + ошибки HTTP (в т.ч. `noticeLanguage`: `uk`|`en`, `termsConsent`)
 - `GET /api/public/{members,news,events,documents,site-settings}`
 - ` /api/admin/*` session cookie + Origin на мутациях
+- `/api/member/*` отдельная session cookie (`uaos_member_session`) + Origin на мутациях; без доступа к admin/applications
 - UI-модели `src/types/*`; `LocalizedText` — uk/en обязательны, de/es/kk/fr опциональны
 - Переводы `src/data/translations/*`: публичные ключи полны для 6 локалей, `admin.ts` — uk/en
-- Маршрути: зокрема `/privacy`, `/terms`
-- URL — джерело істини для мови інтерфейсу: `uk` (default) без префіксу (`/`, `/members/slug`), решта 5 локалей — з префіксом (`/en/...`, `/de/...`, `/es/...`, `/kk/...`, `/fr/...`). Легасі uk-адреси без префіксу лишаються валідними. `localStorage.uaos_lang` — лише останнє переважання (persist для LanguageSwitcher і єдиний сигнал мови для `/admin`, де немає мовного префіксу); URL з явним префіксом або без нього ніколи не редиректиться мовчки через localStorage. `<link rel="alternate" hreflang>` (6 локалей + `x-default` → uk) генерується в рантаймі в `App.tsx` для кожного публічного маршруту (крім `/admin`).
+- Маршрути: зокрема `/privacy`, `/terms`, `/cabinet`
+- URL — джерело істини для мови інтерфейсу: `uk` (default) без префіксу (`/`, `/members/slug`), решта 5 локалей — з префіксом (`/en/...`, `/de/...`, `/es/...`, `/kk/...`, `/fr/...`). Легасі uk-адреси без префіксу лишаються валідними. `localStorage.uaos_lang` — лише останнє переважання (persist для LanguageSwitcher і єдиний сигнал мови для `/admin` та `/cabinet`, де немає мовного префіксу); URL з явним префіксом або без нього ніколи не редиректиться мовчки через localStorage. `<link rel="alternate" hreflang>` (6 локалей + `x-default` → uk) генерується в рантаймі в `App.tsx` для кожного публічного маршруту (крім `/admin` та `/cabinet`).
 - Локализованный контент в Neon: колонки `*_i18n` JSONB (`{uk,en,de,es,kk,fr}`); legacy `*_uk`/`*_en` сохраняются для совместимости
 - Env: `DATABASE_URL`, `SESSION_SECRET`, `MFA_ENC_KEY`, `BLOB_READ_WRITE_TOKEN`, `TURNSTILE_*`, `BREVO_*`, `SITE_URL`; `PRIVACY_POLICY_VERSION` — опциональный override поверх `src/lib/privacyPolicy.ts`
 - SEO (клієнтський шар, без SSR): `public/robots.txt`, `public/sitemap.xml` (origin = `PUBLIC_SITE_ORIGIN` / production `SITE_URL`), `useDocumentMeta` виставляє `canonical`, `og:*`, `twitter:*` після завантаження JS; `index.html` тримає uk-fallback meta для no-JS
@@ -91,4 +98,6 @@ UI (`JoinPage` → `JoinApplicationForm`) → `src/lib/joinRequests.ts` → `POS
 - Локализованный текст читается только через `resolveLocalized`, не прямым индексом по локали: незаполненная локаль обязана падать на английский, а не давать пустоту.
 - Запись контента пишет и `*_i18n`, и legacy-колонки, пока legacy не удалены отдельной миграцией.
 - `/privacy` и `/terms` существуют только на uk/en; остальные локали получают английский текст с явной пометкой об аутентичных версиях.
-- Handler-логика `/api/admin/*` и `/api/public/*` живёт только в `api/admin-router.ts` и `api/public-router.ts`; catch-all `api/admin/[...route].ts` и `api/public/[...route].ts` — только re-export.
+- Handler-логика `/api/admin/*`, `/api/public/*` и `/api/member/*` живёт только в `api/admin-router.ts`, `api/public-router.ts` и `api/member-router.ts`; catch-all `api/admin/[...route].ts`, `api/public/[...route].ts` и `api/member/[...route].ts` — только re-export.
+- Admin session (`uaos_admin_session`) и member session (`uaos_member_session`) не смешиваются; member API не выдаёт доступ к заявкам/админ-контенту.
+- Member-учётки не создаются публичной саморегистрацией — только admin/ops (`users.manage` или `member:create`).

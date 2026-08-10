@@ -4,6 +4,8 @@
     {"source": "/api/admin/(.*)", "destination": "/api/admin-router?route=$1"},
     {"source": "/api/public", "destination": "/api/public-router"},
     {"source": "/api/public/(.*)", "destination": "/api/public-router?route=$1"},
+    {"source": "/api/member", "destination": "/api/member-router"},
+    {"source": "/api/member/(.*)", "destination": "/api/member-router?route=$1"},
     {"source": "/api/(.*)", "destination": "/api/$1"},
     {
       "source": "/((?!api/|@|.*\\..*).*)",

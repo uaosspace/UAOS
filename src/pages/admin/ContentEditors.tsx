@@ -216,7 +216,7 @@ function LocaleTabs({
   onChange: (locale: Locale) => void
 }) {
   return (
-    <div className="md:col-span-2 flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2">
       {LOCALES.map((locale) => {
         const isActive = locale === active
         return (
@@ -240,6 +240,64 @@ function LocaleTabs({
           </button>
         )
       })}
+    </div>
+  )
+}
+
+function mergeTranslationDrafts(
+  current: Record<string, LocalizedText>,
+  translations: Record<string, Partial<Record<Locale, string>>>,
+): Record<string, LocalizedText> {
+  const next: Record<string, LocalizedText> = {}
+  for (const [key, value] of Object.entries(current)) {
+    const draft = {...value}
+    const localized = translations[key]
+    if (localized) {
+      for (const locale of LOCALES) {
+        const proposed = localized[locale]
+        if (proposed && !(draft[locale] ?? '').trim()) {
+          draft[locale] = proposed
+        }
+      }
+    }
+    next[key] = draft
+  }
+  return next
+}
+
+function LocaleToolbar({
+  active,
+  incomplete,
+  onChange,
+  onSuggest,
+  suggesting,
+  suggestLabel,
+  workingLabel,
+  hint,
+}: {
+  active: Locale
+  incomplete: Set<Locale>
+  onChange: (locale: Locale) => void
+  onSuggest: () => void
+  suggesting: boolean
+  suggestLabel: string
+  workingLabel: string
+  hint: string
+}) {
+  return (
+    <div className="md:col-span-2 space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <LocaleTabs active={active} incomplete={incomplete} onChange={onChange} />
+        <button
+          type="button"
+          className={adminSecondaryBtnClass}
+          disabled={suggesting}
+          onClick={onSuggest}
+        >
+          {suggesting ? workingLabel : suggestLabel}
+        </button>
+      </div>
+      <p className="text-xs text-brand-slate-500 dark:text-brand-slate-400">{hint}</p>
     </div>
   )
 }
@@ -357,6 +415,7 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
   const [eventItem, setEventItem] = useState<EventDraft>(emptyEvent())
   const [documentItem, setDocumentItem] = useState<DocumentDraft>(emptyDocument())
   const [fieldLocale, setFieldLocale] = useState<Locale>(DEFAULT_LOCALE)
+  const [translating, setTranslating] = useState(false)
   const [settings, setSettings] = useState<SettingsDraft>({
     phone: '',
     email: '',
@@ -364,6 +423,43 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
     brandTagline: emptyLocalized(),
   })
 
+  async function suggestTranslations(fields: Record<string, LocalizedText>) {
+    setError(null)
+    const payload: Record<string, string> = {}
+    for (const [key, value] of Object.entries(fields)) {
+      const text = (value[fieldLocale] ?? '').trim()
+      if (text) payload[key] = text
+    }
+    if (Object.keys(payload).length === 0) {
+      setError(t.admin_translate_need_source)
+      return null
+    }
+
+    setTranslating(true)
+    try {
+      const data = await api<{
+        translations: Record<string, Partial<Record<Locale, string>>>
+      }>('content/translate', {
+        method: 'POST',
+        body: JSON.stringify({
+          sourceLocale: fieldLocale,
+          fields: payload,
+        }),
+      })
+      setMessage(t.admin_translate_done)
+      return mergeTranslationDrafts(fields, data.translations)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Translation failed'
+      setError(
+        message.includes('not configured') || message.includes('Translation is not configured')
+          ? t.admin_translate_unavailable
+          : message,
+      )
+      return null
+    } finally {
+      setTranslating(false)
+    }
+  }
   const load = useCallback(async () => {
     setError(null)
     if (kind === 'settings') {
@@ -733,7 +829,7 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
           </label>
           <Field label={t.admin_field_slug} value={news.slug} onChange={(v) => setNews({...news, slug: v})} />
           {statusSelect(news.status, (v) => setNews({...news, status: v}))}
-          <LocaleTabs
+          <LocaleToolbar
             active={fieldLocale}
             incomplete={incompleteLocales(
               news.kind === 'internal'
@@ -741,6 +837,25 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
                 : [news.title, news.excerpt],
             )}
             onChange={setFieldLocale}
+            suggesting={translating}
+            suggestLabel={t.admin_translate_suggest}
+            workingLabel={t.admin_translate_working}
+            hint={t.admin_translate_hint}
+            onSuggest={() => {
+              void suggestTranslations(
+                news.kind === 'internal'
+                  ? {title: news.title, excerpt: news.excerpt, body: news.body}
+                  : {title: news.title, excerpt: news.excerpt},
+              ).then((merged) => {
+                if (!merged) return
+                setNews((prev) => ({
+                  ...prev,
+                  title: merged.title ?? prev.title,
+                  excerpt: merged.excerpt ?? prev.excerpt,
+                  body: merged.body ?? prev.body,
+                }))
+              })
+            }}
           />
           <LocalizedField
             label={t.admin_field_title_uk}
@@ -846,10 +961,29 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
           />
           <Field label={t.admin_field_website} value={member.websiteUrl} onChange={(v) => setMember({...member, websiteUrl: v})} />
           <div className="hidden md:block" aria-hidden />
-          <LocaleTabs
+          <LocaleToolbar
             active={fieldLocale}
             incomplete={incompleteLocales([member.name, member.category, member.shortDescription])}
             onChange={setFieldLocale}
+            suggesting={translating}
+            suggestLabel={t.admin_translate_suggest}
+            workingLabel={t.admin_translate_working}
+            hint={t.admin_translate_hint}
+            onSuggest={() => {
+              void suggestTranslations({
+                name: member.name,
+                category: member.category,
+                shortDescription: member.shortDescription,
+              }).then((merged) => {
+                if (!merged) return
+                setMember((prev) => ({
+                  ...prev,
+                  name: merged.name ?? prev.name,
+                  category: merged.category ?? prev.category,
+                  shortDescription: merged.shortDescription ?? prev.shortDescription,
+                }))
+              })
+            }}
           />
           <LocalizedField
             label={t.admin_field_name_uk}
@@ -930,10 +1064,27 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
         <form className={`${adminPanelClass} grid gap-3 md:grid-cols-2`} onSubmit={saveEvent}>
           {statusSelect(eventItem.status, (v) => setEventItem({...eventItem, status: v}))}
           <div className="hidden md:block" aria-hidden />
-          <LocaleTabs
+          <LocaleToolbar
             active={fieldLocale}
             incomplete={incompleteLocales([eventItem.title, eventItem.shortDescription])}
             onChange={setFieldLocale}
+            suggesting={translating}
+            suggestLabel={t.admin_translate_suggest}
+            workingLabel={t.admin_translate_working}
+            hint={t.admin_translate_hint}
+            onSuggest={() => {
+              void suggestTranslations({
+                title: eventItem.title,
+                shortDescription: eventItem.shortDescription,
+              }).then((merged) => {
+                if (!merged) return
+                setEventItem((prev) => ({
+                  ...prev,
+                  title: merged.title ?? prev.title,
+                  shortDescription: merged.shortDescription ?? prev.shortDescription,
+                }))
+              })
+            }}
           />
           <div className="md:col-span-2">
             <LocalizedField
@@ -1021,10 +1172,27 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
         <form className={`${adminPanelClass} grid gap-3 md:grid-cols-2`} onSubmit={saveDocument}>
           <Field label={t.admin_field_slug} value={documentItem.slug} onChange={(v) => setDocumentItem({...documentItem, slug: v})} />
           {statusSelect(documentItem.status, (v) => setDocumentItem({...documentItem, status: v}))}
-          <LocaleTabs
+          <LocaleToolbar
             active={fieldLocale}
             incomplete={incompleteLocales([documentItem.title, documentItem.description])}
             onChange={setFieldLocale}
+            suggesting={translating}
+            suggestLabel={t.admin_translate_suggest}
+            workingLabel={t.admin_translate_working}
+            hint={t.admin_translate_hint}
+            onSuggest={() => {
+              void suggestTranslations({
+                title: documentItem.title,
+                description: documentItem.description,
+              }).then((merged) => {
+                if (!merged) return
+                setDocumentItem((prev) => ({
+                  ...prev,
+                  title: merged.title ?? prev.title,
+                  description: merged.description ?? prev.description,
+                }))
+              })
+            }}
           />
           <LocalizedField
             label={t.admin_field_title_uk}
@@ -1090,10 +1258,27 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
         <form className={`${adminPanelClass} grid gap-3 md:grid-cols-2`} onSubmit={saveSettings}>
           <Field label={t.admin_field_phone} value={settings.phone} onChange={(v) => setSettings({...settings, phone: v})} />
           <Field label={t.admin_field_email} value={settings.email} onChange={(v) => setSettings({...settings, email: v})} />
-          <LocaleTabs
+          <LocaleToolbar
             active={fieldLocale}
             incomplete={incompleteLocales([settings.address, settings.brandTagline])}
             onChange={setFieldLocale}
+            suggesting={translating}
+            suggestLabel={t.admin_translate_suggest}
+            workingLabel={t.admin_translate_working}
+            hint={t.admin_translate_hint}
+            onSuggest={() => {
+              void suggestTranslations({
+                address: settings.address,
+                brandTagline: settings.brandTagline,
+              }).then((merged) => {
+                if (!merged) return
+                setSettings((prev) => ({
+                  ...prev,
+                  address: merged.address ?? prev.address,
+                  brandTagline: merged.brandTagline ?? prev.brandTagline,
+                }))
+              })
+            }}
           />
           <LocalizedField
             label={t.admin_field_address_uk}

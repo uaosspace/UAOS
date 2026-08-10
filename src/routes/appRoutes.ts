@@ -17,6 +17,7 @@ export const APP_ROUTES = {
   privacy: 'privacy',
   terms: 'terms',
   admin: 'admin',
+  cabinet: 'cabinet',
   notFound: 'not-found',
 } as const
 
@@ -53,6 +54,7 @@ export const ROUTE_PATHS: Record<AppRoute, string> = {
   privacy: '/privacy',
   terms: '/terms',
   admin: '/admin',
+  cabinet: '/cabinet',
   'not-found': '/',
 }
 
@@ -92,6 +94,7 @@ export function matchRoutePath(pathname: string): ParsedRoute {
     if (head === 'privacy') return {route: APP_ROUTES.privacy, params: {}}
     if (head === 'terms') return {route: APP_ROUTES.terms, params: {}}
     if (head === 'admin') return {route: APP_ROUTES.admin, params: {}}
+    if (head === 'cabinet') return {route: APP_ROUTES.cabinet, params: {}}
     if (head === 'members') return {route: APP_ROUTES.membersCatalog, params: {}}
     if (head === 'news') return {route: APP_ROUTES.newsList, params: {}}
     if (head === 'events') return {route: APP_ROUTES.eventsList, params: {}}
@@ -99,12 +102,14 @@ export function matchRoutePath(pathname: string): ParsedRoute {
 
   if (segments.length === 2 && second) {
     if (head === 'admin') return {route: APP_ROUTES.admin, params: {}}
+    if (head === 'cabinet') return {route: APP_ROUTES.cabinet, params: {}}
     if (head === 'members') return {route: APP_ROUTES.memberDetails, params: {memberSlug: second}}
     if (head === 'news') return {route: APP_ROUTES.newsDetails, params: {newsSlug: second}}
     if (head === 'events') return {route: APP_ROUTES.eventsDetails, params: {eventSlug: second}}
   }
 
   if (head === 'admin') return {route: APP_ROUTES.admin, params: {}}
+  if (head === 'cabinet') return {route: APP_ROUTES.cabinet, params: {}}
 
   return {route: APP_ROUTES.notFound, params: {}}
 }

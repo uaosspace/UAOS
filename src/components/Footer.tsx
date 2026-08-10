@@ -103,6 +103,9 @@ export default function Footer({
           <button type="button" onClick={onOpenTerms ?? (() => onNavigate(APP_ROUTES.terms))}>
             {t.footer_terms}
           </button>
+          <a href="/admin" className="footer-admin-link">
+            {t.nav_admin}
+          </a>
         </span>
       </div>
     </footer>

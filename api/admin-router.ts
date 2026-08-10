@@ -39,6 +39,11 @@ import {
   sendAdminRecoveryEmail,
 } from './_lib/brevoNotify.js'
 import {isRecord, readStringOr} from '../src/lib/contentGuards.js'
+import {LOCALES, type Locale} from '../src/data/locales.js'
+import {
+  isGeminiConfigured,
+  translateFieldsWithGemini,
+} from './_lib/geminiTranslate.js'
 import {
   createMediaAsset,
   deleteContentDocument,
@@ -59,6 +64,7 @@ import {
 } from './_lib/contentRepo.js'
 import {getBlobByPathname, putPublicBlob, putPrivateBlob} from './_lib/blobStore.js'
 import {fetchOgImageFromPageUrl} from './_lib/fetchOgImage.js'
+import {createMemberUser} from './_lib/auth/memberSession.js'
 
 type RouteResult = {handled: true} | {handled: false}
 
@@ -116,6 +122,18 @@ function requireMutationOrigin(req: VercelRequest, res: VercelResponse): boolean
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  try {
+    await handleAdminRequest(req, res)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Internal server error'
+    console.error('admin handler error:', message)
+    if (!res.headersSent) {
+      return sendJsonError(res, 500, 'Internal server error')
+    }
+  }
+}
+
+async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
   const parts = pathParts(req)
   const method = req.method || 'GET'
   const ip = getClientIp(req) || 'unknown'
@@ -467,6 +485,73 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Content CRUD
   if (parts[0] === 'content') {
     const entity = parts[1]
+
+    if (entity === 'translate' && method === 'POST') {
+      if (!requireMutationOrigin(req, res)) return
+      const session = await requireSession(req, res, 'content.write')
+      if (!session) return
+      if (await isRateLimited(`admin:translate:${session.user.id}`, 15 * 60 * 1000, 30)) {
+        return sendJsonError(res, 429, 'Too many requests')
+      }
+      if (!isGeminiConfigured()) {
+        return sendJsonError(res, 503, 'Translation is not configured')
+      }
+
+      const body = parseJsonBody(req)
+      const source = isRecord(body) ? body : {}
+      const sourceLocaleRaw = readStringOr(source.sourceLocale, '')
+      const sourceLocale = (LOCALES as readonly string[]).includes(sourceLocaleRaw)
+        ? (sourceLocaleRaw as Locale)
+        : null
+      if (!sourceLocale) return sendJsonError(res, 400, 'Invalid sourceLocale')
+
+      const targetRaw = source.targetLocales
+      const targetLocales = Array.isArray(targetRaw)
+        ? targetRaw
+            .filter((item): item is string => typeof item === 'string')
+            .filter((item): item is Locale => (LOCALES as readonly string[]).includes(item))
+        : []
+
+      const fieldsRaw = isRecord(source.fields) ? source.fields : {}
+      const fields: Record<string, string> = {}
+      for (const [key, value] of Object.entries(fieldsRaw)) {
+        if (typeof value === 'string' && value.trim()) fields[key] = value
+      }
+
+      try {
+        const result = await translateFieldsWithGemini({
+          sourceLocale,
+          targetLocales:
+            targetLocales.length > 0
+              ? targetLocales.filter((locale) => locale !== sourceLocale)
+              : LOCALES.filter((locale) => locale !== sourceLocale),
+          fields,
+        })
+        await writeAuditEvent({
+          actorType: 'admin',
+          actorId: session.user.id,
+          action: 'content.translate_draft',
+          ip,
+          metadata: {
+            sourceLocale,
+            targetLocales: result.translations
+              ? Object.keys(Object.values(result.translations)[0] || {})
+              : [],
+            fieldKeys: Object.keys(fields),
+            model: result.model,
+          },
+        })
+        return res.status(200).json({ok: true, translations: result.translations, model: result.model})
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Translation failed'
+        const status =
+          message.includes('not configured') || message.includes('Translation service')
+            ? 503
+            : 400
+        return sendJsonError(res, status, message)
+      }
+    }
+
     if (entity === 'members') {
       if (method === 'GET') {
         const session = await requireSession(req, res, 'content.read')
@@ -647,29 +732,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ]
     if (!allowed.includes(mimeType)) return sendJsonError(res, 400, 'Unsupported media type')
 
-    const uploaded =
-      visibility === 'private'
-        ? await putPrivateBlob(fileName, buffer, mimeType)
-        : await putPublicBlob(fileName, buffer, mimeType)
-    const asset = await createMediaAsset({
-      storageKey: uploaded.pathname,
-      url: uploaded.url,
-      visibility,
-      mimeType,
-      byteSize: buffer.byteLength,
-      originalName: fileName,
-      createdBy: session.user.id,
-    })
-    await writeAuditEvent({
-      actorType: 'admin',
-      actorId: session.user.id,
-      action: 'media.upload',
-      entityType: 'media',
-      entityId: asset.id,
-      ip,
-      metadata: {visibility, mimeType},
-    })
-    return res.status(200).json({asset})
+    try {
+      const uploaded =
+        visibility === 'private'
+          ? await putPrivateBlob(fileName, buffer, mimeType)
+          : await putPublicBlob(fileName, buffer, mimeType)
+      const asset = await createMediaAsset({
+        storageKey: uploaded.pathname,
+        url: uploaded.url,
+        visibility,
+        mimeType,
+        byteSize: buffer.byteLength,
+        originalName: fileName,
+        createdBy: session.user.id,
+      })
+      await writeAuditEvent({
+        actorType: 'admin',
+        actorId: session.user.id,
+        action: 'media.upload',
+        entityType: 'media',
+        entityId: asset.id,
+        ip,
+        metadata: {visibility, mimeType},
+      })
+      return res.status(200).json({asset})
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Upload failed'
+      console.error('media.upload failed:', message)
+      return sendJsonError(res, 400, message)
+    }
   }
 
   if (parts[0] === 'media' && parts[1] === 'fetch-og' && method === 'POST') {
@@ -708,6 +799,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await revokeAllUserSessions(session.user.id)
     clearSessionCookie(res, isSecureRequest(req))
     return res.status(200).json({ok: true})
+  }
+
+  // Provision member portal accounts (ops / users.manage). No public self-signup.
+  if (parts[0] === 'member-users' && method === 'POST') {
+    if (!requireMutationOrigin(req, res)) return
+    const session = await requireSession(req, res, 'users.manage')
+    if (!session) return
+    if (await isRateLimited(`admin:member-users:${session.user.id}`, 15 * 60 * 1000, 30)) {
+      return sendJsonError(res, 429, 'Too many requests')
+    }
+    const body = parseJsonBody(req)
+    const source = isRecord(body) ? body : {}
+    const email = readStringOr(source.email, '')
+    const password = readStringOr(source.password, '')
+    const displayName = readStringOr(source.displayName, '')
+    const memberIdRaw = readStringOr(source.memberId, '')
+    if (!email || !password) return sendJsonError(res, 400, 'email and password required')
+    try {
+      const user = await createMemberUser({
+        email,
+        password,
+        displayName,
+        memberId: memberIdRaw || null,
+      })
+      await writeAuditEvent({
+        actorType: 'admin',
+        actorId: session.user.id,
+        action: 'member_user.create',
+        entityType: 'member_user',
+        entityId: user.id,
+        ip,
+        metadata: {memberId: user.memberId},
+      })
+      return res.status(200).json({ok: true, user})
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Create failed'
+      return sendJsonError(res, 400, message)
+    }
   }
 
   return sendJsonError(res, 404, 'Not found')

@@ -63,11 +63,11 @@ function parseRouteFromLocation(): ParsedLocalizedRoute {
 }
 
 /**
- * Мова для маршруту `/admin` не кодується в URL (адмінка лишається без мовного префіксу),
- * тож для неї єдиний доступний сигнал — останній вибір користувача з localStorage.
+ * Мова для маршрутів `/admin` та `/cabinet` не кодується в URL (без мовного префіксу),
+ * тож для них єдиний доступний сигнал — останній вибір користувача з localStorage.
  */
 function deriveInitialLocale(parsed: ParsedLocalizedRoute): Locale {
-  if (parsed.route === APP_ROUTES.admin) {
+  if (parsed.route === APP_ROUTES.admin || parsed.route === APP_ROUTES.cabinet) {
     try {
       return parseStoredLocale(window.localStorage.getItem(LANG_STORAGE_KEY))
     } catch {
@@ -141,13 +141,13 @@ export function useAppNavigation() {
 
     /**
      * Синхронизирует state с текущим URL при back/forward и ручной смене адреса.
-     * Мова визначається виключно з URL (окрім `/admin`, де немає префіксу).
+     * Мова визначається виключно з URL (окрім `/admin` та `/cabinet`, де немає префіксу).
      */
     const handleLocationChange = () => {
       const nextRoute = parseRouteFromLocation()
       setCurrentRoute(nextRoute.route)
       setRouteParams(nextRoute.params)
-      if (nextRoute.route !== APP_ROUTES.admin) {
+      if (nextRoute.route !== APP_ROUTES.admin && nextRoute.route !== APP_ROUTES.cabinet) {
         setCurrentLangState(nextRoute.locale)
       }
     }
@@ -296,7 +296,7 @@ export function useAppNavigation() {
   )
 
   /**
-   * Пряма зміна мови без переписування URL — лише для `/admin`, де мовний префікс не
+   * Пряма зміна мови без переписування URL — для `/admin` та `/cabinet`, де мовний префікс не
    * використовується і мова інтерфейсу є суто локальним переключенням.
    */
   const setAdminLang = useCallback((nextLang: Locale) => {

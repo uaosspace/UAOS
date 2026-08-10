@@ -144,6 +144,7 @@
       color: var(--text);
       border-color: color-mix(in srgb, var(--yellow) 55%, var(--line));
     }
+    .nav-cabinet-in-menu { display: none; }
     /* Базові стилі .lang — у index.css (.lang-switcher .lang); тут лише розташування в хедері. */
 
     .theme-switch {
@@ -676,8 +677,19 @@
       .desktop-nav a::after { display: none; }
       .menu-button { display: grid; }
       .brand-copy span { display: none; }
-      /* Адмінка — десктопний сценарій; на вузьких екранах посилання витісняло кнопку меню за межі вікна. */
+      /* Кабінет у header-actions — десктоп; на вузьких екранах — пункт у висувному меню. */
       .header-admin-link { display: none; }
+      .nav-cabinet-in-menu {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 13px 7px;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 14.4px;
+        font-weight: 680;
+        background: transparent;
+      }
       .hero { min-height: 820px; }
       .hero-grid { min-height: 740px; }
       .hero-photos {

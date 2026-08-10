@@ -50,4 +50,9 @@ describe('URL → route + locale resolution', () => {
     expect(resolveRoute('/admin')).toEqual({route: APP_ROUTES.admin, params: {}, locale: 'uk'})
     expect(resolveRoute('/en/admin')).toEqual({route: APP_ROUTES.admin, params: {}, locale: 'en'})
   })
+
+  it('keeps cabinet reachable without a locale prefix', () => {
+    expect(resolveRoute('/cabinet')).toEqual({route: APP_ROUTES.cabinet, params: {}, locale: 'uk'})
+    expect(resolveRoute('/en/cabinet')).toEqual({route: APP_ROUTES.cabinet, params: {}, locale: 'en'})
+  })
 })

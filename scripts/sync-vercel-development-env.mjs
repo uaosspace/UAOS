@@ -21,7 +21,6 @@ const REQUIRED = [
   'MFA_ENC_KEY',
   'SESSION_SECRET',
   'SITE_URL',
-  'PRIVACY_POLICY_VERSION',
   'BLOB_READ_WRITE_TOKEN',
   'BLOB_STORE_ID',
   'VITE_TURNSTILE_SITE_KEY',
@@ -29,7 +28,18 @@ const REQUIRED = [
 ]
 
 /** Optional; sync if present in .env.local. */
-const OPTIONAL = ['BLOB_WEBHOOK_PUBLIC_KEY', 'BREVO_API_KEY', 'NOTIFY_EMAIL_TO', 'NOTIFY_EMAIL_FROM']
+const OPTIONAL = [
+  // Empty is valid: published policy version comes from src/lib/privacyPolicy.ts
+  'PRIVACY_POLICY_VERSION',
+  'BLOB_WEBHOOK_PUBLIC_KEY',
+  'UAOS_PRIVATE_READ_WRITE_TOKEN',
+  'UAOS_PRIVATE_BLOB_STORE_ID',
+  'BREVO_API_KEY',
+  'NOTIFY_EMAIL_TO',
+  'NOTIFY_EMAIL_FROM',
+  'GEMINI_API_KEY',
+  'GEMINI_MODEL',
+]
 
 function parseEnvFile(filePath) {
   const out = {}
