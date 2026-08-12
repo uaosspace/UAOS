@@ -7,6 +7,7 @@ import {readLocalizedText} from '../../lib/contentGuards'
 import type {LocalizedText} from '../../types'
 import {resolveContentSlug} from '../../utils/slugify'
 import {accessLevelLabel, localizedFieldLabel} from './adminLabels'
+import {describeAdminMeeting, type AdminMeetingInfo} from './meetingStatusCopy'
 import {
   adminInputClass,
   adminLabelClass,
@@ -432,7 +433,7 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
   const [news, setNews] = useState<NewsDraft>(emptyNews())
   const [member, setMember] = useState<MemberDraft>(emptyMember())
   const [eventItem, setEventItem] = useState<EventDraft>(emptyEvent())
-  const [meetingInfo, setMeetingInfo] = useState<Record<string, unknown> | null>(null)
+  const [meetingInfo, setMeetingInfo] = useState<AdminMeetingInfo | null>(null)
   const [reportInfo, setReportInfo] = useState<Record<string, unknown> | null>(null)
   const [reportSummary, setReportSummary] = useState('')
   const [documentItem, setDocumentItem] = useState<DocumentDraft>(emptyDocument())
@@ -637,7 +638,7 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
     try {
       const slug = resolveContentSlug(eventItem.slug, eventItem.title.uk, 'event')
       // location/organizer have no inputs here; omitting them keeps the stored translations.
-      await api('content/events', {
+      const data = await api<{item: Record<string, unknown>}>('content/events', {
         method: 'POST',
         body: JSON.stringify({
           id: eventItem.id,
@@ -657,11 +658,32 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
           timeZone: eventItem.timeZone || 'Europe/Kyiv',
         }),
       })
+      const savedId = String(data.item?.id ?? eventItem.id ?? '')
+      const savedSlug = String(data.item?.slug ?? slug)
+      setEventItem((prev) => ({
+        ...prev,
+        id: savedId || prev.id,
+        slug: savedSlug || prev.slug,
+      }))
       setMessage(t.admin_saved)
-      setEventItem(emptyEvent())
       await load()
+      if (savedId && eventItem.participationMode === 'zoom') {
+        await refreshMeetingStatus(savedId)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
+    }
+  }
+
+  async function refreshMeetingStatus(eventId: string) {
+    try {
+      const data = await api<{meeting: AdminMeetingInfo | null}>(
+        `content/events/${eventId}/meeting`,
+      )
+      setMeetingInfo(data.meeting)
+    } catch (err) {
+      setMeetingInfo(null)
+      setError(err instanceof Error ? err.message : 'Meeting status failed')
     }
   }
 
@@ -766,8 +788,10 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
   }
 
   function pickEvent(raw: Record<string, unknown>) {
+    const id = String(raw.id || '')
+    const participationMode = String(raw.participationMode || 'offline')
     setEventItem({
-      id: String(raw.id || ''),
+      id,
       slug: String(raw.slug || ''),
       status: raw.status === 'published' ? 'published' : 'draft',
       title: readLocalizedText(raw.title),
@@ -779,12 +803,16 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
       coverUrl: String(raw.coverUrl || raw.coverImageUrl || ''),
       visibility: raw.visibility === 'restricted' ? 'restricted' : 'public',
       accessMinRole: String(raw.accessMinRole || ''),
-      participationMode: String(raw.participationMode || 'offline'),
+      participationMode,
       onlineUrl: String(raw.onlineUrl || ''),
       timeZone: String(raw.timeZone || 'Europe/Kyiv'),
     })
     setMeetingInfo(null)
     setReportInfo(null)
+    setReportSummary('')
+    if (id && participationMode === 'zoom') {
+      void refreshMeetingStatus(id)
+    }
   }
 
   function pickDocument(raw: Record<string, unknown>) {
@@ -1294,12 +1322,20 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
               <button
                 className={adminSecondaryBtnClass}
                 type="button"
-                onClick={() => setEventItem(emptyEvent())}
+                onClick={() => {
+                  setEventItem(emptyEvent())
+                  setMeetingInfo(null)
+                  setReportInfo(null)
+                  setReportSummary('')
+                }}
               >
                 {t.admin_cancel}
               </button>
             ) : null}
           </div>
+          {eventItem.participationMode === 'zoom' && !eventItem.id ? (
+            <p className="md:col-span-2 text-sm text-brand-slate-500">{t.admin_meeting_save_first_hint}</p>
+          ) : null}
           {eventItem.id && eventItem.participationMode === 'zoom' ? (
             <div className="md:col-span-2 space-y-3 rounded-xl border border-brand-slate-200 p-3 dark:border-brand-slate-700">
               <p className="text-sm font-medium text-brand-slate-900 dark:text-white">
@@ -1311,13 +1347,13 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
                     className={adminSecondaryBtnClass}
                     type="button"
                     onClick={() => {
-                      void api<{meeting: Record<string, unknown>}>(
+                      void api<{meeting: AdminMeetingInfo}>(
                         `content/events/${eventItem.id}/meeting`,
                         {method: 'POST', body: JSON.stringify({provider: 'zoom'})},
                       )
                         .then((data) => {
                           setMeetingInfo(data.meeting)
-                          setMessage(t.admin_saved)
+                          setMessage(t.admin_meeting_created_ok)
                         })
                         .catch((err) => setError(err.message))
                     }}
@@ -1331,13 +1367,13 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
                     className={adminSecondaryBtnClass}
                     type="button"
                     onClick={() => {
-                      void api<{meeting: Record<string, unknown>}>(
+                      void api<{meeting: AdminMeetingInfo}>(
                         `content/events/${eventItem.id}/meeting/retry`,
                         {method: 'POST', body: '{}'},
                       )
                         .then((data) => {
                           setMeetingInfo(data.meeting)
-                          setMessage(t.admin_saved)
+                          setMessage(t.admin_meeting_updated_ok)
                         })
                         .catch((err) => setError(err.message))
                     }}
@@ -1351,11 +1387,7 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
                     className={adminSecondaryBtnClass}
                     type="button"
                     onClick={() => {
-                      void api<{meeting: Record<string, unknown> | null}>(
-                        `content/events/${eventItem.id}/meeting`,
-                      )
-                        .then((data) => setMeetingInfo(data.meeting))
-                        .catch((err) => setError(err.message))
+                      void refreshMeetingStatus(String(eventItem.id))
                     }}
                   >
                     {t.admin_meeting_status}
@@ -1371,7 +1403,10 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
                         method: 'POST',
                         body: JSON.stringify({limit: 10}),
                       })
-                        .then(() => setMessage(t.admin_saved))
+                        .then(() => {
+                          setMessage(t.admin_meeting_inbox_ok)
+                          if (eventItem.id) void refreshMeetingStatus(String(eventItem.id))
+                        })
                         .catch((err) => setError(err.message))
                     }}
                   >
@@ -1382,11 +1417,35 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
                   </p>
                 </div>
               </div>
-              {meetingInfo ? (
-                <pre className="overflow-x-auto text-xs text-brand-slate-600 dark:text-brand-slate-300">
-                  {JSON.stringify(meetingInfo, null, 2)}
-                </pre>
-              ) : null}
+              {(() => {
+                const view = describeAdminMeeting(meetingInfo, t)
+                return (
+                  <div className="space-y-2 rounded-lg border border-brand-slate-200 bg-brand-slate-50/60 p-3 text-sm dark:border-brand-slate-700 dark:bg-brand-slate-900/40">
+                    <p className="font-medium text-brand-slate-900 dark:text-white">{view.headline}</p>
+                    {view.schedule ? (
+                      <p className="text-brand-slate-600 dark:text-brand-slate-300">
+                        {t.admin_meeting_schedule_label}: {view.schedule}
+                      </p>
+                    ) : null}
+                    {view.missingJoin ? (
+                      <p className="text-amber-700 dark:text-amber-300">{t.admin_meeting_no_join_url}</p>
+                    ) : null}
+                    {view.error ? (
+                      <p className="text-red-600 dark:text-red-400">{view.error}</p>
+                    ) : null}
+                    {view.joinUrl ? (
+                      <a
+                        className="inline-flex text-brand-blue-600 underline underline-offset-2 dark:text-brand-sky-300"
+                        href={view.joinUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {t.admin_meeting_join_open}
+                      </a>
+                    ) : null}
+                  </div>
+                )
+              })()}
               <p className="text-sm font-medium text-brand-slate-900 dark:text-white">
                 {t.admin_report_block}
               </p>
