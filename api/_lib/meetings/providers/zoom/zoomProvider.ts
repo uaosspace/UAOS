@@ -90,6 +90,32 @@ function durationMinutes(startAt: string, endAt?: string | null): number {
   return Math.max(15, Math.round((end - start) / 60_000))
 }
 
+/**
+ * Zoom expects `start_time` as wall-clock in `timezone` without `Z`/offset.
+ * Passing UTC ISO (`…Z`) together with `timezone` makes Zoom mis-schedule
+ * (and often echo the account default TZ such as America/Los_Angeles).
+ */
+export function toZoomLocalStartTime(isoUtc: string, timeZone: string): string {
+  const date = new Date(isoUtc)
+  if (!Number.isFinite(date.getTime())) {
+    return isoUtc.replace(/\.\d{3}Z$/i, '').replace(/Z$/i, '')
+  }
+  const zone = timeZone.trim() || 'Europe/Kyiv'
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: zone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? '00'
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}`
+}
+
 function mapProviderMeeting(data: Record<string, unknown>): ProviderMeeting {
   return {
     externalId: String(data.id ?? ''),
@@ -160,12 +186,13 @@ export const zoomMeetingProvider: MeetingProvider = {
 
   async createMeeting(input: CreateMeetingInput): Promise<ProviderMeeting> {
     const {hostUserId} = requireZoomEnv()
+    const timezone = input.timezone?.trim() || 'Europe/Kyiv'
     const body = {
       topic: input.topic.slice(0, 200),
       type: 2,
-      start_time: input.startAt,
+      start_time: toZoomLocalStartTime(input.startAt, timezone),
       duration: durationMinutes(input.startAt, input.endAt),
-      timezone: input.timezone || 'Europe/Kyiv',
+      timezone,
       agenda: input.agenda?.slice(0, 2000) ?? '',
       settings: {
         waiting_room: input.waitingRoom !== false,
@@ -185,11 +212,12 @@ export const zoomMeetingProvider: MeetingProvider = {
   },
 
   async updateMeeting(externalId: string, input: CreateMeetingInput): Promise<ProviderMeeting> {
+    const timezone = input.timezone?.trim() || 'Europe/Kyiv'
     const body = {
       topic: input.topic.slice(0, 200),
-      start_time: input.startAt,
+      start_time: toZoomLocalStartTime(input.startAt, timezone),
       duration: durationMinutes(input.startAt, input.endAt),
-      timezone: input.timezone || 'Europe/Kyiv',
+      timezone,
       agenda: input.agenda?.slice(0, 2000) ?? '',
     }
     const response = await zoomFetch(`/meetings/${encodeURIComponent(externalId)}`, {

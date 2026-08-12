@@ -101,15 +101,16 @@ export async function createMeetingForEvent(input: {
       endAt: event.endAt,
       timezone: event.timezone,
     })
+    // Event times are source of truth; Zoom response TZ/start can reflect account defaults.
     const updated = await updateMeetingRow(pending.id, {
       externalId: created.externalId,
       externalUuid: created.externalUuid,
       joinUrl: created.joinUrl,
       startUrlEncrypted: encryptStartUrl(created.startUrl),
       status: 'ready',
-      scheduledStartAt: created.scheduledStartAt ?? event.startAt,
+      scheduledStartAt: event.startAt,
       scheduledEndAt: event.endAt,
-      timezone: created.timezone || event.timezone,
+      timezone: event.timezone,
       lastSyncError: '',
     })
     const meeting = updated!
@@ -118,7 +119,7 @@ export async function createMeetingForEvent(input: {
       kind: 'created',
       accessMinRole: event.accessMinRole,
       title: topicFromEvent(event),
-      startAt: meeting.scheduledStartAt ?? event.startAt,
+      startAt: event.startAt,
       eventSlug: event.slug,
     }).catch((err) => console.error('meeting created notify failed:', err))
     return {meeting: toMeetingPublicDto(meeting)}

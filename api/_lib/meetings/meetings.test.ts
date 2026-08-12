@@ -11,6 +11,7 @@ import {
 import {MeetingProviderRegistry} from './registry.js'
 import {
   buildZoomCrcResponse,
+  toZoomLocalStartTime,
   verifyZoomWebhookSignature,
 } from './providers/zoom/zoomProvider.js'
 import {ProviderNotImplementedError} from './types.js'
@@ -100,6 +101,15 @@ describe('meeting notify urls', () => {
   it('builds event page urls from SITE_URL', () => {
     expect(buildEventPageUrl('board-q1', {SITE_URL: 'https://uaos.example/'})).toBe(
       'https://uaos.example/events/board-q1',
+    )
+  })
+})
+
+describe('Zoom local start_time', () => {
+  it('formats UTC ISO as Kyiv wall clock without Z for Zoom API', () => {
+    // 16:00 Europe/Kyiv (EEST, UTC+3) on 2026-08-12
+    expect(toZoomLocalStartTime('2026-08-12T13:00:00.000Z', 'Europe/Kyiv')).toBe(
+      '2026-08-12T16:00:00',
     )
   })
 })
