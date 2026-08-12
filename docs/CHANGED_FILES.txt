@@ -341,3 +341,5 @@ api/_lib/provisionCabinet.test.ts
 api/_lib/meetings/memberCabinetEvents.ts
 src/lib/cabinetApiErrors.ts
 src/lib/cabinetApiErrors.test.ts
+src/pages/admin/ContentEditors.tsx
+src/data/translations/admin.ts

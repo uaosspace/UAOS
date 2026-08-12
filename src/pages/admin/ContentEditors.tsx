@@ -1305,65 +1305,82 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
               <p className="text-sm font-medium text-brand-slate-900 dark:text-white">
                 {t.admin_meeting_block}
               </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  className={adminSecondaryBtnClass}
-                  type="button"
-                  onClick={() => {
-                    void api<{meeting: Record<string, unknown> | null}>(
-                      `content/events/${eventItem.id}/meeting`,
-                    )
-                      .then((data) => setMeetingInfo(data.meeting))
-                      .catch((err) => setError(err.message))
-                  }}
-                >
-                  {t.admin_meeting_status}
-                </button>
-                <button
-                  className={adminSecondaryBtnClass}
-                  type="button"
-                  onClick={() => {
-                    void api<{meeting: Record<string, unknown>}>(
-                      `content/events/${eventItem.id}/meeting`,
-                      {method: 'POST', body: JSON.stringify({provider: 'zoom'})},
-                    )
-                      .then((data) => {
-                        setMeetingInfo(data.meeting)
-                        setMessage(t.admin_saved)
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <button
+                    className={adminSecondaryBtnClass}
+                    type="button"
+                    onClick={() => {
+                      void api<{meeting: Record<string, unknown>}>(
+                        `content/events/${eventItem.id}/meeting`,
+                        {method: 'POST', body: JSON.stringify({provider: 'zoom'})},
+                      )
+                        .then((data) => {
+                          setMeetingInfo(data.meeting)
+                          setMessage(t.admin_saved)
+                        })
+                        .catch((err) => setError(err.message))
+                    }}
+                  >
+                    {t.admin_meeting_create}
+                  </button>
+                  <p className="text-xs text-brand-slate-500">{t.admin_meeting_create_hint}</p>
+                </div>
+                <div className="space-y-1">
+                  <button
+                    className={adminSecondaryBtnClass}
+                    type="button"
+                    onClick={() => {
+                      void api<{meeting: Record<string, unknown>}>(
+                        `content/events/${eventItem.id}/meeting/retry`,
+                        {method: 'POST', body: '{}'},
+                      )
+                        .then((data) => {
+                          setMeetingInfo(data.meeting)
+                          setMessage(t.admin_saved)
+                        })
+                        .catch((err) => setError(err.message))
+                    }}
+                  >
+                    {t.admin_meeting_retry}
+                  </button>
+                  <p className="text-xs text-brand-slate-500">{t.admin_meeting_retry_hint}</p>
+                </div>
+                <div className="space-y-1">
+                  <button
+                    className={adminSecondaryBtnClass}
+                    type="button"
+                    onClick={() => {
+                      void api<{meeting: Record<string, unknown> | null}>(
+                        `content/events/${eventItem.id}/meeting`,
+                      )
+                        .then((data) => setMeetingInfo(data.meeting))
+                        .catch((err) => setError(err.message))
+                    }}
+                  >
+                    {t.admin_meeting_status}
+                  </button>
+                  <p className="text-xs text-brand-slate-500">{t.admin_meeting_status_hint}</p>
+                </div>
+                <div className="space-y-1">
+                  <button
+                    className={adminSecondaryBtnClass}
+                    type="button"
+                    onClick={() => {
+                      void api('meetings/process-inbox', {
+                        method: 'POST',
+                        body: JSON.stringify({limit: 10}),
                       })
-                      .catch((err) => setError(err.message))
-                  }}
-                >
-                  {t.admin_meeting_create}
-                </button>
-                <button
-                  className={adminSecondaryBtnClass}
-                  type="button"
-                  onClick={() => {
-                    void api<{meeting: Record<string, unknown>}>(
-                      `content/events/${eventItem.id}/meeting/retry`,
-                      {method: 'POST', body: '{}'},
-                    )
-                      .then((data) => {
-                        setMeetingInfo(data.meeting)
-                        setMessage(t.admin_saved)
-                      })
-                      .catch((err) => setError(err.message))
-                  }}
-                >
-                  {t.admin_meeting_retry}
-                </button>
-                <button
-                  className={adminSecondaryBtnClass}
-                  type="button"
-                  onClick={() => {
-                    void api('meetings/process-inbox', {method: 'POST', body: JSON.stringify({limit: 10})})
-                      .then(() => setMessage(t.admin_saved))
-                      .catch((err) => setError(err.message))
-                  }}
-                >
-                  {t.admin_meeting_process_inbox}
-                </button>
+                        .then(() => setMessage(t.admin_saved))
+                        .catch((err) => setError(err.message))
+                    }}
+                  >
+                    {t.admin_meeting_process_inbox}
+                  </button>
+                  <p className="text-xs text-brand-slate-500">
+                    {t.admin_meeting_process_inbox_hint}
+                  </p>
+                </div>
               </div>
               {meetingInfo ? (
                 <pre className="overflow-x-auto text-xs text-brand-slate-600 dark:text-brand-slate-300">
