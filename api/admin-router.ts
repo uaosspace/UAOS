@@ -71,6 +71,7 @@ import {
 } from './_lib/auth/memberSession.js'
 import {
   approveReportForEvent,
+  cancelExternalMeetingForEvent,
   createMeetingForEvent,
   getMeetingBundleForEvent,
   getMeetingDtoForEvent,
@@ -813,6 +814,8 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
         if (!requireMutationOrigin(req, res)) return
         const session = await requireSession(req, res, 'content.write')
         if (!session) return
+        // Zoom first (no orphan meetings), then DB row + cover Blob cleanup.
+        await cancelExternalMeetingForEvent(parts[2])
         await deleteContentEvent(parts[2])
         return res.status(200).json({ok: true})
       }

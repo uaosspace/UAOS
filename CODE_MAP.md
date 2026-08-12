@@ -43,6 +43,7 @@ Webhook: `POST /api/webhooks/meetings/:provider` → verify → inbox `pending` 
 Cron: `GET|POST /api/cron/meetings` (`CRON_SECRET`) daily at 06:00 UTC (Hobby limit; admin can run manually).
 Админ-вкладка «Управління зібраннями»: список, протоколы/источники, скачивание `.md`, настройки адресов, inbox.
 События: `content_events.participation_mode` (`offline` | `zoom` | `online_link` | `phone` | `other`); Zoom/протокол только при `zoom`.
+Удаление события в админке: сначала cancel Zoom + очистка inbox, затем DELETE события (CASCADE meetings/…) и `releaseOwnedMediaIfUnused` для обложки; у новостей при DELETE — то же для `cover_url`.
 Инварианты: provider TEXT; AI draft ≠ approved; start_url не в public DTO; joinUrl только после проверки доступа.
 Чеклист: `docs/MEETINGS_STAGING_CHECKLIST.md`.
 

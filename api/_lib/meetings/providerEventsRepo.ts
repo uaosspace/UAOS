@@ -114,3 +114,20 @@ export async function listPendingProviderEvents(limit = 20): Promise<ProviderEve
   `
   return rows.map((row) => mapEvent(row as Record<string, unknown>))
 }
+
+/** Drops leftover Zoom/webhook inbox rows for a meeting that is being removed. */
+export async function deleteProviderEventsForExternalMeeting(
+  provider: string,
+  externalMeetingId: string,
+): Promise<number> {
+  const externalId = externalMeetingId.trim()
+  if (!externalId) return 0
+  const sql = getSql()
+  const rows = await sql`
+    DELETE FROM meeting_provider_events
+    WHERE provider = ${provider.trim().toLowerCase()}
+      AND external_meeting_id = ${externalId}
+    RETURNING id
+  `
+  return rows.length
+}

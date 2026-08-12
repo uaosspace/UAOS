@@ -205,3 +205,66 @@ describe('createMeetingForEvent participation mode', () => {
     vi.resetModules()
   })
 })
+
+describe('cancelExternalMeetingForEvent', () => {
+  it('cancels Zoom then clears inbox rows', async () => {
+    vi.resetModules()
+    const cancelMeeting = vi.fn().mockResolvedValue(undefined)
+    const updateMeetingRow = vi.fn().mockResolvedValue({})
+    const deleteProviderEventsForExternalMeeting = vi.fn().mockResolvedValue(2)
+    vi.doMock('./meetingsRepo.js', () => ({
+      getMeetingByEventId: vi.fn().mockResolvedValue({
+        id: 'm-1',
+        eventId: 'ev-1',
+        provider: 'zoom',
+        externalId: '82473713439',
+        status: 'ready',
+      }),
+      updateMeetingRow,
+    }))
+    vi.doMock('./providerEventsRepo.js', () => ({
+      deleteProviderEventsForExternalMeeting,
+      claimProviderEvent: vi.fn(),
+      completeProviderEvent: vi.fn(),
+      getProviderEventById: vi.fn(),
+      insertProviderEvent: vi.fn(),
+      listPendingProviderEvents: vi.fn(),
+    }))
+    vi.doMock('./registry.js', () => ({
+      MeetingProviderRegistry: {
+        get: () => ({cancelMeeting}),
+      },
+    }))
+    const {cancelExternalMeetingForEvent} = await import('./meetingService.js')
+    await expect(cancelExternalMeetingForEvent('ev-1')).resolves.toEqual({
+      cancelled: true,
+      provider: 'zoom',
+      externalId: '82473713439',
+    })
+    expect(cancelMeeting).toHaveBeenCalledWith('82473713439')
+    expect(updateMeetingRow).toHaveBeenCalledWith(
+      'm-1',
+      expect.objectContaining({status: 'cancelled'}),
+    )
+    expect(deleteProviderEventsForExternalMeeting).toHaveBeenCalledWith('zoom', '82473713439')
+    vi.doUnmock('./meetingsRepo.js')
+    vi.doUnmock('./providerEventsRepo.js')
+    vi.doUnmock('./registry.js')
+    vi.resetModules()
+  })
+
+  it('is a no-op when the event has no meeting row', async () => {
+    vi.resetModules()
+    vi.doMock('./meetingsRepo.js', () => ({
+      getMeetingByEventId: vi.fn().mockResolvedValue(null),
+    }))
+    const {cancelExternalMeetingForEvent} = await import('./meetingService.js')
+    await expect(cancelExternalMeetingForEvent('ev-missing')).resolves.toEqual({
+      cancelled: false,
+      provider: null,
+      externalId: null,
+    })
+    vi.doUnmock('./meetingsRepo.js')
+    vi.resetModules()
+  })
+})

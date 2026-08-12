@@ -23,6 +23,7 @@ import {
 import {
   claimProviderEvent,
   completeProviderEvent,
+  deleteProviderEventsForExternalMeeting,
   getProviderEventById,
   insertProviderEvent,
   listPendingProviderEvents,
@@ -173,6 +174,35 @@ export async function retryMeetingForEvent(eventId: string) {
     })
     throw Object.assign(new Error(message), {meeting: updated ? toMeetingPublicDto(updated) : null})
   }
+}
+
+/**
+ * Cancels the provider meeting (Zoom DELETE) before the event row is removed.
+ * No-op when there is no linked external meeting. Zoom 404 is treated as already gone.
+ */
+export async function cancelExternalMeetingForEvent(eventId: string): Promise<{
+  cancelled: boolean
+  provider: string | null
+  externalId: string | null
+}> {
+  const meeting = await getMeetingByEventId(eventId)
+  if (!meeting) {
+    return {cancelled: false, provider: null, externalId: null}
+  }
+
+  const externalId = meeting.externalId.trim()
+  if (!externalId || meeting.status === 'cancelled') {
+    if (externalId) {
+      await deleteProviderEventsForExternalMeeting(meeting.provider, externalId)
+    }
+    return {cancelled: false, provider: meeting.provider, externalId: externalId || null}
+  }
+
+  const provider = MeetingProviderRegistry.get(meeting.provider)
+  await provider.cancelMeeting(externalId)
+  await updateMeetingRow(meeting.id, {status: 'cancelled', lastSyncError: ''})
+  await deleteProviderEventsForExternalMeeting(meeting.provider, externalId)
+  return {cancelled: true, provider: meeting.provider, externalId}
 }
 
 export async function getMeetingDtoForEvent(eventId: string) {

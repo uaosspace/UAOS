@@ -522,7 +522,14 @@ export async function upsertContentNews(body: unknown) {
 
 export async function deleteContentNews(id: string) {
   const sql = getSql()
+  const existing = await sql`
+    SELECT cover_url FROM content_news WHERE id = ${id}::uuid LIMIT 1
+  `
+  const coverUrl = String((existing[0] as {cover_url?: unknown} | undefined)?.cover_url ?? '')
   await sql`DELETE FROM content_news WHERE id = ${id}::uuid`
+  if (coverUrl) {
+    await releaseOwnedMediaIfUnused(coverUrl)
+  }
 }
 
 export async function upsertContentEvent(body: unknown) {
