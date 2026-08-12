@@ -93,6 +93,8 @@ export default function CabinetApp({currentLang, setCurrentLang, onBackToSite}: 
   const [newPassword, setNewPassword] = useState('')
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null)
   const [settingsBusy, setSettingsBusy] = useState(false)
+  const [recoveryNotice, setRecoveryNotice] = useState<string | null>(null)
+  const [forgotBusy, setForgotBusy] = useState(false)
 
   const mapError = useCallback(
     (err: unknown, fallback?: string) => {
@@ -135,6 +137,7 @@ export default function CabinetApp({currentLang, setCurrentLang, onBackToSite}: 
   async function handleLogin(event: FormEvent) {
     event.preventDefault()
     setError(null)
+    setRecoveryNotice(null)
     setBusy(true)
     try {
       const data = await api<{user: MemberUser; items?: CabinetEvent[]}>('auth/login', {
@@ -160,6 +163,29 @@ export default function CabinetApp({currentLang, setCurrentLang, onBackToSite}: 
       setUser(null)
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function handleForgotPassword() {
+    setError(null)
+    setRecoveryNotice(null)
+    const trimmed = email.trim()
+    if (!trimmed) {
+      setError(t.cabinet_forgot_need_email)
+      return
+    }
+    setForgotBusy(true)
+    try {
+      await api<{ok: boolean}>('auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({email: trimmed}),
+      })
+      setRecoveryNotice(t.cabinet_forgot_sent)
+      setPassword('')
+    } catch (err) {
+      setError(mapError(err, t.cabinet_forgot_unavailable))
+    } finally {
+      setForgotBusy(false)
     }
   }
 
@@ -280,6 +306,11 @@ export default function CabinetApp({currentLang, setCurrentLang, onBackToSite}: 
             </p>
           </div>
           {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+          {recoveryNotice ? (
+            <p className="text-sm text-brand-blue-600 dark:text-brand-sky-300" role="status">
+              {recoveryNotice}
+            </p>
+          ) : null}
           <label className="block space-y-1.5">
             <span className={adminLabelClass}>{t.cabinet_email}</span>
             <input
@@ -302,9 +333,20 @@ export default function CabinetApp({currentLang, setCurrentLang, onBackToSite}: 
               required
             />
           </label>
-          <button type="submit" className={adminPrimaryBtnClass} disabled={busy}>
+          <button type="submit" className={adminPrimaryBtnClass} disabled={busy || forgotBusy}>
             {busy ? t.cabinet_loading : t.cabinet_sign_in}
           </button>
+          <button
+            type="button"
+            className={`${adminSecondaryBtnClass} w-full`}
+            disabled={busy || forgotBusy}
+            onClick={() => void handleForgotPassword()}
+          >
+            {forgotBusy ? t.cabinet_loading : t.cabinet_forgot_password}
+          </button>
+          <p className="text-xs leading-relaxed text-brand-slate-500 dark:text-brand-slate-400">
+            {t.cabinet_forgot_password_hint}
+          </p>
         </form>
       ) : (
         <section className={`${adminPanelClass} space-y-4`}>

@@ -42,6 +42,7 @@ export default function MemberUsersEditor({currentLang}: {currentLang: Locale}) 
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [levelDrafts, setLevelDrafts] = useState<Record<string, string>>({})
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const data = await api<{items: Array<CabinetUser & {roles?: string[]}>}>('member-users')
@@ -93,6 +94,22 @@ export default function MemberUsersEditor({currentLang}: {currentLang: Locale}) 
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
+    }
+  }
+
+  async function deleteUser(userId: string, userEmail: string) {
+    if (!window.confirm(`${t.admin_cabinet_user_delete_confirm}\n${userEmail}`)) return
+    setError(null)
+    setMessage(null)
+    setDeletingId(userId)
+    try {
+      await api(`member-users/${userId}`, {method: 'DELETE'})
+      setMessage(t.admin_cabinet_user_deleted)
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.admin_cabinet_user_delete_failed)
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -168,9 +185,19 @@ export default function MemberUsersEditor({currentLang}: {currentLang: Locale}) 
                 ))}
               </select>
             </label>
-            <button className={adminSecondaryBtnClass} type="button" onClick={() => void saveLevel(item.id)}>
-              {t.admin_cabinet_user_save_access}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button className={adminSecondaryBtnClass} type="button" onClick={() => void saveLevel(item.id)}>
+                {t.admin_cabinet_user_save_access}
+              </button>
+              <button
+                className={`${adminSecondaryBtnClass} border-red-300 text-red-700 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/40`}
+                type="button"
+                disabled={deletingId === item.id}
+                onClick={() => void deleteUser(item.id, item.email)}
+              >
+                {deletingId === item.id ? t.admin_loading : t.admin_cabinet_user_delete}
+              </button>
+            </div>
           </li>
         ))}
       </ul>

@@ -51,6 +51,12 @@ export const membershipTranslations = {
     cabinet_sign_in: 'Увійти',
     cabinet_sign_out: 'Вийти',
     cabinet_loading: 'Завантаження…',
+    cabinet_forgot_password: 'Скинути пароль',
+    cabinet_forgot_password_hint:
+      'На email облікового запису надішлемо тимчасовий пароль. Після входу змініть його в налаштуваннях.',
+    cabinet_forgot_need_email: 'Спочатку введіть email',
+    cabinet_forgot_sent: 'Якщо обліковий запис існує, лист із тимчасовим паролем надіслано на вказаний email.',
+    cabinet_forgot_unavailable: 'Відновлення пароля тимчасово недоступне',
     cabinet_invalid_credentials: 'Невірний email або пароль',
     cabinet_welcome: 'Ви увійшли',
     cabinet_stub_title: 'Кабінет учасника',
@@ -147,6 +153,13 @@ export const membershipTranslations = {
     cabinet_sign_in: 'Sign in',
     cabinet_sign_out: 'Sign out',
     cabinet_loading: 'Loading…',
+    cabinet_forgot_password: 'Reset password',
+    cabinet_forgot_password_hint:
+      'We will email a temporary password to the account address. Change it in settings after sign-in.',
+    cabinet_forgot_need_email: 'Enter your email first',
+    cabinet_forgot_sent:
+      'If the account exists, a temporary password was emailed to that address.',
+    cabinet_forgot_unavailable: 'Password recovery is temporarily unavailable',
     cabinet_invalid_credentials: 'Invalid email or password',
     cabinet_welcome: 'You are signed in',
     cabinet_stub_title: 'Member cabinet',
@@ -247,6 +260,13 @@ export const membershipTranslations = {
     cabinet_sign_in: 'Anmelden',
     cabinet_sign_out: 'Abmelden',
     cabinet_loading: 'Laden…',
+    cabinet_forgot_password: 'Passwort zurücksetzen',
+    cabinet_forgot_password_hint:
+      'Wir senden ein temporäres Passwort an die Konto-E-Mail. Bitte danach in den Einstellungen ändern.',
+    cabinet_forgot_need_email: 'Bitte zuerst E-Mail eingeben',
+    cabinet_forgot_sent:
+      'Falls das Konto existiert, wurde ein temporäres Passwort an diese E-Mail gesendet.',
+    cabinet_forgot_unavailable: 'Passwortwiederherstellung ist vorübergehend nicht verfügbar',
     cabinet_invalid_credentials: 'Ungültige E-Mail oder Passwort',
     cabinet_welcome: 'Sie sind angemeldet',
     cabinet_stub_title: 'Mitgliederbereich',
@@ -347,6 +367,13 @@ export const membershipTranslations = {
     cabinet_sign_in: 'Iniciar sesión',
     cabinet_sign_out: 'Cerrar sesión',
     cabinet_loading: 'Cargando…',
+    cabinet_forgot_password: 'Restablecer contraseña',
+    cabinet_forgot_password_hint:
+      'Enviaremos una contraseña temporal al correo de la cuenta. Cámbiela en ajustes después de entrar.',
+    cabinet_forgot_need_email: 'Introduzca primero el correo',
+    cabinet_forgot_sent:
+      'Si la cuenta existe, se envió una contraseña temporal a ese correo.',
+    cabinet_forgot_unavailable: 'La recuperación de contraseña no está disponible temporalmente',
     cabinet_invalid_credentials: 'Correo o contraseña no válidos',
     cabinet_welcome: 'Ha iniciado sesión',
     cabinet_stub_title: 'Área de miembros',
@@ -443,6 +470,13 @@ export const membershipTranslations = {
     cabinet_sign_in: 'Кіру',
     cabinet_sign_out: 'Шығу',
     cabinet_loading: 'Жүктелуде…',
+    cabinet_forgot_password: 'Құпия сөзді қалпына келтіру',
+    cabinet_forgot_password_hint:
+      'Тіркелгі поштасына уақытша құпия сөз жібереміз. Кіргеннен кейін баптауларда өзгертіңіз.',
+    cabinet_forgot_need_email: 'Алдымен email енгізіңіз',
+    cabinet_forgot_sent:
+      'Егер тіркелгі бар болса, уақытша құпия сөз сол email-ге жіберілді.',
+    cabinet_forgot_unavailable: 'Құпия сөзді қалпына келтіру уақытша қолжетімсіз',
     cabinet_invalid_credentials: 'Email немесе құпия сөз қате',
     cabinet_welcome: 'Сіз кірдіңіз',
     cabinet_stub_title: 'Қатысушы кабинеті',
@@ -543,6 +577,13 @@ export const membershipTranslations = {
     cabinet_sign_in: 'Se connecter',
     cabinet_sign_out: 'Se déconnecter',
     cabinet_loading: 'Chargement…',
+    cabinet_forgot_password: 'Réinitialiser le mot de passe',
+    cabinet_forgot_password_hint:
+      'Nous enverrons un mot de passe temporaire à l’e-mail du compte. Changez-le dans les paramètres après connexion.',
+    cabinet_forgot_need_email: 'Saisissez d’abord l’e-mail',
+    cabinet_forgot_sent:
+      'Si le compte existe, un mot de passe temporaire a été envoyé à cette adresse.',
+    cabinet_forgot_unavailable: 'La récupération du mot de passe est temporairement indisponible',
     cabinet_invalid_credentials: 'E-mail ou mot de passe incorrect',
     cabinet_welcome: 'Vous êtes connecté',
     cabinet_stub_title: 'Espace membre',

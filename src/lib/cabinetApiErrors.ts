@@ -25,6 +25,8 @@ export function localizeCabinetApiError(message: string | null | undefined, t: C
   if (raw === 'Unauthorized') return t.cabinet_unauthorized
   if (raw === 'Forbidden') return t.cabinet_forbidden
   if (raw === 'Too many requests') return t.cabinet_too_many_requests
+  if (raw.includes('Recovery email is not configured')) return t.cabinet_forgot_unavailable
+  if (raw === 'Email required') return t.cabinet_forgot_need_email
   if (raw === 'Not found' || raw.includes('Meeting not available') || raw.includes('Meeting unavailable')) {
     return t.cabinet_meeting_unavailable
   }

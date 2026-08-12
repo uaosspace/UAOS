@@ -5,16 +5,22 @@ import {isRecord, readStringOr} from '../src/lib/contentGuards.js'
 import {
   assertSameOrigin,
   authenticateMemberPassword,
+  applyMemberPasswordRecovery,
   clearMemberSessionCookie,
   createMemberSession,
+  findMemberUserByEmail,
   readMemberSessionToken,
   resolveMemberSession,
+  revokeAllMemberSessions,
   revokeMemberSessionByToken,
   setMemberSessionCookie,
   type MemberSessionContext,
   updateMemberDisplayName,
   updateMemberPassword,
 } from './_lib/auth/memberSession.js'
+import {generateTempAdminPassword} from './_lib/auth/session.js'
+import {isBrevoSenderConfigured, sendCabinetCredentialsEmail} from './_lib/brevoNotify.js'
+import {writeAuditEvent} from './_lib/audit.js'
 import {
   getJoinForEventWithLevel,
   listMemberAccessibleEvents,
@@ -102,6 +108,61 @@ async function handleMemberRequest(req: VercelRequest, res: VercelResponse) {
       setMemberSessionCookie(res, token, isSecureRequest(req))
       const items = await listMemberAccessibleEvents(user.id, user.accessLevel)
       return res.status(200).json({ok: true, user, items})
+    }
+
+    if (parts[1] === 'forgot-password' && method === 'POST') {
+      if (!requireMutationOrigin(req, res)) return
+      if (await isRateLimited(`member-forgot:ip:${ip}`, 15 * 60 * 1000, 8)) {
+        return sendJsonError(res, 429, 'Too many requests')
+      }
+      if (!isBrevoSenderConfigured()) {
+        return sendJsonError(res, 503, 'Recovery email is not configured')
+      }
+
+      const body = parseJsonBody(req)
+      const email = isRecord(body) ? readStringOr(body.email, '').trim().toLowerCase() : ''
+      if (!email || !email.includes('@')) {
+        return sendJsonError(res, 400, 'Email required')
+      }
+      if (await isRateLimited(`member-forgot:email:${email}`, 15 * 60 * 1000, 3)) {
+        return sendJsonError(res, 429, 'Too many requests')
+      }
+
+      // Uniform success — do not reveal whether the account exists
+      const uniformOk = () =>
+        res.status(200).json({
+          ok: true,
+          message: 'If the account exists, recovery credentials were emailed',
+        })
+
+      const row = await findMemberUserByEmail(email)
+      if (!row || !row.active) return uniformOk()
+
+      const userId = String(row.id)
+      const tempPassword = generateTempAdminPassword()
+      await applyMemberPasswordRecovery({userId, tempPassword})
+      await revokeAllMemberSessions(userId)
+
+      const mail = await sendCabinetCredentialsEmail(email, {
+        displayName: String(row.display_name ?? ''),
+        temporaryPassword: tempPassword,
+      })
+
+      await writeAuditEvent({
+        actorType: 'member',
+        actorId: userId,
+        action: 'member_user.password_recovery',
+        entityType: 'member_user',
+        entityId: userId,
+        ip,
+        metadata: {mail},
+      })
+
+      if (mail !== 'sent') {
+        console.error('member recovery email was not sent:', mail)
+      }
+
+      return uniformOk()
     }
 
     if (parts[1] === 'logout' && method === 'POST') {

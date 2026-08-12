@@ -279,6 +279,43 @@ export async function revokeMemberSessionByToken(token: string): Promise<void> {
   `
 }
 
+export async function revokeAllMemberSessions(memberUserId: string): Promise<void> {
+  const sql = getSql()
+  await sql`
+    UPDATE member_sessions
+    SET revoked_at = now()
+    WHERE user_id = ${memberUserId}::uuid AND revoked_at IS NULL
+  `
+}
+
+export async function applyMemberPasswordRecovery(input: {
+  userId: string
+  tempPassword: string
+}): Promise<void> {
+  assertValidNewPassword(input.tempPassword)
+  const passwordHash = hashPassword(input.tempPassword)
+  const sql = getSql()
+  const updated = await sql`
+    UPDATE member_users
+    SET password_hash = ${passwordHash},
+        must_change_password = true,
+        failed_login_count = 0,
+        locked_until = NULL,
+        updated_at = now()
+    WHERE id = ${input.userId}::uuid AND active = true
+    RETURNING id
+  `
+  if (!updated[0]) throw new Error('Member user not found')
+}
+
+export async function deleteMemberUserAdmin(memberUserId: string): Promise<boolean> {
+  const sql = getSql()
+  const rows = await sql`
+    DELETE FROM member_users WHERE id = ${memberUserId}::uuid RETURNING id
+  `
+  return Boolean(rows[0])
+}
+
 export async function listMemberUsersAdmin(): Promise<MemberUserRecord[]> {
   const sql = getSql()
   const rows = await sql`

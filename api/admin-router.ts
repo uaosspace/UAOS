@@ -66,6 +66,7 @@ import {getBlobByPathname, putPublicBlob, putPrivateBlob} from './_lib/blobStore
 import {fetchOgImageFromPageUrl} from './_lib/fetchOgImage.js'
 import {
   createMemberUser,
+  deleteMemberUserAdmin,
   listMemberUsersAdmin,
   updateMemberUserAccessLevelAdmin,
 } from './_lib/auth/memberSession.js'
@@ -1080,6 +1081,26 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
       const message = err instanceof Error ? err.message : 'Create failed'
       return sendJsonError(res, 400, message)
     }
+  }
+
+  if (parts[0] === 'member-users' && parts[1] && !parts[2] && method === 'DELETE') {
+    if (!requireMutationOrigin(req, res)) return
+    const session = await requireSession(req, res, 'users.manage')
+    if (!session) return
+    if (await isRateLimited(`admin:member-users-delete:${session.user.id}`, 15 * 60 * 1000, 30)) {
+      return sendJsonError(res, 429, 'Too many requests')
+    }
+    const deleted = await deleteMemberUserAdmin(parts[1])
+    if (!deleted) return sendJsonError(res, 404, 'Member user not found')
+    await writeAuditEvent({
+      actorType: 'admin',
+      actorId: session.user.id,
+      action: 'member_user.delete',
+      entityType: 'member_user',
+      entityId: parts[1],
+      ip,
+    })
+    return res.status(200).json({ok: true})
   }
 
   if (parts[0] === 'meetings' && parts[1] === 'list' && method === 'GET') {
