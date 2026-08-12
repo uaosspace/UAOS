@@ -40,7 +40,7 @@ Admin / Event page / Cabinet
 `GET /api/public/events` отдаёт published-события, видимые по лесенке (cookie admin/member; аноним — только `visibility=public`).
 Webhook: `POST /api/webhooks/meetings/:provider` → verify → inbox `pending` → cron/admin drain.
 Письма: создание Zoom-встречи + напоминание за сутки (аудитория: уровень события + правление, или все с кабинетом; ссылка на `/events/:slug`); после approve протокола — только на адреса из `meeting_ops_settings` (не участникам встречи).
-Cron: `GET|POST /api/cron/meetings` (`CRON_SECRET`) hourly.
+Cron: `GET|POST /api/cron/meetings` (`CRON_SECRET`) daily at 06:00 UTC (Hobby limit; admin can run manually).
 Админ-вкладка «Управління зібраннями»: список, протоколы/источники, скачивание `.md`, настройки адресов, inbox.
 События: `content_events.participation_mode` (`offline` | `zoom` | `online_link` | `phone` | `other`); Zoom/протокол только при `zoom`.
 Инварианты: provider TEXT; AI draft ≠ approved; start_url не в public DTO; joinUrl только после проверки доступа.
@@ -57,7 +57,7 @@ Cron: `GET|POST /api/cron/meetings` (`CRON_SECRET`) hourly.
 | `api/admin-router.ts` | Auth, заявки, контент, media, создание member users (rewrite с `/api/admin/*`) |
 | `api/member-router.ts` | Member login/logout/me + cabinet events/join |
 | `api/webhooks/meetings/[provider].ts` | Provider webhook inbox (verify + persist only) |
-| `api/cron/meetings.ts` | Hourly: process inbox + meeting reminders |
+| `api/cron/meetings.ts` | Daily (06:00 UTC): process inbox + meeting reminders |
 | `api/public/[...route].ts` | Thin re-export `public-router` (не дублировать логику) |
 | `api/admin/[...route].ts` | Thin re-export `admin-router` (не дублировать логику) |
 | `api/member/[...route].ts` | Thin re-export `member-router` (не дублировать логику) |
