@@ -37,6 +37,17 @@ export function normalizeLocalizedText(
   return result
 }
 
+export const PARTICIPATION_MODES = ['offline', 'zoom', 'online_link', 'phone', 'other'] as const
+export type ParticipationMode = (typeof PARTICIPATION_MODES)[number]
+
+export function normalizeParticipationMode(raw: unknown): ParticipationMode {
+  const value = typeof raw === 'string' ? raw.trim().toLowerCase() : ''
+  if ((PARTICIPATION_MODES as readonly string[]).includes(value)) {
+    return value as ParticipationMode
+  }
+  return 'offline'
+}
+
 export function normalizeOptionalHttpUrl(raw: unknown, fieldName: string): string {
   const value = typeof raw === 'string' ? raw.trim() : ''
   if (!value) return ''

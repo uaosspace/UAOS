@@ -238,7 +238,7 @@ ${mfaHtml}
   return {subject, textContent, htmlContent}
 }
 
-async function sendBrevoEmail(
+export async function sendBrevoEmail(
   input: {
     apiKey: string
     sender: ParsedEmailSender
@@ -352,6 +352,94 @@ export async function sendAdminRecoveryEmail(
       textContent,
       htmlContent,
       tags: ['uaos-admin-recovery'],
+    },
+    fetchImpl,
+  )
+}
+
+export interface CabinetCredentialsEmailPayload {
+  displayName: string
+  email: string
+  temporaryPassword: string
+  cabinetUrl: string
+}
+
+function cabinetOrigin(env: NodeJS.ProcessEnv = process.env): string {
+  const raw = readTrimmed(env.SITE_URL) || readTrimmed(env.VERCEL_URL) || 'http://localhost:3000'
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw.replace(/\/$/, '')
+  return `https://${raw.replace(/\/$/, '')}`
+}
+
+export function buildCabinetCredentialsEmail(payload: CabinetCredentialsEmailPayload): {
+  subject: string
+  textContent: string
+  htmlContent: string
+} {
+  const name = payload.displayName.trim() || 'учасник/учасниця'
+  const subject = 'Доступ до особистого кабінету UAOS'
+  const textContent = [
+    `Вітаємо, ${name}!`,
+    '',
+    'Вам відкрито доступ до особистого кабінету UAOS.',
+    '',
+    `Сторінка входу: ${payload.cabinetUrl}`,
+    `Email для входу: ${payload.email}`,
+    `Тимчасовий пароль: ${payload.temporaryPassword}`,
+    '',
+    'Будь ласка, увійдіть і змініть пароль у налаштуваннях кабінету.',
+    '',
+    'З повагою,',
+    'UAOS',
+  ].join('\n')
+  const htmlContent = `<div style="font-family:sans-serif;line-height:1.5">
+<p>Вітаємо, <strong>${escapeHtml(name)}</strong>!</p>
+<p>Вам відкрито доступ до особистого кабінету UAOS.</p>
+<p><a href="${escapeHtml(payload.cabinetUrl)}">Увійти в кабінет</a></p>
+<p>Email: <strong>${escapeHtml(payload.email)}</strong></p>
+<p>Тимчасовий пароль: <code>${escapeHtml(payload.temporaryPassword)}</code></p>
+<p style="color:#475569;font-size:13px">Після входу змініть пароль у налаштуваннях кабінету.</p>
+</div>`
+  return {subject, textContent, htmlContent}
+}
+
+/**
+ * Sends cabinet login credentials to a new member user.
+ */
+export async function sendCabinetCredentialsEmail(
+  toEmail: string,
+  input: {displayName: string; temporaryPassword: string},
+  env: NodeJS.ProcessEnv = process.env,
+  fetchImpl: typeof fetch = fetch,
+): Promise<'sent' | 'skipped' | 'failed'> {
+  const config = readBrevoSenderEnv(env)
+  if (!config) return 'skipped'
+
+  const sender = parseNotifyFrom(config.fromRaw)
+  if (!sender) {
+    console.error('Brevo cabinet credentials skipped: invalid NOTIFY_EMAIL_FROM')
+    return 'failed'
+  }
+
+  const to = toEmail.trim().toLowerCase()
+  if (!to.includes('@')) return 'failed'
+
+  const cabinetUrl = `${cabinetOrigin(env)}/cabinet`
+  const {subject, textContent, htmlContent} = buildCabinetCredentialsEmail({
+    displayName: input.displayName,
+    email: to,
+    temporaryPassword: input.temporaryPassword,
+    cabinetUrl,
+  })
+
+  return sendBrevoEmail(
+    {
+      apiKey: config.apiKey,
+      sender,
+      to,
+      subject,
+      textContent,
+      htmlContent,
+      tags: ['uaos-cabinet-credentials'],
     },
     fetchImpl,
   )

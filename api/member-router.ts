@@ -12,7 +12,13 @@ import {
   revokeMemberSessionByToken,
   setMemberSessionCookie,
   type MemberSessionContext,
+  updateMemberDisplayName,
+  updateMemberPassword,
 } from './_lib/auth/memberSession.js'
+import {
+  getJoinForEventWithLevel,
+  listMemberAccessibleEvents,
+} from './_lib/meetings/memberCabinetEvents.js'
 
 function pathParts(req: VercelRequest): string[] {
   const route = req.query.route
@@ -94,7 +100,8 @@ async function handleMemberRequest(req: VercelRequest, res: VercelResponse) {
 
       const token = await createMemberSession({userId: user.id, ip, userAgent})
       setMemberSessionCookie(res, token, isSecureRequest(req))
-      return res.status(200).json({ok: true, user})
+      const items = await listMemberAccessibleEvents(user.id, user.accessLevel)
+      return res.status(200).json({ok: true, user, items})
     }
 
     if (parts[1] === 'logout' && method === 'POST') {
@@ -116,21 +123,87 @@ async function handleMemberRequest(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ok: true, user: session.user})
     }
 
+    if (parts[1] === 'change-password' && method === 'POST') {
+      if (!requireMutationOrigin(req, res)) return
+      const session = await requireMemberSession(req, res)
+      if (!session) return
+      if (await isRateLimited(`member-password:${session.user.id}`, 15 * 60 * 1000, 10)) {
+        return sendJsonError(res, 429, 'Too many requests')
+      }
+      const body = parseJsonBody(req)
+      const source = isRecord(body) ? body : {}
+      const currentPassword = readStringOr(source.currentPassword, '')
+      const newPassword = readStringOr(source.newPassword, '')
+      if (!currentPassword || !newPassword) {
+        return sendJsonError(res, 400, 'currentPassword and newPassword required')
+      }
+      try {
+        const user = await updateMemberPassword(session.user.id, currentPassword, newPassword)
+        return res.status(200).json({ok: true, user})
+      } catch (err) {
+        const status = typeof (err as {status?: unknown})?.status === 'number'
+          ? Number((err as {status: number}).status)
+          : 400
+        const message = err instanceof Error ? err.message : 'Password change failed'
+        return sendJsonError(res, status, message)
+      }
+    }
+
     return sendJsonError(res, 404, 'Not found')
   }
 
-  // Authenticated stub surface for future cabinet features
+  if (parts[0] === 'cabinet' && parts[1] === 'profile' && method === 'PATCH') {
+    if (!requireMutationOrigin(req, res)) return
+    const session = await requireMemberSession(req, res)
+    if (!session) return
+    const body = parseJsonBody(req)
+    const source = isRecord(body) ? body : {}
+    const displayName = readStringOr(source.displayName, '')
+    try {
+      const user = await updateMemberDisplayName(session.user.id, displayName)
+      return res.status(200).json({ok: true, user})
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Update failed'
+      return sendJsonError(res, 400, message)
+    }
+  }
+
+  // Single bootstrap for cabinet UI (user + accessible events) — one vercel-dev invoke.
   if (parts[0] === 'cabinet' && parts[1] === 'summary' && method === 'GET') {
     const session = await requireMemberSession(req, res)
     if (!session) return
+    const items = await listMemberAccessibleEvents(session.user.id, session.user.accessLevel)
     return res.status(200).json({
       ok: true,
       user: session.user,
+      items,
       stub: {
-        profileEditable: false,
-        message: 'Member cabinet foundation — profile editing comes later',
+        profileEditable: true,
+        message: 'Member cabinet settings',
       },
     })
+  }
+
+  if (parts[0] === 'events' && method === 'GET' && !parts[1]) {
+    const session = await requireMemberSession(req, res)
+    if (!session) return
+    const items = await listMemberAccessibleEvents(session.user.id, session.user.accessLevel)
+    return res.status(200).json({ok: true, items})
+  }
+
+  if (parts[0] === 'events' && parts[1] && parts[2] === 'meeting' && method === 'GET') {
+    const session = await requireMemberSession(req, res)
+    if (!session) return
+    try {
+      const meeting = await getJoinForEventWithLevel(parts[1], session.user.accessLevel)
+      return res.status(200).json({ok: true, meeting})
+    } catch (err) {
+      const status = typeof (err as {status?: unknown})?.status === 'number'
+        ? Number((err as {status: number}).status)
+        : 500
+      const message = err instanceof Error ? err.message : 'Meeting unavailable'
+      return sendJsonError(res, status >= 400 && status < 600 ? status : 500, message)
+    }
   }
 
   return sendJsonError(res, 404, 'Not found')

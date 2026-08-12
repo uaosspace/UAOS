@@ -64,7 +64,30 @@ import {
 } from './_lib/contentRepo.js'
 import {getBlobByPathname, putPublicBlob, putPrivateBlob} from './_lib/blobStore.js'
 import {fetchOgImageFromPageUrl} from './_lib/fetchOgImage.js'
-import {createMemberUser} from './_lib/auth/memberSession.js'
+import {
+  createMemberUser,
+  listMemberUsersAdmin,
+  updateMemberUserAccessLevelAdmin,
+} from './_lib/auth/memberSession.js'
+import {
+  approveReportForEvent,
+  createMeetingForEvent,
+  getMeetingBundleForEvent,
+  getMeetingDtoForEvent,
+  getReportDtoForEvent,
+  listMeetingsAdmin,
+  listReportsAdmin,
+  patchReportForEvent,
+  processInbox,
+  processMeetingCronJobs,
+  processProviderEventById,
+  retryMeetingForEvent,
+} from './_lib/meetings/meetingService.js'
+import {getMeetingOpsSettings, putMeetingOpsSettings} from './_lib/meetings/opsSettingsRepo.js'
+import {listPendingProviderEvents} from './_lib/meetings/providerEventsRepo.js'
+import {ASSIGNABLE_ACCESS_LEVELS} from './_lib/meetings/accessCore.js'
+import {MeetingProviderRegistry} from './_lib/meetings/registry.js'
+import {ProviderNotImplementedError, UnknownMeetingProviderError} from './_lib/meetings/types.js'
 
 type RouteResult = {handled: true} | {handled: false}
 
@@ -412,6 +435,37 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({item})
     }
 
+    if (parts[1] && parts[2] === 'provision-cabinet' && method === 'POST') {
+      if (!requireMutationOrigin(req, res)) return
+      const session = await requireSession(req, res, 'applications.write')
+      if (!session) return
+      if (await isRateLimited(`admin:provision-cabinet:${session.user.id}`, 15 * 60 * 1000, 30)) {
+        return sendJsonError(res, 429, 'Too many requests')
+      }
+      const body = parseJsonBody(req)
+      const source = isRecord(body) ? body : {}
+      const accessLevel = readStringOr(source.accessLevel, 'member')
+      const displayName = readStringOr(source.displayName, '')
+      try {
+        const {provisionCabinetFromApplication} = await import('./_lib/provisionCabinet.js')
+        const result = await provisionCabinetFromApplication({
+          applicationId: parts[1],
+          accessLevel,
+          displayName,
+          actorId: session.user.id,
+          ip,
+        })
+        return res.status(200).json({
+          ok: true,
+          user: result.user,
+          emailSent: result.emailSent,
+        })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Provision failed'
+        return sendJsonError(res, 400, message)
+      }
+    }
+
     if (parts[1] && parts[2] === 'status' && method === 'POST') {
       if (!requireMutationOrigin(req, res)) return
       const session = await requireSession(req, res, 'applications.write')
@@ -622,19 +676,140 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
       }
     }
     if (entity === 'events') {
-      if (method === 'GET') {
+      // Meetings / reports nested under content/events/:id/... (before list/create handlers)
+      if (parts[2] && parts[3] === 'meeting') {
+        const eventId = parts[2]
+        if (method === 'GET' && !parts[4]) {
+          const session = await requireSession(req, res, 'content.read')
+          if (!session) return
+          const meeting = await getMeetingDtoForEvent(eventId)
+          return res.status(200).json({meeting})
+        }
+        if (method === 'POST' && !parts[4]) {
+          if (!requireMutationOrigin(req, res)) return
+          const session = await requireSession(req, res, 'content.write')
+          if (!session) return
+          try {
+            const body = parseJsonBody(req)
+            const provider =
+              typeof body === 'object' && body && 'provider' in body
+                ? String((body as {provider?: unknown}).provider || 'zoom')
+                : 'zoom'
+            const result = await createMeetingForEvent({eventId, provider})
+            await writeAuditEvent({
+              actorType: 'admin',
+              actorId: session.user.id,
+              action: 'meeting.create',
+              entityType: 'meeting',
+              entityId: result.meeting.id,
+              ip,
+              metadata: {eventId, provider: result.meeting.provider},
+            })
+            return res.status(200).json(result)
+          } catch (err) {
+            const message = err instanceof Error ? err.message : 'Create meeting failed'
+            const status =
+              err instanceof UnknownMeetingProviderError || err instanceof ProviderNotImplementedError
+                ? 400
+                : 502
+            return sendJsonError(res, status, message)
+          }
+        }
+        if (method === 'POST' && parts[4] === 'retry') {
+          if (!requireMutationOrigin(req, res)) return
+          const session = await requireSession(req, res, 'content.write')
+          if (!session) return
+          try {
+            const result = await retryMeetingForEvent(eventId)
+            await writeAuditEvent({
+              actorType: 'admin',
+              actorId: session.user.id,
+              action: 'meeting.retry',
+              entityType: 'meeting',
+              entityId: result.meeting.id,
+              ip,
+              metadata: {eventId},
+            })
+            return res.status(200).json(result)
+          } catch (err) {
+            const message = err instanceof Error ? err.message : 'Retry failed'
+            return sendJsonError(res, 502, message)
+          }
+        }
+      }
+      if (parts[2] && parts[3] === 'report') {
+        const eventId = parts[2]
+        if (method === 'GET' && !parts[4]) {
+          const session = await requireSession(req, res, 'content.read')
+          if (!session) return
+          const report = await getReportDtoForEvent(eventId)
+          return res.status(200).json({report})
+        }
+        if (method === 'PATCH' && !parts[4]) {
+          if (!requireMutationOrigin(req, res)) return
+          const session = await requireSession(req, res, 'content.write')
+          if (!session) return
+          try {
+            const body = parseJsonBody(req)
+            const source = isRecord(body) ? body : {}
+            const report = await patchReportForEvent(eventId, {
+              editedSummary:
+                typeof source.editedSummary === 'string' ? source.editedSummary : undefined,
+              editedTopics: Array.isArray(source.editedTopics) ? source.editedTopics : undefined,
+              editedDecisions: Array.isArray(source.editedDecisions)
+                ? source.editedDecisions
+                : undefined,
+              editedActionItems: Array.isArray(source.editedActionItems)
+                ? source.editedActionItems
+                : undefined,
+              status:
+                source.status === 'draft' ||
+                source.status === 'in_review' ||
+                source.status === 'rejected'
+                  ? source.status
+                  : undefined,
+            })
+            return res.status(200).json({report})
+          } catch (err) {
+            const message = err instanceof Error ? err.message : 'Patch report failed'
+            return sendJsonError(res, 400, message)
+          }
+        }
+        if (method === 'POST' && parts[4] === 'approve') {
+          if (!requireMutationOrigin(req, res)) return
+          const session = await requireSession(req, res, 'content.write')
+          if (!session) return
+          try {
+            const report = await approveReportForEvent(eventId, session.user.id)
+            await writeAuditEvent({
+              actorType: 'admin',
+              actorId: session.user.id,
+              action: 'meeting_report.approve',
+              entityType: 'meeting_report',
+              entityId: report.id,
+              ip,
+              metadata: {eventId},
+            })
+            return res.status(200).json({report})
+          } catch (err) {
+            const message = err instanceof Error ? err.message : 'Approve failed'
+            return sendJsonError(res, 400, message)
+          }
+        }
+      }
+      if (method === 'GET' && !parts[2]) {
         const session = await requireSession(req, res, 'content.read')
         if (!session) return
         return res.status(200).json({items: await listContentEventsAdmin()})
       }
-      if (method === 'POST') {
+      if (method === 'POST' && !parts[2]) {
         if (!requireMutationOrigin(req, res)) return
         const session = await requireSession(req, res, 'content.write')
         if (!session) return
         const item = await upsertContentEvent(parseJsonBody(req))
         return res.status(200).json({item})
       }
-      if (method === 'DELETE' && parts[2]) {
+      if (method === 'DELETE' && parts[2] && !parts[3]) {
         if (!requireMutationOrigin(req, res)) return
         const session = await requireSession(req, res, 'content.write')
         if (!session) return
@@ -802,7 +977,68 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
   }
 
   // Provision member portal accounts (ops / users.manage). No public self-signup.
-  if (parts[0] === 'member-users' && method === 'POST') {
+  if (parts[0] === 'member-users' && method === 'GET') {
+    const session = await requireSession(req, res, 'users.manage')
+    if (!session) return
+    return res.status(200).json({
+      items: await listMemberUsersAdmin(),
+      accessLevels: [...ASSIGNABLE_ACCESS_LEVELS],
+    })
+  }
+
+  if (parts[0] === 'member-users' && parts[1] && parts[2] === 'access-level' && method === 'PUT') {
+    if (!requireMutationOrigin(req, res)) return
+    const session = await requireSession(req, res, 'users.manage')
+    if (!session) return
+    const body = parseJsonBody(req)
+    const source = isRecord(body) ? body : {}
+    const accessLevel = readStringOr(source.accessLevel, '')
+    try {
+      const user = await updateMemberUserAccessLevelAdmin(parts[1], accessLevel)
+      await writeAuditEvent({
+        actorType: 'admin',
+        actorId: session.user.id,
+        action: 'member_user.access_level',
+        entityType: 'member_user',
+        entityId: user.id,
+        ip,
+        metadata: {accessLevel: user.accessLevel},
+      })
+      return res.status(200).json({ok: true, user})
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Update failed'
+      return sendJsonError(res, 400, message)
+    }
+  }
+
+  if (parts[0] === 'member-users' && parts[1] && parts[2] === 'roles' && method === 'PUT') {
+    if (!requireMutationOrigin(req, res)) return
+    const session = await requireSession(req, res, 'users.manage')
+    if (!session) return
+    const body = parseJsonBody(req)
+    const source = isRecord(body) ? body : {}
+    const accessLevel =
+      readStringOr(source.accessLevel, '') ||
+      (Array.isArray(source.roles) ? String(source.roles[0] ?? 'member') : 'member')
+    try {
+      const user = await updateMemberUserAccessLevelAdmin(parts[1], accessLevel)
+      await writeAuditEvent({
+        actorType: 'admin',
+        actorId: session.user.id,
+        action: 'member_user.access_level',
+        entityType: 'member_user',
+        entityId: user.id,
+        ip,
+        metadata: {accessLevel: user.accessLevel},
+      })
+      return res.status(200).json({ok: true, user})
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Update failed'
+      return sendJsonError(res, 400, message)
+    }
+  }
+
+  if (parts[0] === 'member-users' && method === 'POST' && !parts[1]) {
     if (!requireMutationOrigin(req, res)) return
     const session = await requireSession(req, res, 'users.manage')
     if (!session) return
@@ -815,6 +1051,9 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
     const password = readStringOr(source.password, '')
     const displayName = readStringOr(source.displayName, '')
     const memberIdRaw = readStringOr(source.memberId, '')
+    const accessLevel =
+      readStringOr(source.accessLevel, '') ||
+      (Array.isArray(source.roles) ? String(source.roles[0] ?? 'member') : 'member')
     if (!email || !password) return sendJsonError(res, 400, 'email and password required')
     try {
       const user = await createMemberUser({
@@ -822,6 +1061,7 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
         password,
         displayName,
         memberId: memberIdRaw || null,
+        accessLevel,
       })
       await writeAuditEvent({
         actorType: 'admin',
@@ -830,13 +1070,104 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
         entityType: 'member_user',
         entityId: user.id,
         ip,
-        metadata: {memberId: user.memberId},
+        metadata: {memberId: user.memberId, accessLevel: user.accessLevel},
       })
       return res.status(200).json({ok: true, user})
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Create failed'
       return sendJsonError(res, 400, message)
     }
+  }
+
+  if (parts[0] === 'meetings' && parts[1] === 'list' && method === 'GET') {
+    const session = await requireSession(req, res, 'content.write')
+    if (!session) return
+    return res.status(200).json({items: await listMeetingsAdmin()})
+  }
+
+  if (parts[0] === 'meetings' && parts[1] === 'reports' && method === 'GET') {
+    const session = await requireSession(req, res, 'content.write')
+    if (!session) return
+    return res.status(200).json({items: await listReportsAdmin()})
+  }
+
+  if (parts[0] === 'meetings' && parts[1] === 'ops-settings' && method === 'GET') {
+    const session = await requireSession(req, res, 'content.write')
+    if (!session) return
+    return res.status(200).json({settings: await getMeetingOpsSettings()})
+  }
+
+  if (parts[0] === 'meetings' && parts[1] === 'ops-settings' && method === 'PUT') {
+    if (!requireMutationOrigin(req, res)) return
+    const session = await requireSession(req, res, 'content.write')
+    if (!session) return
+    const body = parseJsonBody(req)
+    const settings = await putMeetingOpsSettings(body)
+    await writeAuditEvent({
+      actorType: 'admin',
+      actorId: session.user.id,
+      action: 'meeting_ops.settings',
+      entityType: 'meeting_ops_settings',
+      entityId: 'default',
+      ip,
+      metadata: {emails: settings.protocolNotifyEmails.length},
+    })
+    return res.status(200).json({settings})
+  }
+
+  if (parts[0] === 'meetings' && parts[1] === 'inbox' && method === 'GET') {
+    const session = await requireSession(req, res, 'content.write')
+    if (!session) return
+    return res.status(200).json({items: await listPendingProviderEvents(50)})
+  }
+
+  if (parts[0] === 'meetings' && parts[1] === 'run-cron' && method === 'POST') {
+    if (!requireMutationOrigin(req, res)) return
+    const session = await requireSession(req, res, 'content.write')
+    if (!session) return
+    const result = await processMeetingCronJobs()
+    return res.status(200).json({ok: true, ...result})
+  }
+
+  if (
+    parts[0] === 'content' &&
+    parts[1] === 'events' &&
+    parts[2] &&
+    parts[3] === 'bundle' &&
+    method === 'GET'
+  ) {
+    const session = await requireSession(req, res, 'content.write')
+    if (!session) return
+    const bundle = await getMeetingBundleForEvent(parts[2])
+    return res.status(200).json({bundle})
+  }
+
+  if (parts[0] === 'provider-events' && parts[1] && parts[2] === 'process' && method === 'POST') {
+    if (!requireMutationOrigin(req, res)) return
+    const session = await requireSession(req, res, 'content.write')
+    if (!session) return
+    const result = await processProviderEventById(parts[1])
+    return res.status(200).json(result)
+  }
+
+  if (parts[0] === 'meetings' && parts[1] === 'process-inbox' && method === 'POST') {
+    if (!requireMutationOrigin(req, res)) return
+    const session = await requireSession(req, res, 'content.write')
+    if (!session) return
+    const body = parseJsonBody(req)
+    const limit =
+      isRecord(body) && typeof body.limit === 'number' ? Math.min(50, Math.max(1, body.limit)) : 10
+    const result = await processInbox(limit)
+    return res.status(200).json(result)
+  }
+
+  if (parts[0] === 'meetings' && parts[1] === 'providers' && method === 'GET') {
+    const session = await requireSession(req, res, 'content.read')
+    if (!session) return
+    return res.status(200).json({
+      known: MeetingProviderRegistry.listKnown(),
+      implemented: MeetingProviderRegistry.listImplemented(),
+    })
   }
 
   return sendJsonError(res, 404, 'Not found')

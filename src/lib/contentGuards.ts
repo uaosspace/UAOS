@@ -1,6 +1,6 @@
 // `.js` обовʼязковий для Vercel serverless ESM: API імпортує цей модуль напряму.
 import {LOCALES} from '../data/locales.js'
-import type {DocumentItem, EventFormat, EventType, LocalizedText, MemberProfileLevel} from '../types'
+import type {DocumentItem, EventFormat, EventType, LocalizedText, MemberProfileLevel, ParticipationMode} from '../types'
 
 type UnknownRecord = Record<string, unknown>
 
@@ -78,6 +78,20 @@ export function readEventType(value: unknown): EventType {
  */
 export function readEventFormat(value: unknown): EventFormat {
   return value === 'online' || value === 'offline' || value === 'hybrid' ? value : 'online'
+}
+
+export function readParticipationMode(value: unknown): ParticipationMode {
+  const raw = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  if (
+    raw === 'offline' ||
+    raw === 'zoom' ||
+    raw === 'online_link' ||
+    raw === 'phone' ||
+    raw === 'other'
+  ) {
+    return raw
+  }
+  return 'offline'
 }
 
 /**

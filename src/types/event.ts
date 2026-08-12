@@ -2,6 +2,7 @@ import type {LocalizedText} from './shared'
 
 export type EventType = 'training' | 'meeting' | 'conference'
 export type EventFormat = 'online' | 'offline' | 'hybrid'
+export type ParticipationMode = 'offline' | 'zoom' | 'online_link' | 'phone' | 'other'
 
 export interface AssociationEvent {
   id: string
@@ -11,6 +12,9 @@ export interface AssociationEvent {
   fullDescription: LocalizedText
   type: EventType
   format: EventFormat
+  participationMode?: ParticipationMode
+  visibility?: 'public' | 'restricted'
+  accessMinRole?: string
   startAt: string
   endAt: string
   timeZone: string

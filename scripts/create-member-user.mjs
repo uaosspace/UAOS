@@ -1,7 +1,7 @@
 /**
  * Create a member portal user in Neon (admin/ops provisioning).
  * Usage:
- *   node --env-file=.env.local scripts/create-member-user.mjs --email=member@example.com --password='...' [--name='...'] [--member-id=uuid]
+ *   node --env-file=.env.local scripts/create-member-user.mjs --email=member@example.com --password='...' [--name='...'] [--member-id=uuid] [--level=member]
  */
 import {neon} from '@neondatabase/serverless'
 import {randomBytes, scryptSync} from 'node:crypto'
@@ -18,6 +18,8 @@ function arg(name) {
   return hit ? hit.slice(prefix.length) : ''
 }
 
+const ALLOWED = new Set(['partner', 'member', 'staff', 'board'])
+
 async function main() {
   const databaseUrl = process.env.DATABASE_URL?.trim()
   if (!databaseUrl) {
@@ -28,6 +30,16 @@ async function main() {
   const password = arg('password')
   const displayName = arg('name') || ''
   const memberId = arg('member-id').trim() || null
+  const fromRoles = (arg('roles') || '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+  let level = (arg('level') || fromRoles[0] || 'member').trim().toLowerCase()
+  if (level === 'other') level = 'partner'
+  if (!ALLOWED.has(level)) {
+    console.error('Invalid --level (partner|member|staff|board)')
+    process.exit(1)
+  }
   if (!email || !password) {
     console.error('Required: --email= --password=')
     process.exit(1)
@@ -55,23 +67,29 @@ async function main() {
       SET password_hash = ${passwordHash},
           display_name = ${displayName},
           member_id = ${memberId},
+          access_level = ${level},
           active = true,
           failed_login_count = 0,
           locked_until = NULL,
           updated_at = now()
       WHERE id = ${existing[0].id}::uuid
-      RETURNING id, email, member_id
+      RETURNING id, email, member_id, access_level
     `
     row = updated[0]
   } else {
     const inserted = await sql`
-      INSERT INTO member_users (email, display_name, password_hash, member_id)
-      VALUES (${email}, ${displayName}, ${passwordHash}, ${memberId})
-      RETURNING id, email, member_id
+      INSERT INTO member_users (email, display_name, password_hash, member_id, access_level)
+      VALUES (${email}, ${displayName}, ${passwordHash}, ${memberId}, ${level})
+      RETURNING id, email, member_id, access_level
     `
     row = inserted[0]
   }
-  console.log('member user ready:', {id: row.id, email: row.email, memberId: row.member_id})
+  console.log('member user ready:', {
+    id: row.id,
+    email: row.email,
+    memberId: row.member_id,
+    accessLevel: row.access_level,
+  })
 }
 
 main().catch((error) => {

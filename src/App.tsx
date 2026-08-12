@@ -231,10 +231,11 @@ export default function App() {
         onNavigate={handleNavigation}
       />
     )
-  } else if (currentRoute === APP_ROUTES.eventsDetails && activeEvent) {
+  } else if (currentRoute === APP_ROUTES.eventsDetails && routeParams.eventSlug) {
     mainContent = (
       <EventsDetailPage
         currentLang={currentLang}
+        eventSlug={routeParams.eventSlug}
         event={activeEvent}
         onBack={() => handleNavigation(APP_ROUTES.eventsList, {skipScrollToTop: true})}
       />

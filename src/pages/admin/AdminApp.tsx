@@ -9,6 +9,7 @@ import {
   adminTabIdleClass,
 } from './adminUi'
 import {
+  accessLevelLabel,
   applicantKindLabel,
   sectorLabel,
   statsKeyLabel,
@@ -53,6 +54,12 @@ type Stats = {
 type ConfirmDialog =
   | {kind: 'delete-one'; id: string; companyName: string}
   | {kind: 'purge-closed'}
+
+const CABINET_ACCESS_LEVELS = ['partner', 'member', 'staff', 'board'] as const
+
+type ProvisionResult = {
+  emailSent: 'sent' | 'skipped' | 'failed'
+}
 
 type AdminAppProps = {
   currentLang: Locale
@@ -102,6 +109,10 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
   const [statsLoading, setStatsLoading] = useState(false)
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
+  const [provisionApp, setProvisionApp] = useState<ApplicationItem | null>(null)
+  const [provisionAccessLevel, setProvisionAccessLevel] = useState<string>('member')
+  const [provisionDisplayName, setProvisionDisplayName] = useState('')
+  const [provisionResult, setProvisionResult] = useState<ProvisionResult | null>(null)
 
   const selected = useMemo(
     () => apps.find((item) => item.id === selectedId) || null,
@@ -267,6 +278,13 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
     }
   }
 
+  function openProvisionDialog(app: ApplicationItem) {
+    setProvisionResult(null)
+    setProvisionAccessLevel('member')
+    setProvisionDisplayName(app.contactPerson.trim())
+    setProvisionApp(app)
+  }
+
   async function setStatus(status: string) {
     if (!selected || isBusy) return
     setBusy(`status:${status}`)
@@ -279,8 +297,35 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
       setApps((prev) =>
         prev.map((item) => (item.id === data.item.id ? {...item, ...data.item} : item)),
       )
+      if (status === 'accepted') {
+        openProvisionDialog(data.item)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Status update failed')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function submitProvisionCabinet() {
+    if (!provisionApp || isBusy) return
+    setBusy('provision')
+    setError(null)
+    setProvisionResult(null)
+    try {
+      const data = await api<{emailSent: ProvisionResult['emailSent']}>(
+        `applications/${provisionApp.id}/provision-cabinet`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            accessLevel: provisionAccessLevel,
+            displayName: provisionDisplayName.trim(),
+          }),
+        },
+      )
+      setProvisionResult({emailSent: data.emailSent})
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Provision failed')
     } finally {
       setBusy(null)
     }
@@ -680,6 +725,16 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
                       )}
                     </button>
                   ))}
+                  {selected.status === 'accepted' ? (
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      className={adminPrimaryBtnClass}
+                      onClick={() => openProvisionDialog(selected)}
+                    >
+                      {t.admin_provision_cabinet_action}
+                    </button>
+                  ) : null}
                   {canDeleteApplication(selected.status) ? (
                     <button
                       type="button"
@@ -824,6 +879,95 @@ export default function AdminApp({currentLang, setCurrentLang}: AdminAppProps) {
               )}
             </button>
           </form>
+        </div>
+      ) : null}
+
+      {provisionApp ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-provision-title"
+        >
+          <div className={`${adminPanelClass} max-w-md space-y-4 shadow-xl`}>
+            <h2
+              id="admin-provision-title"
+              className="font-display text-lg font-semibold text-brand-slate-900 dark:text-white"
+            >
+              {t.admin_provision_cabinet_title}
+            </h2>
+            <p className="text-sm text-brand-slate-600 dark:text-brand-slate-300">
+              {t.admin_provision_cabinet_prompt}
+            </p>
+            <p className="text-sm text-brand-slate-500">{provisionApp.email}</p>
+            {provisionResult ? (
+              <div className="space-y-1 text-sm text-emerald-700 dark:text-emerald-400">
+                <p>{t.admin_provision_cabinet_done}</p>
+                <p>
+                  {provisionResult.emailSent === 'sent'
+                    ? t.admin_provision_cabinet_email_sent
+                    : t.admin_provision_cabinet_email_skipped}
+                </p>
+              </div>
+            ) : (
+              <>
+                <label className="block space-y-1.5 text-sm">
+                  <span className={adminLabelClass}>{t.admin_cabinet_user_access_level}</span>
+                  <select
+                    className={adminInputClass}
+                    value={provisionAccessLevel}
+                    disabled={isBusy}
+                    onChange={(e) => setProvisionAccessLevel(e.target.value)}
+                  >
+                    {CABINET_ACCESS_LEVELS.map((level) => (
+                      <option key={level} value={level}>
+                        {accessLevelLabel(t, level)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block space-y-1.5 text-sm">
+                  <span className={adminLabelClass}>{t.admin_provision_display_name}</span>
+                  <input
+                    className={adminInputClass}
+                    value={provisionDisplayName}
+                    disabled={isBusy}
+                    onChange={(e) => setProvisionDisplayName(e.target.value)}
+                  />
+                </label>
+              </>
+            )}
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className={adminSecondaryBtnClass}
+                disabled={isBusy}
+                onClick={() => {
+                  setProvisionApp(null)
+                  setProvisionResult(null)
+                }}
+              >
+                {provisionResult ? t.admin_provision_cabinet_close : t.admin_provision_cabinet_skip}
+              </button>
+              {!provisionResult ? (
+                <button
+                  type="button"
+                  className={adminPrimaryBtnClass}
+                  disabled={isBusy}
+                  onClick={() => void submitProvisionCabinet()}
+                >
+                  {busy === 'provision' ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                      {t.admin_busy}
+                    </span>
+                  ) : (
+                    t.admin_provision_cabinet_submit
+                  )}
+                </button>
+              ) : null}
+            </div>
+          </div>
         </div>
       ) : null}
 

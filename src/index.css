@@ -148,7 +148,7 @@
 /* Повертає типографіку посилань футера: сброс вище скидає font/color через inherit. */
 .footer-col button {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 14px;
 }
 
 .desktop-nav button {

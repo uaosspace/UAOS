@@ -13,6 +13,7 @@ export class ContentApiError extends Error {
 
 async function fetchJson<T>(path: string): Promise<T> {
   const response = await fetch(path, {
+    credentials: 'include',
     headers: {Accept: 'application/json'},
   })
   if (!response.ok) {

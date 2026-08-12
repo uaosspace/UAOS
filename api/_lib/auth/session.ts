@@ -7,7 +7,7 @@ import {decryptSecret, encryptSecret, hashPassword} from './crypto.js'
 import {buildOtpAuthUrl, generateTotpSecret, verifyTotpCode} from './totp.js'
 
 export const SESSION_COOKIE = 'uaos_admin_session'
-const SESSION_TTL_MS = 8 * 60 * 60 * 1000
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000
 export const RECOVERY_MFA_TTL_MS = 30 * 60 * 1000
 export const RECOVERY_MFA_TTL_MINUTES = 30
 

@@ -32,6 +32,21 @@ export function statusLabel(t: T, status: string): string {
   }
 }
 
+export function accessLevelLabel(t: T, level: string): string {
+  switch (level) {
+    case 'partner':
+      return t.admin_access_level_partner
+    case 'member':
+      return t.admin_access_level_member
+    case 'staff':
+      return t.admin_access_level_staff
+    case 'board':
+      return t.admin_access_level_board
+    default:
+      return level || t.admin_unknown
+  }
+}
+
 export function applicantKindLabel(lang: Locale, t: T, kind: string): string {
   const value = kind.trim()
   if (!value || value === 'unknown') return t.admin_unknown

@@ -7,6 +7,11 @@ export interface SiteSettings {
   email: string
   address: LocalizedText
   brandTagline: LocalizedText
+  statsShowOnSite: boolean
+  statsMembersValue: string
+  statsProducersValue: string
+  statsProjectsValue: string
+  statsYearsValue: string
 }
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
@@ -28,6 +33,34 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
     kk: 'Украина Кәсіптік Қауіпсіздік Қауымдастығы',
     fr: 'Association ukrainienne de la sécurité au travail',
   },
+  statsShowOnSite: false,
+  statsMembersValue: '125',
+  statsProducersValue: '68',
+  statsProjectsValue: '320+',
+  statsYearsValue: '12',
+}
+
+function readStats(source: Record<string, unknown>): Pick<
+  SiteSettings,
+  | 'statsShowOnSite'
+  | 'statsMembersValue'
+  | 'statsProducersValue'
+  | 'statsProjectsValue'
+  | 'statsYearsValue'
+> {
+  return {
+    statsShowOnSite: Boolean(source.statsShowOnSite),
+    statsMembersValue: readStringOr(source.statsMembersValue, DEFAULT_SITE_SETTINGS.statsMembersValue),
+    statsProducersValue: readStringOr(
+      source.statsProducersValue,
+      DEFAULT_SITE_SETTINGS.statsProducersValue,
+    ),
+    statsProjectsValue: readStringOr(
+      source.statsProjectsValue,
+      DEFAULT_SITE_SETTINGS.statsProjectsValue,
+    ),
+    statsYearsValue: readStringOr(source.statsYearsValue, DEFAULT_SITE_SETTINGS.statsYearsValue),
+  }
 }
 
 export async function fetchSiteSettings(): Promise<SiteSettings> {
@@ -43,6 +76,7 @@ export async function fetchSiteSettings(): Promise<SiteSettings> {
       brandTagline: source.brandTagline
         ? readLocalizedText(source.brandTagline)
         : DEFAULT_SITE_SETTINGS.brandTagline,
+      ...readStats(source),
     }
   } catch (err) {
     if (import.meta.env.DEV) {

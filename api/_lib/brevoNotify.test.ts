@@ -1,6 +1,7 @@
 import {describe, expect, it, vi} from 'vitest'
 import {
   buildAdminRecoveryEmail,
+  buildCabinetCredentialsEmail,
   buildJoinNotifyEmail,
   isBrevoNotifyConfigured,
   isBrevoSenderConfigured,
@@ -78,6 +79,20 @@ describe('brevoNotify helpers', () => {
     expect(email.textContent).toContain('TempPass123456')
     expect(email.textContent).toContain('654321')
     expect(email.htmlContent).toContain('TempPass123456')
+  })
+
+  it('builds cabinet credentials email with login link and temp password', () => {
+    const email = buildCabinetCredentialsEmail({
+      displayName: 'Jane Doe',
+      email: 'member@example.com',
+      temporaryPassword: 'TempPass123456789',
+      cabinetUrl: 'https://uaos.example/cabinet',
+    })
+    expect(email.subject).toContain('кабінету')
+    expect(email.textContent).toContain('member@example.com')
+    expect(email.textContent).toContain('TempPass123456789')
+    expect(email.textContent).toContain('https://uaos.example/cabinet')
+    expect(email.textContent).toContain('змініть пароль')
   })
 
   it('falls back to raw ids when label is unknown', () => {

@@ -6,6 +6,7 @@ import {
   normalizeOptionalMediaUrl,
   normalizeOptionalPublicEmail,
   normalizeOptionalPublicPhone,
+  normalizeParticipationMode,
   requireNonEmptyText,
 } from './contentValidation'
 
@@ -67,5 +68,12 @@ describe('contentValidation', () => {
     expect(() => normalizeOptionalPublicEmail('not-an-email')).toThrow(/invalid/)
     expect(normalizeOptionalPublicPhone('+380 67 123-45-67')).toBe('+380 67 123-45-67')
     expect(() => normalizeOptionalPublicPhone('abc')).toThrow(/invalid/)
+  })
+
+  it('normalizes participation mode with offline default', () => {
+    expect(normalizeParticipationMode('zoom')).toBe('zoom')
+    expect(normalizeParticipationMode('online_link')).toBe('online_link')
+    expect(normalizeParticipationMode(undefined)).toBe('offline')
+    expect(normalizeParticipationMode('webex')).toBe('offline')
   })
 })

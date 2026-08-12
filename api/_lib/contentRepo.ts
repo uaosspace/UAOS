@@ -11,9 +11,11 @@ import {
   normalizeOptionalMediaUrl,
   normalizeOptionalPublicEmail,
   normalizeOptionalPublicPhone,
+  normalizeParticipationMode,
   requireNonEmptyText,
   type LocalizedInput,
 } from './contentValidation.js'
+import {canViewEvent} from './meetings/accessCore.js'
 
 /** Localized payload sent to clients: `uk`/`en` always present, extra locales when translated. */
 type LocalizedOutput = {uk: string; en: string} & Record<string, string>
@@ -111,14 +113,33 @@ export async function listPublishedNews() {
   return rows.map(mapNewsPublic)
 }
 
-export async function listPublishedEvents() {
+export async function listPublishedEvents(userLevel: string | null = null) {
   const sql = getSql()
   const rows = await sql`
     SELECT * FROM content_events
     WHERE status = 'published'
     ORDER BY start_at ASC
   `
-  return rows.map(mapEventPublic)
+  return rows
+    .map((row) => mapEventPublic(row as Record<string, unknown>))
+    .filter((event) =>
+      canViewEvent({
+        visibility: event.visibility,
+        accessMinRole: event.accessMinRole,
+        userLevel,
+      }),
+    )
+}
+
+export async function getPublishedEventBySlug(slug: string) {
+  const sql = getSql()
+  const rows = await sql`
+    SELECT * FROM content_events
+    WHERE status = 'published' AND slug = ${slug}
+    LIMIT 1
+  `
+  if (!rows[0]) return null
+  return mapEventPublic(rows[0] as Record<string, unknown>)
 }
 
 export async function listPublishedDocuments() {
@@ -140,6 +161,11 @@ export async function getPublishedSiteSettings() {
       email: '',
       address: {uk: '', en: ''},
       brandTagline: {uk: '', en: ''},
+      statsShowOnSite: false,
+      statsMembersValue: '',
+      statsProducersValue: '',
+      statsProjectsValue: '',
+      statsYearsValue: '',
     }
   }
   const row = rows[0] as Record<string, unknown>
@@ -152,6 +178,11 @@ export async function getPublishedSiteSettings() {
       row.brand_tagline_uk,
       row.brand_tagline_en,
     ),
+    statsShowOnSite: Boolean(row.stats_show_on_site),
+    statsMembersValue: String(row.stats_members_value ?? ''),
+    statsProducersValue: String(row.stats_producers_value ?? ''),
+    statsProjectsValue: String(row.stats_projects_value ?? ''),
+    statsYearsValue: String(row.stats_years_value ?? ''),
   }
 }
 
@@ -232,10 +263,16 @@ function mapEventPublic(row: Record<string, unknown>) {
     endAt: row.end_at ? new Date(String(row.end_at)).toISOString() : null,
     timeZone: String(row.time_zone ?? 'Europe/Kyiv'),
     location: readLocalizedColumn(row.location_i18n, row.location, row.location),
+    // Manual external link only — never provider start_url / gated join from meetings.
     onlineUrl: String(row.online_url ?? ''),
     registrationUrl: String(row.registration_url ?? ''),
     organizer: readLocalizedColumn(row.organizer_i18n, row.organizer, row.organizer),
     coverImageUrl: String(row.cover_url ?? ''),
+    visibility: String(row.visibility ?? 'public') === 'restricted' ? 'restricted' : 'public',
+    accessMinRole: String(row.access_min_role ?? ''),
+    participationMode: String(row.participation_mode ?? 'offline'),
+    createdAt: row.created_at ? new Date(String(row.created_at)).toISOString() : new Date().toISOString(),
+    updatedAt: row.updated_at ? new Date(String(row.updated_at)).toISOString() : new Date().toISOString(),
   }
 }
 
@@ -503,6 +540,15 @@ export async function upsertContentEvent(body: unknown) {
   const startAt = readStringOr(source.startAt, '')
   if (!startAt) throw new Error('startAt required')
   const nextCoverUrl = readStringOr(source.coverImageUrl, '')
+  const visibility =
+    readStringOr(source.visibility, 'public') === 'restricted' ? 'restricted' : 'public'
+  const accessMinRoleRaw = readStringOr(source.accessMinRole, '')
+  const accessMinRole = accessMinRoleRaw.trim().toLowerCase()
+  const allowedMin = new Set(['', 'partner', 'member', 'staff', 'board'])
+  if (!allowedMin.has(accessMinRole)) {
+    throw new Error('Invalid accessMinRole')
+  }
+  const participationMode = normalizeParticipationMode(source.participationMode)
 
   if (id) {
     const previous = await sql`
@@ -535,6 +581,9 @@ export async function upsertContentEvent(body: unknown) {
         registration_url = ${readStringOr(source.registrationUrl, '')},
         organizer = COALESCE(${organizer.uk}::text, organizer),
         cover_url = ${nextCoverUrl},
+        visibility = ${visibility},
+        access_min_role = ${accessMinRole},
+        participation_mode = ${participationMode},
         updated_at = now()
       WHERE id = ${id}::uuid
       RETURNING *
@@ -550,7 +599,8 @@ export async function upsertContentEvent(body: unknown) {
       title_i18n, short_description_i18n, full_description_i18n, location_i18n, organizer_i18n,
       title_uk, title_en, short_description_uk, short_description_en,
       full_description_uk, full_description_en, event_type, event_format, start_at, end_at,
-      time_zone, location, online_url, registration_url, organizer, cover_url
+      time_zone, location, online_url, registration_url, organizer, cover_url,
+      visibility, access_min_role, participation_mode
     ) VALUES (
       ${slug}, ${status},
       ${title.json ?? '{}'}::jsonb,
@@ -566,7 +616,10 @@ export async function upsertContentEvent(body: unknown) {
       ${readStringOr(source.timeZone, 'Europe/Kyiv')},
       ${location.uk ?? ''}, ${readStringOr(source.onlineUrl, '')},
       ${readStringOr(source.registrationUrl, '')}, ${organizer.uk ?? ''},
-      ${nextCoverUrl}
+      ${nextCoverUrl},
+      ${visibility},
+      ${accessMinRole},
+      ${participationMode}
     )
     RETURNING *
   `
@@ -647,11 +700,18 @@ export async function putSiteSettings(body: unknown) {
   // Settings has a single row and the form always submits both fields, so no partial-update dance.
   const address = normalizeLocalizedText(source.address, 'address', 300)
   const brand = normalizeLocalizedText(source.brandTagline, 'brandTagline', 300)
+  const statsShowOnSite = Boolean(source.statsShowOnSite)
+  const statsMembersValue = readStringOr(source.statsMembersValue, '').slice(0, 32)
+  const statsProducersValue = readStringOr(source.statsProducersValue, '').slice(0, 32)
+  const statsProjectsValue = readStringOr(source.statsProjectsValue, '').slice(0, 32)
+  const statsYearsValue = readStringOr(source.statsYearsValue, '').slice(0, 32)
   const sql = getSql()
   await sql`
     INSERT INTO site_settings (
       id, phone, email, address_i18n, brand_tagline_i18n,
-      address_uk, address_en, brand_tagline_uk, brand_tagline_en, updated_at
+      address_uk, address_en, brand_tagline_uk, brand_tagline_en,
+      stats_show_on_site, stats_members_value, stats_producers_value,
+      stats_projects_value, stats_years_value, updated_at
     )
     VALUES (
       'siteSettings',
@@ -663,6 +723,11 @@ export async function putSiteSettings(body: unknown) {
       ${address.en ?? ''},
       ${brand.uk ?? ''},
       ${brand.en ?? ''},
+      ${statsShowOnSite},
+      ${statsMembersValue},
+      ${statsProducersValue},
+      ${statsProjectsValue},
+      ${statsYearsValue},
       now()
     )
     ON CONFLICT (id) DO UPDATE SET
@@ -674,6 +739,11 @@ export async function putSiteSettings(body: unknown) {
       address_en = EXCLUDED.address_en,
       brand_tagline_uk = EXCLUDED.brand_tagline_uk,
       brand_tagline_en = EXCLUDED.brand_tagline_en,
+      stats_show_on_site = EXCLUDED.stats_show_on_site,
+      stats_members_value = EXCLUDED.stats_members_value,
+      stats_producers_value = EXCLUDED.stats_producers_value,
+      stats_projects_value = EXCLUDED.stats_projects_value,
+      stats_years_value = EXCLUDED.stats_years_value,
       updated_at = now()
   `
   return getPublishedSiteSettings()

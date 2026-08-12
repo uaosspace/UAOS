@@ -1,11 +1,12 @@
 import {useCallback, useEffect, useState, type FormEvent} from 'react'
+import {Loader2} from 'lucide-react'
 import {DateTime} from 'luxon'
 import {DEFAULT_LOCALE, LOCALES, LOCALE_META, type Locale} from '../../data/locales'
 import {TRANSLATIONS} from '../../data/translations'
 import {readLocalizedText} from '../../lib/contentGuards'
 import type {LocalizedText} from '../../types'
 import {resolveContentSlug} from '../../utils/slugify'
-import {localizedFieldLabel} from './adminLabels'
+import {accessLevelLabel, localizedFieldLabel} from './adminLabels'
 import {
   adminInputClass,
   adminLabelClass,
@@ -15,6 +16,8 @@ import {
   adminTabActiveClass,
   adminTabIdleClass,
 } from './adminUi'
+import MemberUsersEditor from './MemberUsersEditor'
+import MeetingsManager from './MeetingsManager'
 
 const ADMIN_EVENT_ZONE = 'Europe/Kyiv'
 
@@ -33,7 +36,7 @@ function kyivPartsToIso(date: string, time: string): string {
   return dt.toUTC().toISO() ?? ''
 }
 
-type ContentKind = 'news' | 'members' | 'events' | 'documents' | 'settings'
+type ContentKind = 'news' | 'members' | 'events' | 'documents' | 'settings' | 'cabinetUsers' | 'meetings'
 
 type NewsDraft = {
   id?: string
@@ -75,6 +78,11 @@ type EventDraft = {
   startAt: string
   endAt: string
   coverUrl: string
+  visibility: 'public' | 'restricted'
+  accessMinRole: string
+  participationMode: string
+  onlineUrl: string
+  timeZone: string
 }
 
 type DocumentDraft = {
@@ -94,6 +102,11 @@ type SettingsDraft = {
   email: string
   address: LocalizedText
   brandTagline: LocalizedText
+  statsShowOnSite: boolean
+  statsMembersValue: string
+  statsProducersValue: string
+  statsProjectsValue: string
+  statsYearsValue: string
 }
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -147,6 +160,11 @@ const emptyEvent = (): EventDraft => ({
   startAt: '',
   endAt: '',
   coverUrl: '',
+  visibility: 'public',
+  accessMinRole: '',
+  participationMode: 'offline',
+  onlineUrl: '',
+  timeZone: 'Europe/Kyiv',
 })
 
 const emptyDocument = (): DocumentDraft => ({
@@ -408,11 +426,15 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
   const t = TRANSLATIONS[currentLang]
   const [kind, setKind] = useState<ContentKind>('news')
   const [items, setItems] = useState<unknown[]>([])
+  const [listLoading, setListLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [news, setNews] = useState<NewsDraft>(emptyNews())
   const [member, setMember] = useState<MemberDraft>(emptyMember())
   const [eventItem, setEventItem] = useState<EventDraft>(emptyEvent())
+  const [meetingInfo, setMeetingInfo] = useState<Record<string, unknown> | null>(null)
+  const [reportInfo, setReportInfo] = useState<Record<string, unknown> | null>(null)
+  const [reportSummary, setReportSummary] = useState('')
   const [documentItem, setDocumentItem] = useState<DocumentDraft>(emptyDocument())
   const [fieldLocale, setFieldLocale] = useState<Locale>(DEFAULT_LOCALE)
   const [translating, setTranslating] = useState(false)
@@ -421,6 +443,11 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
     email: '',
     address: emptyLocalized(),
     brandTagline: emptyLocalized(),
+    statsShowOnSite: false,
+    statsMembersValue: '',
+    statsProducersValue: '',
+    statsProjectsValue: '',
+    statsYearsValue: '',
   })
 
   async function suggestTranslations(fields: Record<string, LocalizedText>) {
@@ -462,24 +489,46 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
   }
   const load = useCallback(async () => {
     setError(null)
-    if (kind === 'settings') {
-      const data = await api<{item: Record<string, unknown>}>('content/settings')
-      const item = data.item || {}
-      setSettings({
-        phone: String(item.phone || ''),
-        email: String(item.email || ''),
-        address: readLocalizedText(item.address),
-        brandTagline: readLocalizedText(item.brandTagline),
-      })
+    setListLoading(true)
+    try {
+      if (kind === 'cabinetUsers') {
+        setItems([])
+        return
+      }
+      if (kind === 'meetings') {
+        setItems([])
+        return
+      }
+      if (kind === 'settings') {
+        const data = await api<{item: Record<string, unknown>}>('content/settings')
+        const item = data.item || {}
+        setSettings({
+          phone: String(item.phone || ''),
+          email: String(item.email || ''),
+          address: readLocalizedText(item.address),
+          brandTagline: readLocalizedText(item.brandTagline),
+          statsShowOnSite: Boolean(item.statsShowOnSite),
+          statsMembersValue: String(item.statsMembersValue || ''),
+          statsProducersValue: String(item.statsProducersValue || ''),
+          statsProjectsValue: String(item.statsProjectsValue || ''),
+          statsYearsValue: String(item.statsYearsValue || ''),
+        })
+        setItems([])
+        return
+      }
       setItems([])
-      return
+      const data = await api<{items: unknown[]}>(`content/${kind}`)
+      setItems(data.items || [])
+    } finally {
+      setListLoading(false)
     }
-    const data = await api<{items: unknown[]}>(`content/${kind}`)
-    setItems(data.items || [])
   }, [kind])
 
   useEffect(() => {
-    void load().catch((err) => setError(err instanceof Error ? err.message : 'Load failed'))
+    void load().catch((err) => {
+      setListLoading(false)
+      setError(err instanceof Error ? err.message : 'Load failed')
+    })
   }, [load])
 
   async function uploadFile(file: File, visibility: 'public' | 'private' = 'public') {
@@ -601,6 +650,11 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
           startAt: eventItem.startAt,
           endAt: eventItem.endAt,
           coverImageUrl: eventItem.coverUrl,
+          visibility: eventItem.visibility,
+          accessMinRole: eventItem.accessMinRole,
+          participationMode: eventItem.participationMode,
+          onlineUrl: eventItem.onlineUrl,
+          timeZone: eventItem.timeZone || 'Europe/Kyiv',
         }),
       })
       setMessage(t.admin_saved)
@@ -665,6 +719,11 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
           email: settings.email,
           address: settings.address,
           brandTagline: settings.brandTagline,
+          statsShowOnSite: settings.statsShowOnSite,
+          statsMembersValue: settings.statsMembersValue,
+          statsProducersValue: settings.statsProducersValue,
+          statsProjectsValue: settings.statsProjectsValue,
+          statsYearsValue: settings.statsYearsValue,
         }),
       })
       setMessage(t.admin_saved)
@@ -718,7 +777,14 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
       startAt: String(raw.startAt || ''),
       endAt: String(raw.endAt || ''),
       coverUrl: String(raw.coverUrl || raw.coverImageUrl || ''),
+      visibility: raw.visibility === 'restricted' ? 'restricted' : 'public',
+      accessMinRole: String(raw.accessMinRole || ''),
+      participationMode: String(raw.participationMode || 'offline'),
+      onlineUrl: String(raw.onlineUrl || ''),
+      timeZone: String(raw.timeZone || 'Europe/Kyiv'),
     })
+    setMeetingInfo(null)
+    setReportInfo(null)
   }
 
   function pickDocument(raw: Record<string, unknown>) {
@@ -740,7 +806,9 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
     {id: 'members', label: t.admin_tab_members},
     {id: 'events', label: t.admin_tab_events},
     {id: 'documents', label: t.admin_tab_documents},
+    {id: 'meetings', label: t.admin_tab_meetings},
     {id: 'settings', label: t.admin_tab_settings},
+    {id: 'cabinetUsers', label: t.admin_tab_cabinet_users},
   ]
 
   const statusSelect = (value: 'draft' | 'published', onChange: (v: 'draft' | 'published') => void) => (
@@ -775,40 +843,51 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
       {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
       {message ? <p className="text-sm text-emerald-700 dark:text-emerald-400">{message}</p> : null}
 
-      {kind !== 'settings' ? (
+      {kind !== 'settings' && kind !== 'cabinetUsers' && kind !== 'meetings' ? (
         <div className={adminPanelClass}>
-          <ul className="max-h-52 overflow-auto divide-y divide-brand-slate-200 dark:divide-brand-slate-700">
-            {items.map((raw) => {
-              const item = raw as Record<string, unknown>
-              const id = String(item.id || item.slug || Math.random())
-              const label =
-                String((item.title as {uk?: string} | undefined)?.uk || '') ||
-                String((item.name as {uk?: string} | undefined)?.uk || '') ||
-                String(item.slug || id)
-              return (
-                <li key={id}>
-                  <button
-                    type="button"
-                    className="w-full rounded-xl px-3 py-2.5 text-left text-sm transition hover:bg-brand-slate-50 dark:hover:bg-brand-slate-800/60"
-                    onClick={() => {
-                      if (kind === 'news') pickNews(item)
-                      if (kind === 'members') pickMember(item)
-                      if (kind === 'events') pickEvent(item)
-                      if (kind === 'documents') pickDocument(item)
-                      setMessage(`${t.admin_editing}: ${label}`)
-                    }}
-                  >
-                    <span className="font-medium text-brand-slate-900 dark:text-white">{label}</span>
-                    <span className="ml-2 text-xs text-brand-slate-500">
-                      {String(item.status || '') === 'published'
-                        ? t.admin_status_published
-                        : t.admin_status_draft}
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+          {listLoading ? (
+            <p className="inline-flex items-center gap-2 px-3 py-2.5 text-sm text-brand-slate-500 dark:text-brand-slate-400">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              {t.admin_loading}
+            </p>
+          ) : items.length === 0 ? (
+            <p className="px-3 py-2.5 text-sm text-brand-slate-500 dark:text-brand-slate-400">
+              {t.admin_empty_content_list}
+            </p>
+          ) : (
+            <ul className="max-h-52 overflow-auto divide-y divide-brand-slate-200 dark:divide-brand-slate-700">
+              {items.map((raw) => {
+                const item = raw as Record<string, unknown>
+                const id = String(item.id || item.slug || Math.random())
+                const label =
+                  String((item.title as {uk?: string} | undefined)?.uk || '') ||
+                  String((item.name as {uk?: string} | undefined)?.uk || '') ||
+                  String(item.slug || id)
+                return (
+                  <li key={id}>
+                    <button
+                      type="button"
+                      className="w-full rounded-xl px-3 py-2.5 text-left text-sm transition hover:bg-brand-slate-50 dark:hover:bg-brand-slate-800/60"
+                      onClick={() => {
+                        if (kind === 'news') pickNews(item)
+                        if (kind === 'members') pickMember(item)
+                        if (kind === 'events') pickEvent(item)
+                        if (kind === 'documents') pickDocument(item)
+                        setMessage(`${t.admin_editing}: ${label}`)
+                      }}
+                    >
+                      <span className="font-medium text-brand-slate-900 dark:text-white">{label}</span>
+                      <span className="ml-2 text-xs text-brand-slate-500">
+                        {String(item.status || '') === 'published'
+                          ? t.admin_status_published
+                          : t.admin_status_draft}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </div>
       ) : null}
 
@@ -1125,6 +1204,62 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
             onChange={(v) => setEventItem({...eventItem, coverUrl: v})}
           />
           <label className="block space-y-1.5 text-sm">
+            <span className={adminLabelClass}>{t.admin_field_participation_mode}</span>
+            <select
+              className={adminInputClass}
+              value={eventItem.participationMode}
+              onChange={(e) => setEventItem({...eventItem, participationMode: e.target.value})}
+            >
+              <option value="offline">{t.admin_participation_offline}</option>
+              <option value="zoom">{t.admin_participation_zoom}</option>
+              <option value="online_link">{t.admin_participation_online_link}</option>
+              <option value="phone">{t.admin_participation_phone}</option>
+              <option value="other">{t.admin_participation_other}</option>
+            </select>
+          </label>
+          <label className="block space-y-1.5 text-sm">
+            <span className={adminLabelClass}>{t.admin_field_visibility}</span>
+            <select
+              className={adminInputClass}
+              value={eventItem.visibility}
+              onChange={(e) =>
+                setEventItem({
+                  ...eventItem,
+                  visibility: e.target.value === 'restricted' ? 'restricted' : 'public',
+                })
+              }
+            >
+              <option value="public">{t.admin_visibility_public}</option>
+              <option value="restricted">{t.admin_visibility_restricted}</option>
+            </select>
+          </label>
+          <label className="block space-y-1.5 text-sm">
+            <span className={adminLabelClass}>{t.admin_field_access_min_role}</span>
+            <select
+              className={adminInputClass}
+              value={eventItem.accessMinRole}
+              onChange={(e) => setEventItem({...eventItem, accessMinRole: e.target.value})}
+            >
+              <option value="">{t.admin_access_min_any}</option>
+              <option value="partner">{accessLevelLabel(t, 'partner')}</option>
+              <option value="member">{accessLevelLabel(t, 'member')}</option>
+              <option value="staff">{accessLevelLabel(t, 'staff')}</option>
+              <option value="board">{accessLevelLabel(t, 'board')}</option>
+            </select>
+          </label>
+          {eventItem.participationMode === 'online_link' ? (
+            <Field
+              label={t.admin_field_online_url}
+              value={eventItem.onlineUrl}
+              onChange={(v) => setEventItem({...eventItem, onlineUrl: v})}
+            />
+          ) : null}
+          {eventItem.participationMode === 'phone' || eventItem.participationMode === 'other' ? (
+            <p className="md:col-span-2 text-xs text-brand-slate-500 dark:text-brand-slate-400">
+              {t.admin_participation_describe_hint}
+            </p>
+          ) : null}
+          <label className="block space-y-1.5 text-sm">
             <span className={adminLabelClass}>{t.admin_upload_cover}</span>
             <input
               className="block w-full text-sm text-brand-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-blue-500 file:px-3 file:py-2 file:text-white dark:text-brand-slate-300"
@@ -1165,8 +1300,153 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
               </button>
             ) : null}
           </div>
+          {eventItem.id && eventItem.participationMode === 'zoom' ? (
+            <div className="md:col-span-2 space-y-3 rounded-xl border border-brand-slate-200 p-3 dark:border-brand-slate-700">
+              <p className="text-sm font-medium text-brand-slate-900 dark:text-white">
+                {t.admin_meeting_block}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className={adminSecondaryBtnClass}
+                  type="button"
+                  onClick={() => {
+                    void api<{meeting: Record<string, unknown> | null}>(
+                      `content/events/${eventItem.id}/meeting`,
+                    )
+                      .then((data) => setMeetingInfo(data.meeting))
+                      .catch((err) => setError(err.message))
+                  }}
+                >
+                  {t.admin_meeting_status}
+                </button>
+                <button
+                  className={adminSecondaryBtnClass}
+                  type="button"
+                  onClick={() => {
+                    void api<{meeting: Record<string, unknown>}>(
+                      `content/events/${eventItem.id}/meeting`,
+                      {method: 'POST', body: JSON.stringify({provider: 'zoom'})},
+                    )
+                      .then((data) => {
+                        setMeetingInfo(data.meeting)
+                        setMessage(t.admin_saved)
+                      })
+                      .catch((err) => setError(err.message))
+                  }}
+                >
+                  {t.admin_meeting_create}
+                </button>
+                <button
+                  className={adminSecondaryBtnClass}
+                  type="button"
+                  onClick={() => {
+                    void api<{meeting: Record<string, unknown>}>(
+                      `content/events/${eventItem.id}/meeting/retry`,
+                      {method: 'POST', body: '{}'},
+                    )
+                      .then((data) => {
+                        setMeetingInfo(data.meeting)
+                        setMessage(t.admin_saved)
+                      })
+                      .catch((err) => setError(err.message))
+                  }}
+                >
+                  {t.admin_meeting_retry}
+                </button>
+                <button
+                  className={adminSecondaryBtnClass}
+                  type="button"
+                  onClick={() => {
+                    void api('meetings/process-inbox', {method: 'POST', body: JSON.stringify({limit: 10})})
+                      .then(() => setMessage(t.admin_saved))
+                      .catch((err) => setError(err.message))
+                  }}
+                >
+                  {t.admin_meeting_process_inbox}
+                </button>
+              </div>
+              {meetingInfo ? (
+                <pre className="overflow-x-auto text-xs text-brand-slate-600 dark:text-brand-slate-300">
+                  {JSON.stringify(meetingInfo, null, 2)}
+                </pre>
+              ) : null}
+              <p className="text-sm font-medium text-brand-slate-900 dark:text-white">
+                {t.admin_report_block}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className={adminSecondaryBtnClass}
+                  type="button"
+                  onClick={() => {
+                    void api<{report: Record<string, unknown> | null}>(
+                      `content/events/${eventItem.id}/report`,
+                    )
+                      .then((data) => {
+                        setReportInfo(data.report)
+                        setReportSummary(String(data.report?.summary ?? ''))
+                      })
+                      .catch((err) => setError(err.message))
+                  }}
+                >
+                  {t.admin_report_summary}
+                </button>
+                <button
+                  className={adminSecondaryBtnClass}
+                  type="button"
+                  onClick={() => {
+                    void api<{report: Record<string, unknown>}>(
+                      `content/events/${eventItem.id}/report`,
+                      {
+                        method: 'PATCH',
+                        body: JSON.stringify({editedSummary: reportSummary, status: 'in_review'}),
+                      },
+                    )
+                      .then((data) => {
+                        setReportInfo(data.report)
+                        setMessage(t.admin_saved)
+                      })
+                      .catch((err) => setError(err.message))
+                  }}
+                >
+                  {t.admin_report_save_draft}
+                </button>
+                <button
+                  className={adminPrimaryBtnClass}
+                  type="button"
+                  onClick={() => {
+                    void api<{report: Record<string, unknown>}>(
+                      `content/events/${eventItem.id}/report/approve`,
+                      {method: 'POST', body: '{}'},
+                    )
+                      .then((data) => {
+                        setReportInfo(data.report)
+                        setMessage(t.admin_saved)
+                      })
+                      .catch((err) => setError(err.message))
+                  }}
+                >
+                  {t.admin_report_approve}
+                </button>
+              </div>
+              <textarea
+                className={adminInputClass}
+                rows={4}
+                value={reportSummary}
+                onChange={(e) => setReportSummary(e.target.value)}
+                placeholder={t.admin_report_summary}
+              />
+              {reportInfo ? (
+                <p className="text-xs text-brand-slate-500">
+                  status: {String(reportInfo.status ?? '—')}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </form>
       ) : null}
+
+      {kind === 'cabinetUsers' ? <MemberUsersEditor currentLang={currentLang} /> : null}
+      {kind === 'meetings' ? <MeetingsManager currentLang={currentLang} /> : null}
 
       {kind === 'documents' ? (
         <form className={`${adminPanelClass} grid gap-3 md:grid-cols-2`} onSubmit={saveDocument}>
@@ -1291,6 +1571,37 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
             value={settings.brandTagline}
             locale={fieldLocale}
             onChange={(v) => setSettings({...settings, brandTagline: v})}
+          />
+          <div className="md:col-span-2 border-t border-brand-slate-200 dark:border-brand-slate-700 pt-3 mt-1">
+            <p className={`${adminLabelClass} mb-2`}>{t.admin_stats_showcase_title}</p>
+            <label className="inline-flex items-center gap-2 text-sm mb-3">
+              <input
+                type="checkbox"
+                checked={settings.statsShowOnSite}
+                onChange={(e) => setSettings({...settings, statsShowOnSite: e.target.checked})}
+              />
+              {t.admin_stats_show_on_site}
+            </label>
+          </div>
+          <Field
+            label={t.admin_stats_members_value}
+            value={settings.statsMembersValue}
+            onChange={(v) => setSettings({...settings, statsMembersValue: v})}
+          />
+          <Field
+            label={t.admin_stats_producers_value}
+            value={settings.statsProducersValue}
+            onChange={(v) => setSettings({...settings, statsProducersValue: v})}
+          />
+          <Field
+            label={t.admin_stats_projects_value}
+            value={settings.statsProjectsValue}
+            onChange={(v) => setSettings({...settings, statsProjectsValue: v})}
+          />
+          <Field
+            label={t.admin_stats_years_value}
+            value={settings.statsYearsValue}
+            onChange={(v) => setSettings({...settings, statsYearsValue: v})}
           />
           <div className="md:col-span-2">
             <button className={adminPrimaryBtnClass} type="submit">

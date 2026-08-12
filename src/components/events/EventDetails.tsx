@@ -1,20 +1,29 @@
 import type {Locale} from '../../data/locales'
 import {resolveLocalized} from '../../data/locales'
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import { AssociationEvent } from '../../types';
 import { TRANSLATIONS } from '../../data/translations';
 import { formatEventDateRange, isPastEvent } from '../../utils/eventDate';
 import SaveEventMenu from './SaveEventMenu';
 import { shareEvent } from '../../utils/calendarExport';
-import { MapPin, Globe, User, Clock, ExternalLink, Share2 } from 'lucide-react';
+import { MapPin, Globe, User, Clock, ExternalLink, Share2, Loader2 } from 'lucide-react';
 
 interface EventDetailsProps {
   event: AssociationEvent;
   currentLang: Locale;
 }
 
+type MeetingMeta = {
+  status: string
+  provider: string
+  canJoin: boolean
+} | null
+
 export default function EventDetails({ event, currentLang }: EventDetailsProps) {
   const t = TRANSLATIONS[currentLang];
+  const [meeting, setMeeting] = useState<MeetingMeta>(null)
+  const [joining, setJoining] = useState(false)
+  const [joinError, setJoinError] = useState<string | null>(null)
   
   const typeKey = `events_${event.type}` as keyof typeof t;
   const typeText = t[typeKey] || event.type;
@@ -24,6 +33,9 @@ export default function EventDetails({ event, currentLang }: EventDetailsProps) 
 
   const dateRange = formatEventDateRange(event, currentLang);
   const past = isPastEvent(event);
+  const participationMode = event.participationMode ?? (event.onlineUrl ? 'online_link' : 'offline');
+  const showOnlineLink = participationMode === 'online_link' && Boolean(event.onlineUrl);
+  const showZoomJoin = participationMode === 'zoom';
 
   const titleText = resolveLocalized(event.title, currentLang);
   const locationText = event.location ? resolveLocalized(event.location, currentLang) : '';
@@ -33,9 +45,67 @@ export default function EventDetails({ event, currentLang }: EventDetailsProps) 
     ? resolveLocalized(event.fullDescription, currentLang)
     : '';
 
+  useEffect(() => {
+    if (!showZoomJoin) {
+      setMeeting(null)
+      return
+    }
+    let cancelled = false
+    async function loadMeetingMeta() {
+      try {
+        const response = await fetch(`/api/public/events/${encodeURIComponent(event.id)}`, {
+          credentials: 'include',
+          headers: {Accept: 'application/json'},
+        })
+        if (!response.ok) return
+        const data = (await response.json()) as {meeting?: MeetingMeta}
+        if (!cancelled) setMeeting(data.meeting ?? null)
+      } catch {
+        if (!cancelled) setMeeting(null)
+      }
+    }
+    void loadMeetingMeta()
+    return () => {
+      cancelled = true
+    }
+  }, [event.id, showZoomJoin])
+
+  async function joinMeeting() {
+    setJoinError(null)
+    setJoining(true)
+    try {
+      const response = await fetch(`/api/public/events/${encodeURIComponent(event.id)}/meeting`, {
+        credentials: 'include',
+        headers: {Accept: 'application/json'},
+      })
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string
+        meeting?: {joinUrl?: string}
+      }
+      if (response.status === 401) {
+        setJoinError(t.events_meeting_login_needed)
+        return
+      }
+      if (response.status === 403) {
+        setJoinError(t.events_meeting_forbidden)
+        return
+      }
+      if (!response.ok || !data.meeting?.joinUrl) {
+        setJoinError(
+          typeof data.error === 'string' ? data.error : t.events_meeting_unavailable,
+        )
+        return
+      }
+      window.location.assign(data.meeting.joinUrl)
+    } catch {
+      setJoinError(t.events_meeting_unavailable)
+    } finally {
+      setJoining(false)
+    }
+  }
+
   return (
     <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] rounded-2xl bg-white dark:bg-brand-slate-900">
-      {/* Cover + text scroll; actions stay in bottom row (no card-level overflow — dropdowns must escape) */}
       <div className="min-h-0 overflow-y-auto overscroll-contain custom-scrollbar rounded-t-2xl">
         {event.coverImageUrl && (
           <div className="w-full bg-brand-slate-50 dark:bg-brand-slate-800/80 border-b border-brand-slate-100 dark:border-brand-slate-700">
@@ -79,21 +149,14 @@ export default function EventDetails({ event, currentLang }: EventDetailsProps) 
               </div>
             </div>
 
-            {(event.format === 'offline' || event.format === 'hybrid') && locationText && (
+            {locationText ? (
               <div className="flex items-start gap-3 text-brand-slate-700 dark:text-brand-slate-200">
                 <MapPin className="w-5 h-5 text-brand-slate-400 shrink-0 mt-0.5" />
                 <p>{locationText}</p>
               </div>
-            )}
+            ) : null}
 
-            {(event.format === 'online' || event.format === 'hybrid') && (
-              <div className="flex items-start gap-3 text-brand-slate-700 dark:text-brand-slate-200">
-                <Globe className="w-5 h-5 text-brand-slate-400 shrink-0 mt-0.5" />
-                <p>{t.events_online}</p>
-              </div>
-            )}
-
-            {organizerText && (
+            {organizerText ? (
               <div className="flex items-start gap-3 text-brand-slate-700 dark:text-brand-slate-200">
                 <User className="w-5 h-5 text-brand-slate-400 shrink-0 mt-0.5" />
                 <div>
@@ -101,7 +164,7 @@ export default function EventDetails({ event, currentLang }: EventDetailsProps) 
                   <p>{organizerText}</p>
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
 
           <div className="prose prose-slate dark:prose-invert max-w-none">
@@ -132,7 +195,7 @@ export default function EventDetails({ event, currentLang }: EventDetailsProps) 
               </a>
             )}
 
-            {event.onlineUrl && (
+            {showOnlineLink && event.onlineUrl ? (
               <a
                 href={event.onlineUrl}
                 target="_blank"
@@ -142,7 +205,23 @@ export default function EventDetails({ event, currentLang }: EventDetailsProps) 
                 {t.events_join_online}
                 <Globe className="w-4 h-4" />
               </a>
-            )}
+            ) : null}
+
+            {showZoomJoin && meeting ? (
+              <button
+                type="button"
+                disabled={joining || !meeting.canJoin}
+                onClick={() => void joinMeeting()}
+                className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                {joining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+                {joining ? t.events_meeting_loading : t.events_join_online}
+              </button>
+            ) : null}
+
+            {joinError ? (
+              <p className="w-full text-sm text-red-600 dark:text-red-400">{joinError}</p>
+            ) : null}
 
             <SaveEventMenu event={event} currentLang={currentLang} />
           </>

@@ -7,6 +7,7 @@ import {
   readEventType,
   readHttpUrl,
   readLocalizedText,
+  readParticipationMode,
   readStringOr,
 } from '../lib/contentGuards'
 
@@ -109,6 +110,9 @@ export function mapEvent(doc: unknown): AssociationEvent {
     fullDescription: readLocalizedText(source.fullDescription),
     type: readEventType(source.type),
     format: readEventFormat(source.format),
+    participationMode: readParticipationMode(source.participationMode),
+    visibility: source.visibility === 'restricted' ? 'restricted' : 'public',
+    accessMinRole: readStringOr(source.accessMinRole, ''),
     startAt: readStringOr(source.startAt, new Date().toISOString()),
     endAt: readStringOr(source.endAt, readStringOr(source.startAt, new Date().toISOString())),
     timeZone: readStringOr(source.timeZone, 'Europe/Kyiv'),
