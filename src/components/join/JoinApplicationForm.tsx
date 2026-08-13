@@ -207,8 +207,9 @@ export default function JoinApplicationForm({
   const showProductCategories = form.applicantKind === 'producer-supplier'
   const showCompetencies = form.applicantKind === 'expert-org'
 
-  const inputClass =
-    'w-full px-3.5 py-2.5 rounded-xl glass-pill focus:border-brand-blue-500 dark:focus:border-brand-sky-400 focus:bg-white dark:focus:bg-brand-slate-900 text-sm text-brand-slate-800 dark:text-brand-slate-200 outline-none transition-all'
+  const controlClass =
+    'px-3.5 py-2.5 rounded-xl glass-pill focus:border-brand-blue-500 dark:focus:border-brand-sky-400 focus:bg-white dark:focus:bg-brand-slate-900 text-sm text-brand-slate-800 dark:text-brand-slate-200 outline-none transition-all'
+  const inputClass = `w-full ${controlClass}`
   const labelClass = 'block text-xs font-semibold text-brand-slate-600 dark:text-brand-slate-300 mb-1.5'
 
   if (status === 'success') {
@@ -396,7 +397,7 @@ export default function JoinApplicationForm({
         </div>
         <div>
           <label className={labelClass} htmlFor="join-phone">{t.join_form_phone_lbl}</label>
-          <div className="flex gap-2">
+          <div className="flex min-w-0 items-stretch gap-2">
             <label className="sr-only" htmlFor="join-phone-code">
               {t.join_form_phone_code_lbl}
             </label>
@@ -404,12 +405,12 @@ export default function JoinApplicationForm({
               id="join-phone-code"
               value={form.phoneDial}
               onChange={(event) => update('phoneDial', event.target.value)}
-              className={`${inputClass} w-[8.5rem] shrink-0`}
+              className="w-[5.5rem] max-w-[5.5rem] shrink-0 px-2 py-2.5 rounded-xl glass-pill focus:border-brand-blue-500 dark:focus:border-brand-sky-400 focus:bg-white dark:focus:bg-brand-slate-900 text-sm text-brand-slate-800 dark:text-brand-slate-200 outline-none transition-all"
               aria-label={t.join_form_phone_code_lbl}
             >
               {PHONE_COUNTRY_CODES.map((item) => (
-                <option key={item.dial} value={item.dial}>
-                  {item.iso} {item.dial}
+                <option key={item.dial} value={item.dial} title={`${item.iso} ${item.dial}`}>
+                  {item.dial}
                 </option>
               ))}
             </select>
@@ -422,7 +423,7 @@ export default function JoinApplicationForm({
               maxLength={20}
               value={form.phoneNational}
               onChange={(event) => update('phoneNational', event.target.value)}
-              className={inputClass}
+              className={`${controlClass} min-w-0 flex-1`}
             />
           </div>
         </div>
