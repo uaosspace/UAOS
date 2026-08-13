@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from 'react'
 import type {Locale} from '../../data/locales'
 import {TRANSLATIONS} from '../../data/translations'
+import {buildProtocolDocxBlob} from '../../lib/protocolDocx'
 import {
   adminInputClass,
   adminLabelClass,
@@ -156,17 +157,17 @@ export default function EventProtocolPanel({
     }
   }
 
-  function formatProtocolSection(label: string, items: unknown[]): string {
-    if (!items.length) return ''
-    const lines = items.map((item) => {
-      if (typeof item === 'string') return `- ${item}`
-      if (item && typeof item === 'object') return `- ${JSON.stringify(item)}`
-      return `- ${String(item)}`
-    })
-    return `${label}\n${lines.join('\n')}\n\n`
+  function formatListItems(items: unknown[]): string[] {
+    return items
+      .map((item) => {
+        if (typeof item === 'string') return item.trim()
+        if (item && typeof item === 'object') return JSON.stringify(item)
+        return String(item)
+      })
+      .filter(Boolean)
   }
 
-  function downloadProtocol() {
+  async function downloadProtocol() {
     if (!bundle?.report) return
     const report = bundle.report
     const title =
@@ -174,31 +175,35 @@ export default function EventProtocolPanel({
       report.eventSlug ||
       eventSlug ||
       'protocol'
-    const recordingLines = bundle.recordings
-      .map((rec) => `- ${rec.recordingType || rec.fileType || rec.id}: ${rec.downloadUrl}`)
-      .join('\n')
-    const body = [
-      `# ${title}`,
-      '',
-      `Status: ${report.status}`,
-      '',
-      '## Summary',
-      editedSummary || report.summary || '',
-      '',
-      formatProtocolSection('## Decisions', report.decisions),
-      formatProtocolSection('## Action items', report.actionItems),
-      bundle.transcript?.contentText
-        ? `## Transcript\n${bundle.transcript.contentText.slice(0, 50000)}\n\n`
-        : '',
-      recordingLines ? `## Recordings\n${recordingLines}\n` : '',
-    ].join('\n')
-    const blob = new Blob([body], {type: 'text/markdown;charset=utf-8'})
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `${report.eventSlug || eventSlug || 'protocol'}-protocol.md`
-    anchor.click()
-    URL.revokeObjectURL(url)
+    onErrorRef.current?.(null)
+    try {
+      const blob = await buildProtocolDocxBlob({
+        title,
+        status: report.status,
+        body: editedSummary || report.summary || '',
+        decisions: formatListItems(report.decisions),
+        actionItems: formatListItems(report.actionItems),
+        transcriptText: bundle.transcript?.contentText?.slice(0, 50000),
+        recordingLines: bundle.recordings.map(
+          (rec) => `${rec.recordingType || rec.fileType || rec.id}: ${rec.downloadUrl}`,
+        ),
+        labels: {
+          status: currentLang === 'en' ? 'Status' : 'Статус',
+          decisions: currentLang === 'en' ? 'Decisions' : 'Рішення',
+          actionItems: currentLang === 'en' ? 'Action items' : 'Поручення',
+          transcript: t.admin_meetings_transcript,
+          recordings: t.admin_meetings_recordings,
+        },
+      })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `${report.eventSlug || eventSlug || 'protocol'}-protocol.docx`
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      onErrorRef.current?.(err instanceof Error ? err.message : 'Download failed')
+    }
   }
 
   return (
@@ -278,7 +283,11 @@ export default function EventProtocolPanel({
           {t.admin_meetings_approve}
         </button>
         {bundle?.report ? (
-          <button type="button" className={adminSecondaryBtnClass} onClick={() => downloadProtocol()}>
+          <button
+            type="button"
+            className={adminSecondaryBtnClass}
+            onClick={() => void downloadProtocol()}
+          >
             {t.admin_meetings_download_protocol}
           </button>
         ) : null}
