@@ -1,3 +1,5 @@
+import {createHash} from 'node:crypto'
+import {isGeminiConfigured} from '../geminiTranslate.js'
 import {MeetingProviderRegistry} from './registry.js'
 import {
   findMeetingByExternal,
@@ -8,6 +10,11 @@ import {
   updateMeetingRow,
   type MeetingRow,
 } from './meetingsRepo.js'
+import {
+  draftProtocolFromTranscriptWithGemini,
+  fallbackDraftFromTranscript,
+} from './geminiMeetingProtocol.js'
+import {assertTranscriptUploadInput} from './transcriptFile.js'
 import {
   approveReport,
   getReportByMeetingId,
@@ -216,6 +223,103 @@ export async function getReportDtoForEvent(eventId: string) {
   if (!meeting) return null
   const report = await getReportByMeetingId(meeting.id)
   return report ? toReportDto(report) : null
+}
+
+/**
+ * Manual path alongside Zoom cloud sync: upload local .vtt/.txt into meeting_transcripts,
+ * then draft a protocol (Gemini when configured, otherwise transcript preview).
+ */
+export async function uploadManualTranscriptForEvent(input: {
+  eventId: string
+  fileName: string
+  dataBase64: string
+  generateDraft?: boolean
+}) {
+  const event = await getEventMeetingContext(input.eventId)
+  if (!event) throw new Error('Event not found')
+
+  const parsed = assertTranscriptUploadInput({
+    fileName: input.fileName,
+    dataBase64: input.dataBase64,
+  })
+
+  let meeting = await getMeetingByEventId(input.eventId)
+  if (!meeting || meeting.status === 'cancelled') {
+    meeting = await insertMeeting({
+      eventId: input.eventId,
+      provider: 'zoom',
+      externalId: '',
+      externalUuid: '',
+      joinUrl: '',
+      startUrlEncrypted: '',
+      status: 'awaiting_artifacts',
+      scheduledStartAt: event.startAt,
+      scheduledEndAt: event.endAt,
+      timezone: event.timezone,
+    })
+  }
+
+  const contentHash = createHash('sha256').update(parsed.contentText).digest('hex').slice(0, 16)
+  await replaceTranscript(meeting.id, {
+    externalId: `manual:${parsed.fileName}:${contentHash}`,
+    format: parsed.format,
+    contentText: parsed.contentText,
+    downloadUrl: `manual://${parsed.fileName}`,
+    raw: {
+      source: 'manual_upload',
+      fileName: parsed.fileName,
+      byteLength: parsed.byteLength,
+    },
+  })
+
+  if (meeting.status === 'ended' || meeting.status === 'ready' || meeting.status === 'live') {
+    await updateMeetingRow(meeting.id, {status: 'awaiting_artifacts', lastSyncError: ''})
+  } else if (meeting.status === 'pending' || meeting.status === 'sync_error') {
+    await updateMeetingRow(meeting.id, {status: 'awaiting_artifacts', lastSyncError: ''})
+  }
+
+  const generateDraft = input.generateDraft !== false
+  let draftGenerated = false
+  let draftError: string | null = null
+  let reportDto: ReturnType<typeof toReportDto> | null = null
+
+  if (generateDraft) {
+    try {
+      const title = topicFromEvent(event)
+      const draft = isGeminiConfigured()
+        ? await draftProtocolFromTranscriptWithGemini({
+            transcriptText: parsed.contentText,
+            meetingTitle: title,
+          })
+        : fallbackDraftFromTranscript(parsed.contentText, title)
+      const report = await upsertDraftReport(meeting.id, draft)
+      reportDto = toReportDto(report)
+      draftGenerated = draft.sourceProvider === 'gemini_manual_transcript'
+    } catch (err) {
+      draftError = err instanceof Error ? err.message : 'Draft generation failed'
+      try {
+        const report = await upsertDraftReport(
+          meeting.id,
+          fallbackDraftFromTranscript(parsed.contentText, topicFromEvent(event)),
+        )
+        reportDto = toReportDto(report)
+      } catch {
+        // transcript already stored
+      }
+    }
+  } else {
+    const existing = await getReportByMeetingId(meeting.id)
+    reportDto = existing ? toReportDto(existing) : null
+  }
+
+  const transcript = await getTranscriptForMeeting(meeting.id)
+  return {
+    meeting: toMeetingPublicDto((await getMeetingByEventId(input.eventId)) ?? meeting),
+    transcript,
+    report: reportDto,
+    draftGenerated,
+    draftError,
+  }
 }
 
 export async function patchReportForEvent(

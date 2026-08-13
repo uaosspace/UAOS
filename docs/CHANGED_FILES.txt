@@ -369,3 +369,7 @@ db/migrations/014_event_notify_recipients.sql
 api/_lib/meetings/eventNotifyRecipients.ts
 api/_lib/meetings/eventNotifyRecipients.test.ts
 src/pages/admin/EventNotifyPicker.tsx
+api/_lib/meetings/transcriptFile.ts
+api/_lib/meetings/transcriptFile.test.ts
+api/_lib/meetings/geminiMeetingProtocol.ts
+api/_lib/meetings/geminiMeetingProtocol.test.ts

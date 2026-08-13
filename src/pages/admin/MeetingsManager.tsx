@@ -66,6 +66,7 @@ export default function MeetingsManager({currentLang}: {currentLang: Locale}) {
   const [editedSummary, setEditedSummary] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [uploadingTranscript, setUploadingTranscript] = useState(false)
 
   const loadList = useCallback(async () => {
     const data = await api<{items: MeetingListItem[]}>('meetings/list')
@@ -169,6 +170,51 @@ export default function MeetingsManager({currentLang}: {currentLang: Locale}) {
       await loadInbox()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Process failed')
+    }
+  }
+
+  async function uploadTranscriptFile(file: File) {
+    if (!selectedEventId) return
+    setError(null)
+    setMessage(null)
+    setUploadingTranscript(true)
+    try {
+      const dataBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const result = typeof reader.result === 'string' ? reader.result : ''
+          const comma = result.indexOf(',')
+          resolve(comma >= 0 ? result.slice(comma + 1) : result)
+        }
+        reader.onerror = () => reject(new Error('Failed to read file'))
+        reader.readAsDataURL(file)
+      })
+      const result = await api<{
+        draftGenerated: boolean
+        draftError: string | null
+      }>(`content/events/${selectedEventId}/meeting/transcript`, {
+        method: 'POST',
+        body: JSON.stringify({
+          fileName: file.name,
+          dataBase64,
+          generateDraft: true,
+        }),
+      })
+      setMessage(
+        result.draftGenerated
+          ? t.admin_meetings_upload_transcript_draft_ok
+          : t.admin_meetings_upload_transcript_ok,
+      )
+      if (result.draftError) {
+        setError(result.draftError)
+      }
+      await openBundle(selectedEventId)
+      await loadReports()
+      await loadList()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploadingTranscript(false)
     }
   }
 
@@ -290,6 +336,26 @@ export default function MeetingsManager({currentLang}: {currentLang: Locale}) {
               <h3 className="font-semibold text-brand-slate-900 dark:text-white">
                 {t.admin_meetings_sources_title}
               </h3>
+              <div className="space-y-1.5">
+                <label className="block space-y-1.5 text-sm">
+                  <span className={adminLabelClass}>{t.admin_meetings_upload_transcript}</span>
+                  <input
+                    type="file"
+                    accept=".vtt,.txt,text/vtt,text/plain"
+                    disabled={uploadingTranscript || !selectedEventId}
+                    className="block w-full text-sm text-brand-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-brand-blue-600 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white dark:text-brand-slate-300"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      e.target.value = ''
+                      if (file) void uploadTranscriptFile(file)
+                    }}
+                  />
+                </label>
+                <p className="text-xs text-brand-slate-500">{t.admin_meetings_upload_transcript_hint}</p>
+                {uploadingTranscript ? (
+                  <p className="text-xs text-brand-slate-500">{t.admin_meetings_uploading_transcript}</p>
+                ) : null}
+              </div>
               <label className="block space-y-1.5 text-sm">
                 <span className={adminLabelClass}>{t.admin_meetings_summary}</span>
                 <textarea

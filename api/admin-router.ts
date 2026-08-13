@@ -89,6 +89,7 @@ import {
   processMeetingCronJobs,
   processProviderEventById,
   retryMeetingForEvent,
+  uploadManualTranscriptForEvent,
 } from './_lib/meetings/meetingService.js'
 import {getMeetingOpsSettings, putMeetingOpsSettings} from './_lib/meetings/opsSettingsRepo.js'
 import {listPendingProviderEvents} from './_lib/meetings/providerEventsRepo.js'
@@ -761,6 +762,41 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
           } catch (err) {
             const message = err instanceof Error ? err.message : 'Retry failed'
             return sendJsonError(res, 502, message)
+          }
+        }
+        if (method === 'POST' && parts[4] === 'transcript') {
+          if (!requireMutationOrigin(req, res)) return
+          const session = await requireSession(req, res, 'content.write')
+          if (!session) return
+          if (await isRateLimited(`admin:meeting-transcript:${session.user.id}`, 60_000, 10)) {
+            return sendJsonError(res, 429, 'Too many requests')
+          }
+          try {
+            const body = parseJsonBody(req)
+            const source = isRecord(body) ? body : {}
+            const result = await uploadManualTranscriptForEvent({
+              eventId,
+              fileName: readStringOr(source.fileName, ''),
+              dataBase64: readStringOr(source.dataBase64, ''),
+              generateDraft: source.generateDraft !== false,
+            })
+            await writeAuditEvent({
+              actorType: 'admin',
+              actorId: session.user.id,
+              action: 'meeting.transcript_upload',
+              entityType: 'meeting',
+              entityId: result.meeting.id,
+              ip,
+              metadata: {
+                eventId,
+                draftGenerated: result.draftGenerated,
+                hasDraftError: Boolean(result.draftError),
+              },
+            })
+            return res.status(200).json(result)
+          } catch (err) {
+            const message = err instanceof Error ? err.message : 'Transcript upload failed'
+            return sendJsonError(res, 400, message)
           }
         }
       }
