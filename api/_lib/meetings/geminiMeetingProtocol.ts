@@ -32,14 +32,32 @@ export function buildProtocolPrompt(input: ProtocolDraftInput, transcript: strin
   const title = input.meetingTitle?.trim() || 'UAOS meeting'
   return [
     'You are an assistant for the Ukrainian Association of Professional Safety (UAOS).',
-    'Turn the meeting transcript into a structured protocol draft.',
-    'Write the summary and list items in Ukrainian (uk).',
-    'Do not invent attendees, decisions, or facts that are not supported by the transcript.',
-    'If something is unclear, omit it rather than guessing.',
-    `Meeting title: ${title}`,
-    'Return ONLY valid JSON of the form:',
-    '{"summary":"...","topics":["..."],"decisions":["..."],"actionItems":["..."]}',
-    'topics / decisions / actionItems must be arrays of short strings (may be empty).',
+    'Turn the meeting transcript into an official-style protocol draft for association / committee work.',
+    'Write everything in Ukrainian (uk).',
+    'Do not invent attendees, decisions, deadlines, or facts that are not supported by the transcript.',
+    'If something is unclear or missing, omit it or write «не зазначено» — never guess.',
+    `Meeting title (use as context): ${title}`,
+    '',
+    'Return ONLY valid JSON of this exact shape:',
+    '{',
+    '  "detailedProtocol": "markdown string",',
+    '  "briefReport": "short plain text",',
+    '  "topics": ["..."],',
+    '  "decisions": ["..."],',
+    '  "actionItems": ["..."]',
+    '}',
+    '',
+    'Field rules:',
+    '1) detailedProtocol — detailed protocol in Markdown with these headings in order (skip a heading only if empty):',
+    '   ## Мета зустрічі',
+    '   ## Порядок денний / теми',
+    '   ## Хід обговорення',
+    '   ## Рішення',
+    '   ## Поручення',
+    '   Under «Поручення» prefer lines like: «Хто — що — строк (якщо є в тексті)».',
+    '2) briefReport — short report for quick reading: 3–8 sentences, key outcomes and next steps only.',
+    '3) topics / decisions / actionItems — short string arrays mirroring the detailed protocol (may be empty).',
+    '4) Do not include the raw transcript in any field.',
     '',
     'Transcript:',
     transcript,
@@ -54,6 +72,24 @@ function asStringList(value: unknown): string[] {
     .slice(0, 40)
 }
 
+/** Compose editable summary: detailed protocol first, brief report below. */
+export function composeProtocolSummary(detailedProtocol: string, briefReport: string): string {
+  const detailed = detailedProtocol.trim()
+  const brief = briefReport.trim()
+  if (detailed && brief) {
+    return [
+      '## Детальний протокол',
+      '',
+      detailed,
+      '',
+      '## Короткий звіт',
+      '',
+      brief,
+    ].join('\n')
+  }
+  return detailed || brief
+}
+
 export function normalizeProtocolResponse(raw: unknown): {
   summary: string
   topics: string[]
@@ -62,8 +98,15 @@ export function normalizeProtocolResponse(raw: unknown): {
 } {
   if (!raw || typeof raw !== 'object') throw new Error('Invalid protocol payload')
   const root = raw as Record<string, unknown>
-  const summary = typeof root.summary === 'string' ? root.summary.trim() : ''
+
+  const detailed =
+    typeof root.detailedProtocol === 'string' ? root.detailedProtocol.trim() : ''
+  const brief = typeof root.briefReport === 'string' ? root.briefReport.trim() : ''
+  const legacySummary = typeof root.summary === 'string' ? root.summary.trim() : ''
+
+  const summary = composeProtocolSummary(detailed, brief) || legacySummary
   if (!summary) throw new Error('Protocol summary missing')
+
   return {
     summary,
     topics: asStringList(root.topics),
@@ -143,8 +186,16 @@ export function fallbackDraftFromTranscript(
 ): NormalizedMeetingReport {
   const preview = transcriptText.trim().slice(0, 4000)
   const title = meetingTitle?.trim()
+  const detailed = [
+    title ? `## Мета зустрічі\n${title}` : '## Мета зустрічі\nне зазначено',
+    '## Хід обговорення',
+    preview || 'не зазначено',
+  ].join('\n\n')
   return {
-    summary: title ? `${title}\n\n${preview}` : preview,
+    summary: composeProtocolSummary(
+      detailed,
+      'Короткий звіт недоступний без Gemini — відредагуйте вручну за розшифровкою.',
+    ),
     topics: [],
     decisions: [],
     actionItems: [],
