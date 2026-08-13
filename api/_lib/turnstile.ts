@@ -1,6 +1,9 @@
 /**
  * Cloudflare Turnstile server-side verification.
  * If TURNSTILE_SECRET_KEY is unset, verification is skipped (local/dev only).
+ *
+ * Temporary: empty token is allowed (widget may fail to mount on SPA).
+ * When a token is present it is always verified. Restore hard-require later.
  */
 
 export interface TurnstileVerifyResult {
@@ -30,7 +33,8 @@ export async function verifyTurnstileToken(input: {
 
   const token = input.token.trim()
   if (!token) {
-    return {ok: false, skipped: false, error: 'Turnstile token is required'}
+    // Soft-skip: captcha widget missing/unready must not block join (temporary).
+    return {ok: true, skipped: true}
   }
 
   const fetchImpl = input.fetchImpl ?? fetch

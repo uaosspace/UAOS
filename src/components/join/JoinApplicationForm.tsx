@@ -95,31 +95,45 @@ export default function JoinApplicationForm({
   // Explicit render so SPA remount (leave join → return) recreates the widget.
   useEffect(() => {
     if (!turnstileSiteKey) return
-    if (!turnstileHostRef.current) return
 
     let cancelled = false
     let widgetId: string | null = null
+    let raf = 0
+    let attempts = 0
 
-    void loadTurnstileScript()
-      .then((api) => {
-        if (cancelled || !turnstileHostRef.current) return
-        widgetId = api.render(turnstileHostRef.current, {
-          sitekey: turnstileSiteKey,
-          theme: 'auto',
+    const mount = () => {
+      const host = turnstileHostRef.current
+      if (!host) {
+        if (cancelled || attempts >= 30) return
+        attempts += 1
+        raf = window.requestAnimationFrame(mount)
+        return
+      }
+
+      void loadTurnstileScript()
+        .then((api) => {
+          if (cancelled || !turnstileHostRef.current) return
+          widgetId = api.render(turnstileHostRef.current, {
+            sitekey: turnstileSiteKey,
+            theme: 'auto',
+          })
+          if (cancelled) {
+            removeTurnstileWidget(widgetId)
+            widgetId = null
+            return
+          }
+          turnstileWidgetIdRef.current = widgetId
         })
-        if (cancelled) {
-          removeTurnstileWidget(widgetId)
-          widgetId = null
-          return
-        }
-        turnstileWidgetIdRef.current = widgetId
-      })
-      .catch(() => {
-        if (!cancelled) turnstileWidgetIdRef.current = null
-      })
+        .catch(() => {
+          if (!cancelled) turnstileWidgetIdRef.current = null
+        })
+    }
+
+    mount()
 
     return () => {
       cancelled = true
+      if (raf) window.cancelAnimationFrame(raf)
       turnstileWidgetIdRef.current = null
       removeTurnstileWidget(widgetId)
     }
@@ -169,14 +183,10 @@ export default function JoinApplicationForm({
     setErrorMessage(null)
 
     try {
+      // If the widget mounted — send token for server verify; if not — allow submit (temporary soft-skip).
       const turnstileToken = turnstileSiteKey
         ? readTurnstileToken(turnstileWidgetIdRef.current)
         : ''
-      if (turnstileSiteKey && !turnstileToken) {
-        setStatus('error')
-        setErrorMessage(t.join_form_turnstile_error)
-        return
-      }
 
       await submitJoinRequest({
         companyName: form.companyName.trim(),

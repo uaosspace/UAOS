@@ -388,3 +388,4 @@ src/data/translations/membership.ts
 src/lib/turnstileClient.ts
 src/lib/turnstileClient.test.ts
 src/components/join/JoinApplicationForm.tsx
+api/_lib/turnstile.test.ts
