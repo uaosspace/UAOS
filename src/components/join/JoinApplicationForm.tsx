@@ -1,11 +1,21 @@
-import {useEffect, useState, type FormEvent} from 'react'
+import {useEffect, useRef, useState, type FormEvent} from 'react'
 import type {Locale} from '../../data/locales'
 import {resolveLocalized} from '../../data/locales'
+import {
+  composeJoinPhone,
+  defaultPhoneDialForLocale,
+  PHONE_COUNTRY_CODES,
+} from '../../data/phoneCountryCodes'
 import {TRANSLATIONS} from '../../data/translations'
 import {PARTICIPANT_TYPES, SECTORS, PRODUCT_CATEGORIES, COMPETENCY_AREAS} from '../../data/referenceLists'
 import type {ApplicantKind} from '../../types'
 import {submitJoinRequest} from '../../lib/joinRequests'
 import {resolveNoticeLanguage} from '../../lib/privacyPolicy'
+import {
+  loadTurnstileScript,
+  readTurnstileToken,
+  removeTurnstileWidget,
+} from '../../lib/turnstileClient'
 import {Loader2, CheckCircle2, AlertCircle} from 'lucide-react'
 
 interface JoinApplicationFormProps {
@@ -21,7 +31,8 @@ interface FormState {
   edrpou: string
   contactPerson: string
   email: string
-  phone: string
+  phoneDial: string
+  phoneNational: string
   message: string
   applicantKind: ApplicantKind | ''
   sectors: string[]
@@ -32,22 +43,25 @@ interface FormState {
   hp: string
 }
 
-const INITIAL_STATE: FormState = {
-  companyName: '',
-  website: '',
-  activityField: '',
-  edrpou: '',
-  contactPerson: '',
-  email: '',
-  phone: '',
-  message: '',
-  applicantKind: '',
-  sectors: [],
-  productCategories: [],
-  competencies: [],
-  privacyConsent: false,
-  termsConsent: false,
-  hp: '',
+function createInitialState(locale: Locale): FormState {
+  return {
+    companyName: '',
+    website: '',
+    activityField: '',
+    edrpou: '',
+    contactPerson: '',
+    email: '',
+    phoneDial: defaultPhoneDialForLocale(locale),
+    phoneNational: '',
+    message: '',
+    applicantKind: '',
+    sectors: [],
+    productCategories: [],
+    competencies: [],
+    privacyConsent: false,
+    termsConsent: false,
+    hp: '',
+  }
 }
 
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error'
@@ -62,37 +76,77 @@ export default function JoinApplicationForm({
   onOpenTerms,
 }: JoinApplicationFormProps) {
   const t = TRANSLATIONS[currentLang]
-  const [form, setForm] = useState<FormState>(INITIAL_STATE)
+  const [form, setForm] = useState<FormState>(() => createInitialState(currentLang))
   const [status, setStatus] = useState<SubmitStatus>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() || ''
+  const turnstileHostRef = useRef<HTMLDivElement | null>(null)
+  const turnstileWidgetIdRef = useRef<string | null>(null)
 
   useEffect(() => {
+    setForm((prev) => {
+      if (prev.phoneNational.trim()) return prev
+      const nextDial = defaultPhoneDialForLocale(currentLang)
+      if (prev.phoneDial === nextDial) return prev
+      return {...prev, phoneDial: nextDial}
+    })
+  }, [currentLang])
+
+  // Explicit render so SPA remount (leave join → return) recreates the widget.
+  useEffect(() => {
     if (!turnstileSiteKey) return
-    const existing = document.querySelector('script[data-uaos-turnstile]')
-    if (existing) return
-    const script = document.createElement('script')
-    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js'
-    script.async = true
-    script.defer = true
-    script.dataset.uaosTurnstile = '1'
-    document.head.appendChild(script)
+    if (!turnstileHostRef.current) return
+
+    let cancelled = false
+    let widgetId: string | null = null
+
+    void loadTurnstileScript()
+      .then((api) => {
+        if (cancelled || !turnstileHostRef.current) return
+        widgetId = api.render(turnstileHostRef.current, {
+          sitekey: turnstileSiteKey,
+          theme: 'auto',
+        })
+        if (cancelled) {
+          removeTurnstileWidget(widgetId)
+          widgetId = null
+          return
+        }
+        turnstileWidgetIdRef.current = widgetId
+      })
+      .catch(() => {
+        if (!cancelled) turnstileWidgetIdRef.current = null
+      })
+
+    return () => {
+      cancelled = true
+      turnstileWidgetIdRef.current = null
+      removeTurnstileWidget(widgetId)
+    }
   }, [turnstileSiteKey])
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({...prev, [key]: value}))
   }
 
+  const composedPhone = composeJoinPhone(form.phoneDial, form.phoneNational)
+
   /** Клієнтська валідація дзеркалить обов'язкові поля/правила api/_lib/joinApplication.ts. */
   function validate(): string | null {
-    if (!form.companyName.trim() || !form.activityField.trim() || !form.contactPerson.trim() || !form.email.trim() || !form.phone.trim()) {
+    if (
+      !form.companyName.trim() ||
+      !form.activityField.trim() ||
+      !form.contactPerson.trim() ||
+      !form.email.trim() ||
+      !composedPhone
+    ) {
       return t.join_form_error
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
       return t.join_form_error
     }
-    if (form.phone.replace(/[^\d]/g, '').length < 9) {
-      return t.join_form_error
+    if (composedPhone.replace(/[^\d]/g, '').length < 9) {
+      return t.invalid_phone
     }
     if (!form.privacyConsent || !form.termsConsent) {
       return t.join_form_error
@@ -115,11 +169,14 @@ export default function JoinApplicationForm({
     setErrorMessage(null)
 
     try {
-      const turnstileApi = (window as unknown as {
-        turnstile?: {getResponse?: (id?: string) => string}
-      }).turnstile
-      const turnstileToken =
-        typeof turnstileApi?.getResponse === 'function' ? turnstileApi.getResponse() || '' : ''
+      const turnstileToken = turnstileSiteKey
+        ? readTurnstileToken(turnstileWidgetIdRef.current)
+        : ''
+      if (turnstileSiteKey && !turnstileToken) {
+        setStatus('error')
+        setErrorMessage(t.join_form_turnstile_error)
+        return
+      }
 
       await submitJoinRequest({
         companyName: form.companyName.trim(),
@@ -127,7 +184,7 @@ export default function JoinApplicationForm({
         activityField: form.activityField.trim(),
         contactPerson: form.contactPerson.trim(),
         email: form.email.trim(),
-        phone: form.phone.trim(),
+        phone: composedPhone,
         message: form.message.trim(),
         edrpou: form.edrpou.trim(),
         hp: form.hp,
@@ -339,15 +396,35 @@ export default function JoinApplicationForm({
         </div>
         <div>
           <label className={labelClass} htmlFor="join-phone">{t.join_form_phone_lbl}</label>
-          <input
-            id="join-phone"
-            type="tel"
-            required
-            maxLength={30}
-            value={form.phone}
-            onChange={(event) => update('phone', event.target.value)}
-            className={inputClass}
-          />
+          <div className="flex gap-2">
+            <label className="sr-only" htmlFor="join-phone-code">
+              {t.join_form_phone_code_lbl}
+            </label>
+            <select
+              id="join-phone-code"
+              value={form.phoneDial}
+              onChange={(event) => update('phoneDial', event.target.value)}
+              className={`${inputClass} w-[8.5rem] shrink-0`}
+              aria-label={t.join_form_phone_code_lbl}
+            >
+              {PHONE_COUNTRY_CODES.map((item) => (
+                <option key={item.dial} value={item.dial}>
+                  {item.iso} {item.dial}
+                </option>
+              ))}
+            </select>
+            <input
+              id="join-phone"
+              type="tel"
+              required
+              inputMode="tel"
+              autoComplete="tel-national"
+              maxLength={20}
+              value={form.phoneNational}
+              onChange={(event) => update('phoneNational', event.target.value)}
+              className={inputClass}
+            />
+          </div>
         </div>
       </div>
 
@@ -421,9 +498,7 @@ export default function JoinApplicationForm({
         </div>
       )}
 
-      {turnstileSiteKey ? (
-        <div className="cf-turnstile" data-sitekey={turnstileSiteKey} data-theme="auto" />
-      ) : null}
+      {turnstileSiteKey ? <div ref={turnstileHostRef} className="min-h-[65px]" /> : null}
 
       <button
         type="submit"
