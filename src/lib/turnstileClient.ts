@@ -65,23 +65,14 @@ export function loadTurnstileScript(): Promise<TurnstileApi> {
   return new Promise((resolve, reject) => {
     const script = document.createElement('script')
     script.src = TURNSTILE_SCRIPT_SRC
-    script.async = true
-    script.defer = true
+    // Do not set defer/async with turnstile.ready(); we resolve on our own load handler.
     script.dataset.uaosTurnstile = '1'
     script.addEventListener(
       'load',
       () => {
-        const finish = () => {
-          const api = getTurnstileApi()
-          if (api) resolve(api)
-          else reject(new Error('Turnstile API missing after script load'))
-        }
         const api = getTurnstileApi()
-        if (api?.ready) {
-          api.ready(finish)
-          return
-        }
-        finish()
+        if (api) resolve(api)
+        else reject(new Error('Turnstile API missing after script load'))
       },
       {once: true},
     )
