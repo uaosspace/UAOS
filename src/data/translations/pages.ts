@@ -10,6 +10,7 @@ export const pagesTranslations = {
     activity_formats_label: 'Формати роботи',
 
     members_featured_badge: 'Рекомендовано',
+    members_group_empty: 'У цій групі поки немає опублікованих учасників.',
 
     news_page_subtitle: 'Останні події, ініціативи та новини галузевого життя асоціації UAOS.',
     news_section_title: 'Новини',
@@ -79,6 +80,7 @@ export const pagesTranslations = {
     activity_formats_label: 'Working formats',
 
     members_featured_badge: 'Featured',
+    members_group_empty: 'No published members in this group yet.',
 
     news_page_subtitle: 'The latest events, initiatives, and industry news from the UAOS association.',
     news_section_title: 'News',
@@ -148,6 +150,7 @@ export const pagesTranslations = {
     activity_formats_label: 'Arbeitsformate',
 
     members_featured_badge: 'Empfohlen',
+    members_group_empty: 'In dieser Gruppe sind noch keine veröffentlichten Mitglieder.',
 
     news_page_subtitle: 'Die neuesten Events, Initiativen und Branchennachrichten des Verbands UAOS.',
     news_section_title: 'Nachrichten',
@@ -218,6 +221,7 @@ export const pagesTranslations = {
     activity_formats_label: 'Formatos de trabajo',
 
     members_featured_badge: 'Destacado',
+    members_group_empty: 'Aún no hay miembros publicados en este grupo.',
 
     news_page_subtitle: 'Los últimos eventos, iniciativas y noticias sectoriales de la asociación UAOS.',
     news_section_title: 'Noticias',
@@ -290,6 +294,7 @@ export const pagesTranslations = {
     activity_formats_label: 'Жұмыс форматтары',
 
     members_featured_badge: 'Ұсынылады',
+    members_group_empty: 'Бұл топта әзірге жарияланған қатысушылар жоқ.',
 
     news_page_subtitle: 'UAOS қауымдастығының соңғы оқиғалары, бастамалары және салалық жаңалықтары.',
     news_section_title: 'Жаңалықтар',
@@ -360,6 +365,7 @@ export const pagesTranslations = {
     activity_formats_label: 'Formats de travail',
 
     members_featured_badge: 'Recommandé',
+    members_group_empty: 'Aucun membre publié dans ce groupe pour le moment.',
 
     news_page_subtitle: 'Les derniers événements, initiatives et actualités sectorielles de l’association UAOS.',
     news_section_title: 'Actualités',

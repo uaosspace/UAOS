@@ -1,6 +1,7 @@
 import type {Locale} from '../data/locales'
 import {TRANSLATIONS} from '../data/translations'
 import {useDocumentMeta} from '../hooks/useDocumentMeta'
+import {useSiteSettingsResource} from '../hooks/content/useSiteSettingsResource'
 import MissionBenefitsSection from '../components/MissionBenefitsSection'
 import DirectionsSection from '../components/DirectionsSection'
 import FoundersSection from '../components/FoundersSection'
@@ -27,6 +28,7 @@ const ABOUT_PARTNERS_NOTE = {
 
 export default function AboutPage({currentLang}: AboutPageProps) {
   const t = TRANSLATIONS[currentLang]
+  const {data: settings} = useSiteSettingsResource(true)
   useDocumentMeta({
     title: `${t.nav_about} — ${t.brand_name}`,
     description: ABOUT_INTRO[currentLang],
@@ -54,7 +56,7 @@ export default function AboutPage({currentLang}: AboutPageProps) {
         </p>
       </section>
 
-      <DirectionsSection currentLang={currentLang} />
+      {settings.aboutGoalsShowOnSite ? <DirectionsSection currentLang={currentLang} /> : null}
 
       <FoundersSection currentLang={currentLang} />
 

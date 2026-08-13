@@ -118,6 +118,12 @@ export default function MemberUsersEditor({currentLang}: {currentLang: Locale}) 
       {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
       {message ? <p className="text-sm text-brand-blue-600 dark:text-brand-sky-300">{message}</p> : null}
 
+      <div className="flex flex-wrap gap-2">
+        <a className={adminSecondaryBtnClass} href="/api/admin/member-users/export">
+          {t.admin_export_cabinet_users_csv}
+        </a>
+      </div>
+
       <form className={`${adminPanelClass} grid gap-3 md:grid-cols-2`} onSubmit={(e) => void createUser(e)}>
         <label className="block space-y-1.5 text-sm">
           <span className={adminLabelClass}>{t.admin_cabinet_user_email}</span>

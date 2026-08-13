@@ -1,4 +1,4 @@
-import {useState} from 'react'
+import {useMemo, useState} from 'react'
 import {Menu, X} from 'lucide-react'
 import {TRANSLATIONS} from '../data/translations'
 import type {Locale} from '../data/locales'
@@ -6,6 +6,7 @@ import BrandLogo from './BrandLogo'
 import LanguageSwitcher from './LanguageSwitcher'
 import ScribbleLink from './ScribbleLink'
 import {APP_ROUTES, type AppRoute} from '../routes/appRoutes'
+import {useSiteSettingsResource} from '../hooks/content/useSiteSettingsResource'
 
 interface HeaderProps {
   currentLang: Locale
@@ -35,6 +36,14 @@ export default function Header({
 }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const t = TRANSLATIONS[currentLang]
+  const {data: settings} = useSiteSettingsResource(true)
+  const navItems = useMemo(
+    () =>
+      NAV_ITEMS.filter(
+        (item) => item.route !== APP_ROUTES.knowledge || settings.knowledgeShowOnSite,
+      ),
+    [settings.knowledgeShowOnSite],
+  )
 
   const handleNavClick = (route: AppRoute, options?: {anchor?: string}) => {
     setMobileMenuOpen(false)
@@ -65,7 +74,7 @@ export default function Header({
           id="site-nav"
           aria-label={t.aria_main_nav}
         >
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <button
               key={item.key}
               type="button"

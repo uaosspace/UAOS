@@ -1,7 +1,9 @@
+import {useMemo} from 'react'
 import {TRANSLATIONS} from '../data/translations'
 import BrandLogo from './BrandLogo'
 import type {Locale} from '../data/locales'
 import {APP_ROUTES, type AppRoute} from '../routes/appRoutes'
+import {useSiteSettingsResource} from '../hooks/content/useSiteSettingsResource'
 
 interface FooterProps {
   currentLang: Locale
@@ -35,6 +37,14 @@ export default function Footer({
 }: FooterProps) {
   const t = TRANSLATIONS[currentLang]
   const year = new Date().getFullYear()
+  const {data: settings} = useSiteSettingsResource(true)
+  const footerNav = useMemo(
+    () =>
+      FOOTER_NAV.filter(
+        (item) => item.route !== APP_ROUTES.knowledge || settings.knowledgeShowOnSite,
+      ),
+    [settings.knowledgeShowOnSite],
+  )
 
   return (
     <footer className="site-footer">
@@ -53,17 +63,19 @@ export default function Footer({
             </span>
           </button>
           <p>{t.footer_desc}</p>
+          {settings.socialsShowOnSite ? (
           <div className="socials">
             <a href={`mailto:${t.footer_email}`} aria-label={t.social_linkedin}>in</a>
             <a href={`mailto:${t.footer_email}`} aria-label={t.social_facebook}>f</a>
             <a href={`mailto:${t.footer_email}`} aria-label={t.social_youtube}>▶</a>
             <a href={`mailto:${t.footer_email}`} aria-label={t.social_telegram}>↗</a>
           </div>
+          ) : null}
         </div>
 
         <div className="footer-col">
           <h3>{t.footer_nav_title}</h3>
-          {FOOTER_NAV.map((item) => (
+          {footerNav.map((item) => (
             <button key={item.key} type="button" onClick={() => onNavigate(item.route)}>
               {t[item.key]}
             </button>

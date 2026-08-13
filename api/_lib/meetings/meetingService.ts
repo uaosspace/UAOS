@@ -34,6 +34,7 @@ import {canJoinMeeting, canViewEvent} from './access.js'
 import {getSql} from '../db.js'
 import {isRecord, readStringOr} from '../../../src/lib/contentGuards.js'
 import {notifyMeetingAudience, notifyProtocolApproved} from './meetingNotify.js'
+import {listEventNotifyEmails} from './eventNotifyRecipients.js'
 import {listDueReminderMeetings} from './notificationsRepo.js'
 import {getPublishedEventBySlug} from '../contentRepo.js'
 import {
@@ -118,7 +119,7 @@ export async function createMeetingForEvent(input: {
     void notifyMeetingAudience({
       meetingId: meeting.id,
       kind: 'created',
-      accessMinRole: event.accessMinRole,
+      emails: await listEventNotifyEmails(event.id, 'meeting'),
       title: topicFromEvent(event),
       startAt: event.startAt,
       eventSlug: event.slug,
@@ -252,6 +253,7 @@ export async function approveReportForEvent(eventId: string, adminUserId: string
         ? transcript.contentText.slice(0, 4000)
         : undefined,
       recordingLinks: recordings.map((item) => item.downloadUrl).filter(Boolean),
+      extraEmails: await listEventNotifyEmails(event.id, 'protocol'),
     }).catch((err) => console.error('protocol approve notify failed:', err))
   }
   return dto
@@ -542,7 +544,7 @@ export async function processMeetingCronJobs() {
     const result = await notifyMeetingAudience({
       meetingId: item.meetingId,
       kind: 'reminder',
-      accessMinRole: item.accessMinRole,
+      emails: await listEventNotifyEmails(item.eventId, 'meeting'),
       title: item.titleUk || item.titleEn || item.slug,
       startAt: item.scheduledStartAt,
       eventSlug: item.slug,

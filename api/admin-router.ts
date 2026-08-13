@@ -62,6 +62,11 @@ import {
   upsertContentMember,
   upsertContentNews,
 } from './_lib/contentRepo.js'
+import {
+  buildCabinetUsersCsv,
+  buildContentMembersCatalogCsv,
+} from './_lib/memberDirectoryExport.js'
+import {listCabinetDirectoryForNotify} from './_lib/meetings/eventNotifyRecipients.js'
 import {getBlobByPathname, putPublicBlob, putPrivateBlob} from './_lib/blobStore.js'
 import {fetchOgImageFromPageUrl} from './_lib/fetchOgImage.js'
 import {
@@ -609,6 +614,21 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
     }
 
     if (entity === 'members') {
+      if (parts[2] === 'export' && method === 'GET') {
+        const session = await requireSession(req, res, 'content.read')
+        if (!session) return
+        const body = await buildContentMembersCatalogCsv()
+        await writeAuditEvent({
+          actorType: 'admin',
+          actorId: session.user.id,
+          action: 'content.members.export',
+          ip,
+          metadata: {bytes: body.length},
+        })
+        res.setHeader('content-type', 'text/csv; charset=utf-8')
+        res.setHeader('content-disposition', 'attachment; filename="members-catalog.csv"')
+        return res.status(200).send(body)
+      }
       if (method === 'GET') {
         const session = await requireSession(req, res, 'content.read')
         if (!session) return
@@ -678,6 +698,11 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
       }
     }
     if (entity === 'events') {
+      if (parts[2] === 'notify-directory' && method === 'GET') {
+        const session = await requireSession(req, res, 'content.read')
+        if (!session) return
+        return res.status(200).json({items: await listCabinetDirectoryForNotify()})
+      }
       // Meetings / reports nested under content/events/:id/... (before list/create handlers)
       if (parts[2] && parts[3] === 'meeting') {
         const eventId = parts[2]
@@ -981,6 +1006,22 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
   }
 
   // Provision member portal accounts (ops / users.manage). No public self-signup.
+  if (parts[0] === 'member-users' && parts[1] === 'export' && method === 'GET') {
+    const session = await requireSession(req, res, 'users.manage')
+    if (!session) return
+    const body = await buildCabinetUsersCsv()
+    await writeAuditEvent({
+      actorType: 'admin',
+      actorId: session.user.id,
+      action: 'member_users.export',
+      ip,
+      metadata: {bytes: body.length},
+    })
+    res.setHeader('content-type', 'text/csv; charset=utf-8')
+    res.setHeader('content-disposition', 'attachment; filename="cabinet-users.csv"')
+    return res.status(200).send(body)
+  }
+
   if (parts[0] === 'member-users' && method === 'GET') {
     const session = await requireSession(req, res, 'users.manage')
     if (!session) return

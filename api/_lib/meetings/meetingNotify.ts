@@ -4,7 +4,7 @@ import {
   readBrevoSenderEnv,
   sendBrevoEmail,
 } from '../brevoNotify.js'
-import {listMemberEmailsForEventNotify} from './memberRolesRepo.js'
+import {mergeUniqueEmails} from './eventNotifyRecipients.js'
 import {tryClaimNotification, type MeetingNotifyKind} from './notificationsRepo.js'
 import {getMeetingOpsSettings} from './opsSettingsRepo.js'
 
@@ -68,7 +68,7 @@ async function sendToMany(
 export async function notifyMeetingAudience(input: {
   meetingId: string
   kind: MeetingNotifyKind
-  accessMinRole: string
+  emails: string[]
   title: string
   startAt: string
   eventSlug: string
@@ -77,7 +77,7 @@ export async function notifyMeetingAudience(input: {
 }) {
   const env = input.env ?? process.env
   const fetchImpl = input.fetchImpl ?? fetch
-  const emails = await listMemberEmailsForEventNotify(input.accessMinRole)
+  const emails = mergeUniqueEmails(input.emails)
   const eventUrl = buildEventPageUrl(input.eventSlug, env)
   const title = input.title || 'Подія UAOS'
   const subject =
@@ -124,13 +124,14 @@ export async function notifyProtocolApproved(input: {
   summary: string
   transcriptPreview?: string
   recordingLinks?: string[]
+  extraEmails?: string[]
   env?: NodeJS.ProcessEnv
   fetchImpl?: typeof fetch
 }) {
   const env = input.env ?? process.env
   const fetchImpl = input.fetchImpl ?? fetch
   const settings = await getMeetingOpsSettings()
-  const recipients = settings.protocolNotifyEmails
+  const recipients = mergeUniqueEmails(settings.protocolNotifyEmails, input.extraEmails ?? [])
   if (!recipients.length) return {sent: 0, failed: 0, skipped: 0}
 
   const eventUrl = buildEventPageUrl(input.eventSlug, env)

@@ -3,6 +3,13 @@
  */
 import {getSql} from './db.js'
 import {isRecord, readStringOr} from '../../src/lib/contentGuards.js'
+import {
+  listAllEventNotifyRecipients,
+  parseNotifyFilterRole,
+  parseNotifyPickerMode,
+  parseNotifyRecipients,
+  replaceEventNotifyRecipients,
+} from './meetings/eventNotifyRecipients.js'
 import {releaseOwnedMediaIfUnused} from './mediaCleanup.js'
 import {
   clampOptionalText,
@@ -166,6 +173,9 @@ export async function getPublishedSiteSettings() {
       statsProducersValue: '',
       statsProjectsValue: '',
       statsYearsValue: '',
+      aboutGoalsShowOnSite: false,
+      knowledgeShowOnSite: false,
+      socialsShowOnSite: false,
     }
   }
   const row = rows[0] as Record<string, unknown>
@@ -183,6 +193,9 @@ export async function getPublishedSiteSettings() {
     statsProducersValue: String(row.stats_producers_value ?? ''),
     statsProjectsValue: String(row.stats_projects_value ?? ''),
     statsYearsValue: String(row.stats_years_value ?? ''),
+    aboutGoalsShowOnSite: Boolean(row.about_goals_show_on_site),
+    knowledgeShowOnSite: Boolean(row.knowledge_show_on_site),
+    socialsShowOnSite: Boolean(row.socials_show_on_site),
   }
 }
 
@@ -313,13 +326,21 @@ export async function listContentNewsAdmin() {
 export async function listContentEventsAdmin() {
   const sql = getSql()
   const rows = await sql`SELECT * FROM content_events ORDER BY start_at DESC`
-  return rows.map((row) => ({
-    ...mapEventPublic(row as Record<string, unknown>),
-    id: String((row as Record<string, unknown>).id),
-    slug: String((row as Record<string, unknown>).slug || ''),
-    published: String((row as Record<string, unknown>).status) === 'published',
-    status: String((row as Record<string, unknown>).status || 'draft'),
-  }))
+  const recipientsByEvent = await listAllEventNotifyRecipients()
+  return rows.map((row) => {
+    const record = row as Record<string, unknown>
+    const id = String(record.id)
+    return {
+      ...mapEventPublic(record),
+      id,
+      slug: String(record.slug || ''),
+      published: String(record.status) === 'published',
+      status: String(record.status || 'draft'),
+      notifyPickerMode: parseNotifyPickerMode(record.notify_picker_mode),
+      notifyFilterRole: parseNotifyFilterRole(record.notify_filter_role),
+      notifyRecipients: recipientsByEvent.get(id) ?? [],
+    }
+  })
 }
 
 export async function listContentDocumentsAdmin() {
@@ -556,6 +577,9 @@ export async function upsertContentEvent(body: unknown) {
     throw new Error('Invalid accessMinRole')
   }
   const participationMode = normalizeParticipationMode(source.participationMode)
+  const notifyPickerMode = parseNotifyPickerMode(source.notifyPickerMode)
+  const notifyFilterRole = parseNotifyFilterRole(source.notifyFilterRole)
+  const notifyRecipients = parseNotifyRecipients(source.notifyRecipients)
 
   if (id) {
     const previous = await sql`
@@ -591,6 +615,8 @@ export async function upsertContentEvent(body: unknown) {
         visibility = ${visibility},
         access_min_role = ${accessMinRole},
         participation_mode = ${participationMode},
+        notify_picker_mode = ${notifyPickerMode},
+        notify_filter_role = ${notifyFilterRole},
         updated_at = now()
       WHERE id = ${id}::uuid
       RETURNING *
@@ -598,6 +624,8 @@ export async function upsertContentEvent(body: unknown) {
     if (previousCoverUrl && previousCoverUrl !== nextCoverUrl) {
       await releaseOwnedMediaIfUnused(previousCoverUrl)
     }
+    const savedId = String((rows[0] as {id?: unknown} | undefined)?.id ?? id)
+    await replaceEventNotifyRecipients(savedId, notifyRecipients)
     return rows[0]
   }
   const rows = await sql`
@@ -607,7 +635,7 @@ export async function upsertContentEvent(body: unknown) {
       title_uk, title_en, short_description_uk, short_description_en,
       full_description_uk, full_description_en, event_type, event_format, start_at, end_at,
       time_zone, location, online_url, registration_url, organizer, cover_url,
-      visibility, access_min_role, participation_mode
+      visibility, access_min_role, participation_mode, notify_picker_mode, notify_filter_role
     ) VALUES (
       ${slug}, ${status},
       ${title.json ?? '{}'}::jsonb,
@@ -626,10 +654,14 @@ export async function upsertContentEvent(body: unknown) {
       ${nextCoverUrl},
       ${visibility},
       ${accessMinRole},
-      ${participationMode}
+      ${participationMode},
+      ${notifyPickerMode},
+      ${notifyFilterRole}
     )
     RETURNING *
   `
+  const savedId = String((rows[0] as {id?: unknown} | undefined)?.id ?? '')
+  if (savedId) await replaceEventNotifyRecipients(savedId, notifyRecipients)
   return rows[0]
 }
 
@@ -712,13 +744,17 @@ export async function putSiteSettings(body: unknown) {
   const statsProducersValue = readStringOr(source.statsProducersValue, '').slice(0, 32)
   const statsProjectsValue = readStringOr(source.statsProjectsValue, '').slice(0, 32)
   const statsYearsValue = readStringOr(source.statsYearsValue, '').slice(0, 32)
+  const aboutGoalsShowOnSite = Boolean(source.aboutGoalsShowOnSite)
+  const knowledgeShowOnSite = Boolean(source.knowledgeShowOnSite)
+  const socialsShowOnSite = Boolean(source.socialsShowOnSite)
   const sql = getSql()
   await sql`
     INSERT INTO site_settings (
       id, phone, email, address_i18n, brand_tagline_i18n,
       address_uk, address_en, brand_tagline_uk, brand_tagline_en,
       stats_show_on_site, stats_members_value, stats_producers_value,
-      stats_projects_value, stats_years_value, updated_at
+      stats_projects_value, stats_years_value,
+      about_goals_show_on_site, knowledge_show_on_site, socials_show_on_site, updated_at
     )
     VALUES (
       'siteSettings',
@@ -735,6 +771,9 @@ export async function putSiteSettings(body: unknown) {
       ${statsProducersValue},
       ${statsProjectsValue},
       ${statsYearsValue},
+      ${aboutGoalsShowOnSite},
+      ${knowledgeShowOnSite},
+      ${socialsShowOnSite},
       now()
     )
     ON CONFLICT (id) DO UPDATE SET
@@ -751,6 +790,9 @@ export async function putSiteSettings(body: unknown) {
       stats_producers_value = EXCLUDED.stats_producers_value,
       stats_projects_value = EXCLUDED.stats_projects_value,
       stats_years_value = EXCLUDED.stats_years_value,
+      about_goals_show_on_site = EXCLUDED.about_goals_show_on_site,
+      knowledge_show_on_site = EXCLUDED.knowledge_show_on_site,
+      socials_show_on_site = EXCLUDED.socials_show_on_site,
       updated_at = now()
   `
   return getPublishedSiteSettings()

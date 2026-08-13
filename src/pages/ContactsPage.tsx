@@ -1,6 +1,7 @@
 import type {Locale} from '../data/locales'
 import {TRANSLATIONS} from '../data/translations'
 import {useDocumentMeta} from '../hooks/useDocumentMeta'
+import {useSiteSettingsResource} from '../hooks/content/useSiteSettingsResource'
 import {Phone, Mail, MapPin, Share2} from 'lucide-react'
 
 interface ContactsPageProps {
@@ -9,6 +10,7 @@ interface ContactsPageProps {
 
 export default function ContactsPage({currentLang}: ContactsPageProps) {
   const t = TRANSLATIONS[currentLang]
+  const {data: settings} = useSiteSettingsResource(true)
   useDocumentMeta({
     title: `${t.contacts_title} — ${t.brand_name}`,
     description: t.contacts_subtitle,
@@ -70,6 +72,7 @@ export default function ContactsPage({currentLang}: ContactsPageProps) {
             </div>
           </div>
 
+          {settings.socialsShowOnSite ? (
           <div className="flex items-start gap-3">
             <Share2 className="w-5 h-5 text-brand-blue-500 shrink-0 mt-0.5" />
             <div>
@@ -89,6 +92,7 @@ export default function ContactsPage({currentLang}: ContactsPageProps) {
               </div>
             </div>
           </div>
+          ) : null}
         </div>
       </div>
     </article>

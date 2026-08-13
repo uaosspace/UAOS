@@ -2,6 +2,7 @@ import type {Locale} from '../data/locales'
 import {resolveLocalized} from '../data/locales'
 import {TRANSLATIONS} from '../data/translations'
 import {PARTICIPANT_TYPES, SECTORS} from '../data/referenceLists'
+import {groupMembersByCatalogGroup} from '../data/memberCatalogGroups'
 import {useDocumentMeta} from '../hooks/useDocumentMeta'
 import type {AssociationMember} from '../types'
 import {ArrowRight} from 'lucide-react'
@@ -43,6 +44,80 @@ function MemberLogoBadge({logoUrl, shortName, name}: {logoUrl: string; shortName
   )
 }
 
+function MemberCard({
+  member,
+  currentLang,
+  t,
+  onSelectMember,
+}: {
+  member: AssociationMember
+  currentLang: Locale
+  t: (typeof TRANSLATIONS)[Locale]
+  onSelectMember: (slug: string) => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelectMember(member.slug)}
+      className="glass-card glass-card-hover rounded-2xl p-6 flex flex-col justify-between text-left shadow-sm group"
+    >
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <MemberLogoBadge
+            logoUrl={member.logoUrl}
+            shortName={member.shortName}
+            name={resolveLocalized(member.name, currentLang)}
+          />
+          {member.featured && (
+            <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-brand-yellow-500 bg-brand-yellow-50 dark:bg-brand-yellow-950/30 px-2 py-0.5 rounded">
+              {t.members_featured_badge}
+            </span>
+          )}
+        </div>
+
+        <h3 className="text-base font-display font-bold text-brand-slate-900 dark:text-white leading-snug group-hover:text-brand-blue-500 dark:group-hover:text-brand-sky-300 transition-colors">
+          {resolveLocalized(member.name, currentLang)}
+        </h3>
+
+        <div className="flex flex-wrap gap-1.5">
+          {member.participantTypes.slice(0, 2).map((typeId) => (
+            <span
+              key={typeId}
+              className="text-[10px] font-mono font-semibold uppercase text-brand-blue-600 dark:text-brand-sky-300 bg-brand-blue-50 dark:bg-brand-blue-950/30 px-2 py-0.5 rounded"
+            >
+              {labelFor(PARTICIPANT_TYPES, typeId, currentLang)}
+            </span>
+          ))}
+          {member.sectors?.slice(0, 1).map((sectorId) => (
+            <span
+              key={sectorId}
+              className="text-[10px] font-mono font-semibold uppercase text-brand-slate-500 dark:text-brand-slate-300 bg-brand-slate-100 dark:bg-brand-slate-800 px-2 py-0.5 rounded"
+            >
+              {labelFor(SECTORS, sectorId, currentLang)}
+            </span>
+          ))}
+        </div>
+
+        <p className="text-xs text-brand-slate-600 dark:text-brand-slate-200 leading-relaxed line-clamp-3">
+          {resolveLocalized(member.shortDescription, currentLang)}
+        </p>
+      </div>
+
+      <div className="pt-4 mt-4 border-t border-brand-slate-100 dark:border-brand-slate-800 flex items-center justify-between">
+        {member.region && (
+          <span className="text-[10px] font-mono text-brand-slate-500 dark:text-brand-slate-350 uppercase">
+            {member.region}
+          </span>
+        )}
+        <span className="inline-flex items-center gap-1 text-xs font-bold text-brand-blue-500 group-hover:text-brand-blue-600 dark:text-brand-sky-300">
+          {t.btn_read_more}
+          <ArrowRight className="w-3.5 h-3.5" />
+        </span>
+      </div>
+    </button>
+  )
+}
+
 export default function MembersCatalogPage({currentLang, members, onSelectMember}: MembersCatalogPageProps) {
   const t = TRANSLATIONS[currentLang]
   useDocumentMeta({
@@ -53,6 +128,9 @@ export default function MembersCatalogPage({currentLang, members, onSelectMember
   const publishedMembers = members
     .filter((member) => member.published !== false)
     .sort((a, b) => a.order - b.order)
+
+  const sections = groupMembersByCatalogGroup(publishedMembers)
+  const localeKey = currentLang === 'uk' ? 'uk' : 'en'
 
   return (
     <article className="pt-24 pb-20 bg-transparent min-h-screen transition-colors duration-300">
@@ -67,66 +145,27 @@ export default function MembersCatalogPage({currentLang, members, onSelectMember
         </div>
 
         {publishedMembers.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {publishedMembers.map((member) => (
-              <button
-                key={member.id}
-                type="button"
-                onClick={() => onSelectMember(member.slug)}
-                className="glass-card glass-card-hover rounded-2xl p-6 flex flex-col justify-between text-left shadow-sm group"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <MemberLogoBadge
-                      logoUrl={member.logoUrl}
-                      shortName={member.shortName}
-                      name={resolveLocalized(member.name, currentLang)}
+          <div className="space-y-12">
+            {sections.map(({group, members: groupMembers}) => (
+              <section key={group.id} aria-labelledby={`members-group-${group.id}`}>
+                <h2
+                  id={`members-group-${group.id}`}
+                  className="text-lg sm:text-xl font-display font-semibold text-brand-slate-900 dark:text-white tracking-tight mb-5"
+                >
+                  {group.label[localeKey]}
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {groupMembers.map((member) => (
+                    <MemberCard
+                      key={`${group.id}-${member.id}`}
+                      member={member}
+                      currentLang={currentLang}
+                      t={t}
+                      onSelectMember={onSelectMember}
                     />
-                    {member.featured && (
-                      <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-brand-yellow-500 bg-brand-yellow-50 dark:bg-brand-yellow-950/30 px-2 py-0.5 rounded">
-                        {t.members_featured_badge}
-                      </span>
-                    )}
-                  </div>
-
-                  <h2 className="text-base font-display font-bold text-brand-slate-900 dark:text-white leading-snug group-hover:text-brand-blue-500 dark:group-hover:text-brand-sky-300 transition-colors">
-                    {resolveLocalized(member.name, currentLang)}
-                  </h2>
-
-                  <div className="flex flex-wrap gap-1.5">
-                    {member.participantTypes.slice(0, 2).map((typeId) => (
-                      <span
-                        key={typeId}
-                        className="text-[10px] font-mono font-semibold uppercase text-brand-blue-600 dark:text-brand-sky-300 bg-brand-blue-50 dark:bg-brand-blue-950/30 px-2 py-0.5 rounded"
-                      >
-                        {labelFor(PARTICIPANT_TYPES, typeId, currentLang)}
-                      </span>
-                    ))}
-                    {member.sectors?.slice(0, 1).map((sectorId) => (
-                      <span
-                        key={sectorId}
-                        className="text-[10px] font-mono font-semibold uppercase text-brand-slate-500 dark:text-brand-slate-300 bg-brand-slate-100 dark:bg-brand-slate-800 px-2 py-0.5 rounded"
-                      >
-                        {labelFor(SECTORS, sectorId, currentLang)}
-                      </span>
-                    ))}
-                  </div>
-
-                  <p className="text-xs text-brand-slate-600 dark:text-brand-slate-200 leading-relaxed line-clamp-3">
-                    {resolveLocalized(member.shortDescription, currentLang)}
-                  </p>
+                  ))}
                 </div>
-
-                <div className="pt-4 mt-4 border-t border-brand-slate-100 dark:border-brand-slate-800 flex items-center justify-between">
-                  {member.region && (
-                    <span className="text-[10px] font-mono text-brand-slate-500 dark:text-brand-slate-350 uppercase">{member.region}</span>
-                  )}
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-brand-blue-500 group-hover:text-brand-blue-600 dark:text-brand-sky-300">
-                    {t.btn_read_more}
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-              </button>
+              </section>
             ))}
           </div>
         ) : (

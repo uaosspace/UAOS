@@ -10,6 +10,7 @@ import {useMembersResource} from './hooks/content/useMembersResource'
 import {useNewsResource} from './hooks/content/useNewsResource'
 import {useEventsResource} from './hooks/content/useEventsResource'
 import {useDocumentsResource} from './hooks/content/useDocumentsResource'
+import {useSiteSettingsResource} from './hooks/content/useSiteSettingsResource'
 import {LOCALE_META} from './data/locales'
 import {buildHreflangAlternates} from './routes/localizedRouting'
 import {buildRawRoutePath} from './routes/appRoutes'
@@ -76,6 +77,7 @@ export default function App() {
 
   const documentsNeeded = currentRoute === APP_ROUTES.knowledge
   const {data: documents} = useDocumentsResource(documentsNeeded)
+  const {data: siteSettings} = useSiteSettingsResource(true)
 
   const {
     cookieConsent,
@@ -241,7 +243,11 @@ export default function App() {
       />
     )
   } else if (currentRoute === APP_ROUTES.knowledge) {
-    mainContent = <KnowledgePage currentLang={currentLang} documents={documents} />
+    mainContent = siteSettings.knowledgeShowOnSite ? (
+      <KnowledgePage currentLang={currentLang} documents={documents} />
+    ) : (
+      <NotFoundPage currentLang={currentLang} onBackHome={() => handleNavigation(APP_ROUTES.home)} />
+    )
   } else if (currentRoute === APP_ROUTES.join) {
     mainContent = (
       <JoinPage

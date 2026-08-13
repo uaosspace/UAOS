@@ -19,6 +19,11 @@ import {
 } from './adminUi'
 import MemberUsersEditor from './MemberUsersEditor'
 import MeetingsManager from './MeetingsManager'
+import EventNotifyPicker, {
+  type CabinetNotifyPerson,
+  type EventNotifyRecipientDraft,
+  type NotifyPickerMode,
+} from './EventNotifyPicker'
 
 const ADMIN_EVENT_ZONE = 'Europe/Kyiv'
 
@@ -84,6 +89,9 @@ type EventDraft = {
   participationMode: string
   onlineUrl: string
   timeZone: string
+  notifyPickerMode: NotifyPickerMode
+  notifyFilterRole: string
+  notifyRecipients: EventNotifyRecipientDraft[]
 }
 
 type DocumentDraft = {
@@ -108,6 +116,9 @@ type SettingsDraft = {
   statsProducersValue: string
   statsProjectsValue: string
   statsYearsValue: string
+  aboutGoalsShowOnSite: boolean
+  knowledgeShowOnSite: boolean
+  socialsShowOnSite: boolean
 }
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -166,6 +177,9 @@ const emptyEvent = (): EventDraft => ({
   participationMode: 'offline',
   onlineUrl: '',
   timeZone: 'Europe/Kyiv',
+  notifyPickerMode: 'by_role',
+  notifyFilterRole: '',
+  notifyRecipients: [],
 })
 
 const emptyDocument = (): DocumentDraft => ({
@@ -433,6 +447,8 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
   const [news, setNews] = useState<NewsDraft>(emptyNews())
   const [member, setMember] = useState<MemberDraft>(emptyMember())
   const [eventItem, setEventItem] = useState<EventDraft>(emptyEvent())
+  const [cabinetDirectory, setCabinetDirectory] = useState<CabinetNotifyPerson[]>([])
+  const [cabinetDirectoryLoading, setCabinetDirectoryLoading] = useState(false)
   const [meetingInfo, setMeetingInfo] = useState<AdminMeetingInfo | null>(null)
   const [reportInfo, setReportInfo] = useState<Record<string, unknown> | null>(null)
   const [reportSummary, setReportSummary] = useState('')
@@ -449,6 +465,9 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
     statsProducersValue: '',
     statsProjectsValue: '',
     statsYearsValue: '',
+    aboutGoalsShowOnSite: false,
+    knowledgeShowOnSite: false,
+    socialsShowOnSite: false,
   })
 
   async function suggestTranslations(fields: Record<string, LocalizedText>) {
@@ -513,9 +532,23 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
           statsProducersValue: String(item.statsProducersValue || ''),
           statsProjectsValue: String(item.statsProjectsValue || ''),
           statsYearsValue: String(item.statsYearsValue || ''),
+          aboutGoalsShowOnSite: Boolean(item.aboutGoalsShowOnSite),
+          knowledgeShowOnSite: Boolean(item.knowledgeShowOnSite),
+          socialsShowOnSite: Boolean(item.socialsShowOnSite),
         })
         setItems([])
         return
+      }
+      if (kind === 'events') {
+        setCabinetDirectoryLoading(true)
+        try {
+          const dir = await api<{items: CabinetNotifyPerson[]}>('content/events/notify-directory')
+          setCabinetDirectory(dir.items || [])
+        } catch {
+          setCabinetDirectory([])
+        } finally {
+          setCabinetDirectoryLoading(false)
+        }
       }
       setItems([])
       const data = await api<{items: unknown[]}>(`content/${kind}`)
@@ -656,6 +689,9 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
           participationMode: eventItem.participationMode,
           onlineUrl: eventItem.onlineUrl,
           timeZone: eventItem.timeZone || 'Europe/Kyiv',
+          notifyPickerMode: eventItem.notifyPickerMode,
+          notifyFilterRole: eventItem.notifyFilterRole,
+          notifyRecipients: eventItem.notifyRecipients,
         }),
       })
       const savedId = String(data.item?.id ?? eventItem.id ?? '')
@@ -746,6 +782,9 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
           statsProducersValue: settings.statsProducersValue,
           statsProjectsValue: settings.statsProjectsValue,
           statsYearsValue: settings.statsYearsValue,
+          aboutGoalsShowOnSite: settings.aboutGoalsShowOnSite,
+          knowledgeShowOnSite: settings.knowledgeShowOnSite,
+          socialsShowOnSite: settings.socialsShowOnSite,
         }),
       })
       setMessage(t.admin_saved)
@@ -806,6 +845,18 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
       participationMode,
       onlineUrl: String(raw.onlineUrl || ''),
       timeZone: String(raw.timeZone || 'Europe/Kyiv'),
+      notifyPickerMode: raw.notifyPickerMode === 'by_members' ? 'by_members' : 'by_role',
+      notifyFilterRole: String(raw.notifyFilterRole || ''),
+      notifyRecipients: Array.isArray(raw.notifyRecipients)
+        ? raw.notifyRecipients
+            .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+            .map((item) => ({
+              memberUserId: String(item.memberUserId || ''),
+              notifyMeeting: Boolean(item.notifyMeeting),
+              notifyProtocol: Boolean(item.notifyProtocol),
+            }))
+            .filter((item) => item.memberUserId)
+        : [],
     })
     setMeetingInfo(null)
     setReportInfo(null)
@@ -870,6 +921,14 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
 
       {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
       {message ? <p className="text-sm text-emerald-700 dark:text-emerald-400">{message}</p> : null}
+
+      {kind === 'members' ? (
+        <div className="flex flex-wrap gap-2">
+          <a className={adminSecondaryBtnClass} href="/api/admin/content/members/export">
+            {t.admin_export_members_catalog_csv}
+          </a>
+        </div>
+      ) : null}
 
       {kind !== 'settings' && kind !== 'cabinetUsers' && kind !== 'meetings' ? (
         <div className={adminPanelClass}>
@@ -1275,6 +1334,19 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
               <option value="board">{accessLevelLabel(t, 'board')}</option>
             </select>
           </label>
+          <EventNotifyPicker
+            currentLang={currentLang}
+            people={cabinetDirectory}
+            loading={cabinetDirectoryLoading}
+            mode={eventItem.notifyPickerMode}
+            filterRole={eventItem.notifyFilterRole}
+            recipients={eventItem.notifyRecipients}
+            onModeChange={(mode) => setEventItem({...eventItem, notifyPickerMode: mode})}
+            onFilterRoleChange={(role) => setEventItem({...eventItem, notifyFilterRole: role})}
+            onRecipientsChange={(recipients) =>
+              setEventItem({...eventItem, notifyRecipients: recipients})
+            }
+          />
           {eventItem.participationMode === 'online_link' ? (
             <Field
               label={t.admin_field_online_url}
@@ -1657,6 +1729,31 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
                 onChange={(e) => setSettings({...settings, statsShowOnSite: e.target.checked})}
               />
               {t.admin_stats_show_on_site}
+            </label>
+            <p className={`${adminLabelClass} mb-2 mt-4`}>{t.admin_visibility_title}</p>
+            <label className="flex items-center gap-2 text-sm mb-2">
+              <input
+                type="checkbox"
+                checked={settings.aboutGoalsShowOnSite}
+                onChange={(e) => setSettings({...settings, aboutGoalsShowOnSite: e.target.checked})}
+              />
+              {t.admin_visibility_about_goals}
+            </label>
+            <label className="flex items-center gap-2 text-sm mb-2">
+              <input
+                type="checkbox"
+                checked={settings.knowledgeShowOnSite}
+                onChange={(e) => setSettings({...settings, knowledgeShowOnSite: e.target.checked})}
+              />
+              {t.admin_visibility_knowledge}
+            </label>
+            <label className="flex items-center gap-2 text-sm mb-3">
+              <input
+                type="checkbox"
+                checked={settings.socialsShowOnSite}
+                onChange={(e) => setSettings({...settings, socialsShowOnSite: e.target.checked})}
+              />
+              {t.admin_visibility_socials}
             </label>
           </div>
           <Field

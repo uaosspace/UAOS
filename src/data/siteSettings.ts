@@ -12,6 +12,12 @@ export interface SiteSettings {
   statsProducersValue: string
   statsProjectsValue: string
   statsYearsValue: string
+  /** About page: «прагнення / цілі» cards (DirectionsSection). */
+  aboutGoalsShowOnSite: boolean
+  /** Public Knowledge library in nav and /knowledge. */
+  knowledgeShowOnSite: boolean
+  /** Contacts + footer social network links. */
+  socialsShowOnSite: boolean
 }
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
@@ -38,6 +44,9 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   statsProducersValue: '68',
   statsProjectsValue: '320+',
   statsYearsValue: '12',
+  aboutGoalsShowOnSite: false,
+  knowledgeShowOnSite: false,
+  socialsShowOnSite: false,
 }
 
 function readStats(source: Record<string, unknown>): Pick<
@@ -47,6 +56,9 @@ function readStats(source: Record<string, unknown>): Pick<
   | 'statsProducersValue'
   | 'statsProjectsValue'
   | 'statsYearsValue'
+  | 'aboutGoalsShowOnSite'
+  | 'knowledgeShowOnSite'
+  | 'socialsShowOnSite'
 > {
   return {
     statsShowOnSite: Boolean(source.statsShowOnSite),
@@ -60,6 +72,9 @@ function readStats(source: Record<string, unknown>): Pick<
       DEFAULT_SITE_SETTINGS.statsProjectsValue,
     ),
     statsYearsValue: readStringOr(source.statsYearsValue, DEFAULT_SITE_SETTINGS.statsYearsValue),
+    aboutGoalsShowOnSite: Boolean(source.aboutGoalsShowOnSite),
+    knowledgeShowOnSite: Boolean(source.knowledgeShowOnSite),
+    socialsShowOnSite: Boolean(source.socialsShowOnSite),
   }
 }
 

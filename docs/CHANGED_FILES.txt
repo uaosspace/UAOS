@@ -358,3 +358,14 @@ src/lib/cabinetApiErrors.test.ts
 src/pages/admin/meetingStatusCopy.ts
 src/pages/admin/meetingStatusCopy.test.ts
 src/pages/admin/ContentEditors.tsx
+src/data/memberCatalogGroups.ts
+src/data/memberCatalogGroups.test.ts
+api/_lib/memberCatalogGroups.ts
+api/_lib/memberDirectoryExport.ts
+db/migrations/012_site_visibility_flags.sql
+db/migrations/013_socials_visibility.sql
+src/pages/ContactsPage.tsx
+db/migrations/014_event_notify_recipients.sql
+api/_lib/meetings/eventNotifyRecipients.ts
+api/_lib/meetings/eventNotifyRecipients.test.ts
+src/pages/admin/EventNotifyPicker.tsx
