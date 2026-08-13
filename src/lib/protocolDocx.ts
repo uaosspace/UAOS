@@ -13,13 +13,11 @@ export type ProtocolDocxInput = {
   body: string
   decisions: unknown[]
   actionItems: unknown[]
-  transcriptText?: string
   recordingLines?: string[]
   labels?: {
     status?: string
     decisions?: string
     actionItems?: string
-    transcript?: string
     recordings?: string
   }
 }
@@ -103,7 +101,6 @@ export function buildProtocolDocument(input: ProtocolDocxInput): Document {
     status: input.labels?.status ?? 'Статус',
     decisions: input.labels?.decisions ?? 'Рішення',
     actionItems: input.labels?.actionItems ?? 'Поручення',
-    transcript: input.labels?.transcript ?? 'Розшифровка',
     recordings: input.labels?.recordings ?? 'Записи',
   }
 
@@ -137,20 +134,6 @@ export function buildProtocolDocument(input: ProtocolDocxInput): Document {
     children.push(sectionHeading(labels.actionItems))
     for (const item of actionItems) {
       children.push(new Paragraph({text: item, bullet: {level: 0}}))
-    }
-  }
-
-  const transcript = input.transcriptText?.trim()
-  if (transcript) {
-    children.push(new Paragraph({children: []}))
-    children.push(sectionHeading(labels.transcript))
-    for (const line of transcript.slice(0, 50000).split(/\n/)) {
-      const trimmed = line.trim()
-      if (!trimmed) {
-        children.push(new Paragraph({children: []}))
-        continue
-      }
-      children.push(new Paragraph({children: [new TextRun(trimmed)]}))
     }
   }
 

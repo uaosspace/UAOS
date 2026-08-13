@@ -183,7 +183,6 @@ export default function EventProtocolPanel({
         body: editedSummary || report.summary || '',
         decisions: formatListItems(report.decisions),
         actionItems: formatListItems(report.actionItems),
-        transcriptText: bundle.transcript?.contentText?.slice(0, 50000),
         recordingLines: bundle.recordings.map(
           (rec) => `${rec.recordingType || rec.fileType || rec.id}: ${rec.downloadUrl}`,
         ),
@@ -191,7 +190,6 @@ export default function EventProtocolPanel({
           status: currentLang === 'en' ? 'Status' : 'Статус',
           decisions: currentLang === 'en' ? 'Decisions' : 'Рішення',
           actionItems: currentLang === 'en' ? 'Action items' : 'Поручення',
-          transcript: t.admin_meetings_transcript,
           recordings: t.admin_meetings_recordings,
         },
       })
