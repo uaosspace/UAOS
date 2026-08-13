@@ -255,6 +255,9 @@ export const adminTranslations = {
     admin_meetings_upload_transcript_ok: 'Розшифровку збережено',
     admin_meetings_upload_transcript_draft_ok: 'Розшифровку збережено, чернетку протоколу згенеровано',
     admin_meetings_uploading_transcript: 'Завантаження…',
+    admin_meetings_open_event: 'Відкрити подію',
+    admin_protocol_panel_hint:
+      'Локальний .vtt/.txt або дані з Zoom після «Підтягнути». Чернетка протоколу тут же.',
     admin_tab_cabinet_users: 'Кабінет-користувачі',
     admin_cabinet_user_email: 'Email',
     admin_cabinet_user_password: 'Пароль (мін. 12)',
@@ -541,6 +544,9 @@ export const adminTranslations = {
     admin_meetings_upload_transcript_ok: 'Transcript saved',
     admin_meetings_upload_transcript_draft_ok: 'Transcript saved; protocol draft generated',
     admin_meetings_uploading_transcript: 'Uploading…',
+    admin_meetings_open_event: 'Open event',
+    admin_protocol_panel_hint:
+      'Local .vtt/.txt or Zoom data after pull. Edit and approve the protocol draft here.',
     admin_tab_cabinet_users: 'Cabinet users',
     admin_cabinet_user_email: 'Email',
     admin_cabinet_user_password: 'Password (min 12)',

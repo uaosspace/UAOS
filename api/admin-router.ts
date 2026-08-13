@@ -881,6 +881,12 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
         await deleteContentEvent(parts[2])
         return res.status(200).json({ok: true})
       }
+      if (parts[2] && parts[3] === 'bundle' && method === 'GET') {
+        const session = await requireSession(req, res, 'content.write')
+        if (!session) return
+        const bundle = await getMeetingBundleForEvent(parts[2])
+        return res.status(200).json({bundle})
+      }
     }
     if (entity === 'documents') {
       if (method === 'GET') {
@@ -1228,19 +1234,6 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
     if (!session) return
     const result = await processMeetingCronJobs()
     return res.status(200).json({ok: true, ...result})
-  }
-
-  if (
-    parts[0] === 'content' &&
-    parts[1] === 'events' &&
-    parts[2] &&
-    parts[3] === 'bundle' &&
-    method === 'GET'
-  ) {
-    const session = await requireSession(req, res, 'content.write')
-    if (!session) return
-    const bundle = await getMeetingBundleForEvent(parts[2])
-    return res.status(200).json({bundle})
   }
 
   if (parts[0] === 'provider-events' && parts[1] && parts[2] === 'process' && method === 'POST') {

@@ -19,6 +19,7 @@ import {
 } from './adminUi'
 import MemberUsersEditor from './MemberUsersEditor'
 import MeetingsManager from './MeetingsManager'
+import EventProtocolPanel from './EventProtocolPanel'
 import EventNotifyPicker, {
   type CabinetNotifyPerson,
   type EventNotifyRecipientDraft,
@@ -450,8 +451,6 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
   const [cabinetDirectory, setCabinetDirectory] = useState<CabinetNotifyPerson[]>([])
   const [cabinetDirectoryLoading, setCabinetDirectoryLoading] = useState(false)
   const [meetingInfo, setMeetingInfo] = useState<AdminMeetingInfo | null>(null)
-  const [reportInfo, setReportInfo] = useState<Record<string, unknown> | null>(null)
-  const [reportSummary, setReportSummary] = useState('')
   const [documentItem, setDocumentItem] = useState<DocumentDraft>(emptyDocument())
   const [fieldLocale, setFieldLocale] = useState<Locale>(DEFAULT_LOCALE)
   const [translating, setTranslating] = useState(false)
@@ -732,6 +731,7 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
       await api(`content/events/${eventItem.id}`, {method: 'DELETE'})
       setMessage(t.admin_saved)
       setEventItem(emptyEvent())
+      setMeetingInfo(null)
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed')
@@ -859,10 +859,26 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
         : [],
     })
     setMeetingInfo(null)
-    setReportInfo(null)
-    setReportSummary('')
     if (id && participationMode === 'zoom') {
       void refreshMeetingStatus(id)
+    }
+  }
+
+  async function openEventById(eventId: string) {
+    setError(null)
+    setMessage(null)
+    setKind('events')
+    try {
+      const data = await api<{items: Record<string, unknown>[]}>('content/events')
+      setItems(data.items)
+      const raw = data.items.find((item) => String(item.id || '') === eventId)
+      if (!raw) {
+        setError(t.admin_meetings_empty)
+        return
+      }
+      pickEvent(raw)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Load failed')
     }
   }
 
@@ -1397,8 +1413,6 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
                 onClick={() => {
                   setEventItem(emptyEvent())
                   setMeetingInfo(null)
-                  setReportInfo(null)
-                  setReportSummary('')
                 }}
               >
                 {t.admin_cancel}
@@ -1518,83 +1532,28 @@ export default function ContentEditors({currentLang}: ContentEditorsProps) {
                   </div>
                 )
               })()}
-              <p className="text-sm font-medium text-brand-slate-900 dark:text-white">
-                {t.admin_report_block}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  className={adminSecondaryBtnClass}
-                  type="button"
-                  onClick={() => {
-                    void api<{report: Record<string, unknown> | null}>(
-                      `content/events/${eventItem.id}/report`,
-                    )
-                      .then((data) => {
-                        setReportInfo(data.report)
-                        setReportSummary(String(data.report?.summary ?? ''))
-                      })
-                      .catch((err) => setError(err.message))
-                  }}
-                >
-                  {t.admin_report_summary}
-                </button>
-                <button
-                  className={adminSecondaryBtnClass}
-                  type="button"
-                  onClick={() => {
-                    void api<{report: Record<string, unknown>}>(
-                      `content/events/${eventItem.id}/report`,
-                      {
-                        method: 'PATCH',
-                        body: JSON.stringify({editedSummary: reportSummary, status: 'in_review'}),
-                      },
-                    )
-                      .then((data) => {
-                        setReportInfo(data.report)
-                        setMessage(t.admin_saved)
-                      })
-                      .catch((err) => setError(err.message))
-                  }}
-                >
-                  {t.admin_report_save_draft}
-                </button>
-                <button
-                  className={adminPrimaryBtnClass}
-                  type="button"
-                  onClick={() => {
-                    void api<{report: Record<string, unknown>}>(
-                      `content/events/${eventItem.id}/report/approve`,
-                      {method: 'POST', body: '{}'},
-                    )
-                      .then((data) => {
-                        setReportInfo(data.report)
-                        setMessage(t.admin_saved)
-                      })
-                      .catch((err) => setError(err.message))
-                  }}
-                >
-                  {t.admin_report_approve}
-                </button>
-              </div>
-              <textarea
-                className={adminInputClass}
-                rows={4}
-                value={reportSummary}
-                onChange={(e) => setReportSummary(e.target.value)}
-                placeholder={t.admin_report_summary}
+            </div>
+          ) : null}
+          {eventItem.id && eventItem.participationMode === 'zoom' ? (
+            <div className="md:col-span-2">
+              <EventProtocolPanel
+                currentLang={currentLang}
+                eventId={String(eventItem.id)}
+                eventSlug={eventItem.slug}
+                titleUk={eventItem.title.uk}
+                titleEn={eventItem.title.en}
+                onMessage={setMessage}
+                onError={setError}
               />
-              {reportInfo ? (
-                <p className="text-xs text-brand-slate-500">
-                  status: {String(reportInfo.status ?? '—')}
-                </p>
-              ) : null}
             </div>
           ) : null}
         </form>
       ) : null}
 
       {kind === 'cabinetUsers' ? <MemberUsersEditor currentLang={currentLang} /> : null}
-      {kind === 'meetings' ? <MeetingsManager currentLang={currentLang} /> : null}
+      {kind === 'meetings' ? (
+        <MeetingsManager currentLang={currentLang} onOpenEvent={(eventId) => void openEventById(eventId)} />
+      ) : null}
 
       {kind === 'documents' ? (
         <form className={`${adminPanelClass} grid gap-3 md:grid-cols-2`} onSubmit={saveDocument}>
