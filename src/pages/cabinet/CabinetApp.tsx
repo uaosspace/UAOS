@@ -253,6 +253,7 @@ export default function CabinetApp({currentLang, setCurrentLang, onBackToSite}: 
       setUser(data.user)
       setCurrentPassword('')
       setNewPassword('')
+      setSettingsOpen(false)
       setSettingsMessage(t.cabinet_password_changed)
     } catch (err) {
       setError(mapError(err, t.cabinet_password_change_failed))
@@ -440,11 +441,19 @@ export default function CabinetApp({currentLang, setCurrentLang, onBackToSite}: 
           </div>
 
           <div className="space-y-3 border-t border-brand-slate-200 pt-4 dark:border-brand-slate-700">
+            {settingsMessage ? (
+              <p className="text-sm text-emerald-700 dark:text-emerald-400" role="status">
+                {settingsMessage}
+              </p>
+            ) : null}
             <button
               type="button"
               className={`${adminSecondaryBtnClass} w-full justify-between`}
               aria-expanded={settingsOpen}
-              onClick={() => setSettingsOpen((open) => !open)}
+              onClick={() => {
+                setSettingsOpen((open) => !open)
+                if (!settingsOpen) setSettingsMessage(null)
+              }}
             >
               <span className="inline-flex items-center gap-2">
                 <Settings className="h-4 w-4" aria-hidden />
@@ -461,9 +470,6 @@ export default function CabinetApp({currentLang, setCurrentLang, onBackToSite}: 
                 <p className="sr-only">
                   {settingsOpen ? t.cabinet_settings_close : t.cabinet_settings_open}
                 </p>
-                {settingsMessage ? (
-                  <p className="text-sm text-emerald-700 dark:text-emerald-400">{settingsMessage}</p>
-                ) : null}
                 <label className="block space-y-1.5 text-sm">
                   <span className={adminLabelClass}>{t.cabinet_display_name}</span>
                   <input
@@ -518,7 +524,11 @@ export default function CabinetApp({currentLang, setCurrentLang, onBackToSite}: 
                         disabled={settingsBusy}
                         onChange={(e) => setNewPassword(e.target.value)}
                         minLength={12}
+                        maxLength={128}
                       />
+                      <span className="block text-xs text-brand-slate-500 dark:text-brand-slate-400">
+                        {t.cabinet_password_rules}
+                      </span>
                     </label>
                     <button type="submit" className={adminPrimaryBtnClass} disabled={settingsBusy}>
                       {settingsBusy ? t.cabinet_loading : t.cabinet_save_password}

@@ -21,6 +21,13 @@ export function localizeCabinetApiError(message: string | null | undefined, t: C
   if (raw.includes('Password must be at least')) return t.cabinet_password_too_short
   if (raw.includes('Password is too long')) return t.cabinet_password_too_long
   if (raw.includes('Password must not contain whitespace')) return t.cabinet_password_whitespace
+  if (
+    raw.includes('Password must include at least one uppercase') ||
+    raw.includes('Password must include at least one digit') ||
+    raw.includes('Password must include at least one symbol')
+  ) {
+    return t.cabinet_password_rules
+  }
   if (raw.includes('New password must differ')) return t.cabinet_password_must_differ
   if (raw === 'Unauthorized') return t.cabinet_unauthorized
   if (raw === 'Forbidden') return t.cabinet_forbidden

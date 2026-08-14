@@ -44,8 +44,17 @@ async function main() {
     console.error('Required: --email= --password=')
     process.exit(1)
   }
-  if (password.length < 12 || /\s/.test(password)) {
-    console.error('Password must be at least 12 characters without whitespace')
+  if (
+    password.length < 12 ||
+    password.length > 128 ||
+    /\s/.test(password) ||
+    !/[A-Z]/.test(password) ||
+    !/[0-9]/.test(password) ||
+    !/[^A-Za-z0-9]/.test(password)
+  ) {
+    console.error(
+      'Password: min 12, max 128, no spaces, at least 1 uppercase, 1 digit, 1 symbol',
+    )
     process.exit(1)
   }
 

@@ -27,6 +27,15 @@ describe('localizeCabinetApiError', () => {
     expect(localizeCabinetApiError('Email required', en)).toBe(en.cabinet_forgot_need_email)
   })
 
+  it('maps password complexity policy to the rules hint', () => {
+    expect(localizeCabinetApiError('Password must include at least one digit', uk)).toBe(
+      uk.cabinet_password_rules,
+    )
+    expect(localizeCabinetApiError('Password must include at least one symbol', en)).toBe(
+      en.cabinet_password_rules,
+    )
+  })
+
   it('never returns raw English for unknown API strings', () => {
     const out = localizeCabinetApiError('Some obscure English failure', uk)
     expect(out).toBe(uk.cabinet_request_failed)

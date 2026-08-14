@@ -41,13 +41,19 @@ describe('admin auth primitives', () => {
     expect(() => assertValidNewPassword('short')).toThrow(/at least/)
     expect(() => assertValidNewPassword('has spaces here!!')).toThrow(/whitespace/)
     expect(() => assertValidNewPassword('a'.repeat(200))).toThrow(/too long/)
-    expect(() => assertValidNewPassword('LongEnoughPass1')).not.toThrow()
+    expect(() => assertValidNewPassword('LongEnoughPass1')).toThrow(/symbol/)
+    expect(() => assertValidNewPassword('LongEnoughPass!')).toThrow(/digit/)
+    expect(() => assertValidNewPassword('longenough1!aa')).toThrow(/uppercase/)
+    expect(() => assertValidNewPassword('LongEnough1!aa')).not.toThrow()
   })
 
   it('generates temporary passwords that pass policy', () => {
     const password = generateTempAdminPassword()
     expect(() => assertValidNewPassword(password)).not.toThrow()
     expect(password).not.toMatch(/\s/)
+    expect(password).toMatch(/[A-Z]/)
+    expect(password).toMatch(/[0-9]/)
+    expect(password).toMatch(/[^A-Za-z0-9]/)
   })
 
   it('hashes recovery MFA codes in a timing-safe comparable form', () => {

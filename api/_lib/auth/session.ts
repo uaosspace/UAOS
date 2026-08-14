@@ -181,7 +181,7 @@ export async function revokeOtherUserSessions(userId: string, keepSessionId: str
 const PASSWORD_MIN_LEN = 12
 const PASSWORD_MAX_LEN = 128
 
-/** Validates a new admin password without logging the value. */
+/** Validates a new admin/member password without logging the value. */
 export function assertValidNewPassword(password: string): void {
   if (typeof password !== 'string' || password.length < PASSWORD_MIN_LEN) {
     throw new Error(`Password must be at least ${PASSWORD_MIN_LEN} characters`)
@@ -191,6 +191,15 @@ export function assertValidNewPassword(password: string): void {
   }
   if (/\s/.test(password)) {
     throw new Error('Password must not contain whitespace')
+  }
+  if (!/[A-Z]/.test(password)) {
+    throw new Error('Password must include at least one uppercase letter')
+  }
+  if (!/[0-9]/.test(password)) {
+    throw new Error('Password must include at least one digit')
+  }
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    throw new Error('Password must include at least one symbol')
   }
 }
 
@@ -293,17 +302,34 @@ export async function confirmMfaSetup(userId: string, code: string): Promise<boo
  * Temporary password for email recovery. Meets assertValidNewPassword rules.
  * Ambiguous characters (0/O/1/l/I) are avoided for easier typing from email.
  */
-export function generateTempAdminPassword(bytes: () => Buffer = () => randomBytes(18)): string {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@$%*'
+export function generateTempAdminPassword(bytes: () => Buffer = () => randomBytes(24)): string {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+  const lower = 'abcdefghijkmnopqrstuvwxyz'
+  const digits = '23456789'
+  const symbols = '!@$%*'
+  const alphabet = `${upper}${lower}${digits}${symbols}`
   const raw = bytes()
-  let out = ''
-  for (let i = 0; i < raw.length; i += 1) {
-    out += alphabet[raw[i]! % alphabet.length]
-  }
-  if (out.length < PASSWORD_MIN_LEN) {
+  if (raw.length < 20) {
     throw new Error('Failed to generate temporary password')
   }
-  return out.slice(0, 20)
+  const pick = (set: string, byte: number) => set[byte % set.length]!
+  const chars = [
+    pick(upper, raw[0]!),
+    pick(digits, raw[1]!),
+    pick(symbols, raw[2]!),
+  ]
+  for (let i = 3; i < 20; i += 1) {
+    chars.push(pick(alphabet, raw[i]!))
+  }
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = raw[i]! % (i + 1)
+    const tmp = chars[i]!
+    chars[i] = chars[j]!
+    chars[j] = tmp
+  }
+  const out = chars.join('')
+  assertValidNewPassword(out)
+  return out
 }
 
 /** Six-digit one-time MFA code for email recovery (not Authenticator TOTP). */

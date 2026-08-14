@@ -24,7 +24,7 @@ vi.mock('./audit.js', () => ({
 }))
 
 vi.mock('./auth/session.js', () => ({
-  generateTempAdminPassword: () => 'TempPass123456789',
+  generateTempAdminPassword: () => 'TempPass1234567!',
 }))
 
 describe('provisionCabinetFromApplication', () => {
