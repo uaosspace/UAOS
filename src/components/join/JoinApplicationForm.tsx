@@ -366,7 +366,7 @@ export default function JoinApplicationForm({
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="min-w-0">
           <label className={labelClass} htmlFor="join-edrpou">{t.join_form_edrpou_lbl}</label>
           <input
@@ -392,19 +392,18 @@ export default function JoinApplicationForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="min-w-0">
           <label className={labelClass} htmlFor="join-email">{t.join_form_email_lbl}</label>
-          <textarea
+          <input
             id="join-email"
+            type="email"
             required
-            rows={2}
             maxLength={254}
             autoComplete="email"
-            inputMode="email"
             value={form.email}
             onChange={(event) => update('email', event.target.value)}
-            className={`${inputClass} resize-none break-all leading-snug`}
+            className={inputClass}
           />
         </div>
         <div className="min-w-0">

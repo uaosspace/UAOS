@@ -382,22 +382,27 @@ export function buildCabinetCredentialsEmail(payload: CabinetCredentialsEmailPay
     '',
     'Вам відкрито доступ до особистого кабінету UAOS.',
     '',
-    `Сторінка входу: ${payload.cabinetUrl}`,
+    'Відкрийте цю адресу в браузері (можна скопіювати):',
+    payload.cabinetUrl,
+    '',
     `Email для входу: ${payload.email}`,
     `Тимчасовий пароль: ${payload.temporaryPassword}`,
     '',
-    'Будь ласка, увійдіть і змініть пароль у налаштуваннях кабінету.',
+    'Після входу створіть свій пароль.',
     '',
     'З повагою,',
     'UAOS',
   ].join('\n')
+  // Keep the cabinet URL as visible text, not <a href>. Brevo click-tracking
+  // rewrites HTML links to sendibt*.com, which mail clients flag as unsafe.
   const htmlContent = `<div style="font-family:sans-serif;line-height:1.5">
 <p>Вітаємо, <strong>${escapeHtml(name)}</strong>!</p>
 <p>Вам відкрито доступ до особистого кабінету UAOS.</p>
-<p><a href="${escapeHtml(payload.cabinetUrl)}">Увійти в кабінет</a></p>
+<p>Відкрийте цю адресу в браузері (можна скопіювати):</p>
+<p style="font-size:16px;word-break:break-all"><strong>${escapeHtml(payload.cabinetUrl)}</strong></p>
 <p>Email: <strong>${escapeHtml(payload.email)}</strong></p>
 <p>Тимчасовий пароль: <code>${escapeHtml(payload.temporaryPassword)}</code></p>
-<p style="color:#475569;font-size:13px">Після входу змініть пароль у налаштуваннях кабінету.</p>
+<p style="color:#475569;font-size:13px">Після входу створіть свій пароль.</p>
 </div>`
   return {subject, textContent, htmlContent}
 }

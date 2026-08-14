@@ -124,16 +124,31 @@ export default function MemberUsersEditor({currentLang}: {currentLang: Locale}) 
         </a>
       </div>
 
-      <form className={`${adminPanelClass} grid gap-3 md:grid-cols-2`} onSubmit={(e) => void createUser(e)}>
+      <form
+        className={`${adminPanelClass} grid gap-3 md:grid-cols-2`}
+        autoComplete="off"
+        onSubmit={(e) => void createUser(e)}
+      >
         <label className="block space-y-1.5 text-sm">
           <span className={adminLabelClass}>{t.admin_cabinet_user_email}</span>
-          <input className={adminInputClass} value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input
+            className={adminInputClass}
+            type="email"
+            name="new-member-email"
+            autoComplete="off"
+            spellCheck={false}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
         </label>
         <label className="block space-y-1.5 text-sm">
           <span className={adminLabelClass}>{t.admin_cabinet_user_password}</span>
           <input
             className={adminInputClass}
             type="password"
+            name="new-member-password"
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
