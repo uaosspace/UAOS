@@ -1,10 +1,10 @@
 import {useEffect, useRef, useState, type FormEvent} from 'react'
 import type {Locale} from '../../data/locales'
 import {resolveLocalized} from '../../data/locales'
+import PhoneDialSelect from './PhoneDialSelect'
 import {
   composeJoinPhone,
   defaultPhoneDialForLocale,
-  PHONE_COUNTRY_CODES,
 } from '../../data/phoneCountryCodes'
 import {TRANSLATIONS} from '../../data/translations'
 import {PARTICIPANT_TYPES, SECTORS, PRODUCT_CATEGORIES, COMPETENCY_AREAS} from '../../data/referenceLists'
@@ -366,8 +366,8 @@ export default function JoinApplicationForm({
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
+      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] gap-4">
+        <div className="min-w-0">
           <label className={labelClass} htmlFor="join-edrpou">{t.join_form_edrpou_lbl}</label>
           <input
             id="join-edrpou"
@@ -378,7 +378,7 @@ export default function JoinApplicationForm({
             className={inputClass}
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <label className={labelClass} htmlFor="join-contactPerson">{t.join_form_person_lbl}</label>
           <input
             id="join-contactPerson"
@@ -392,38 +392,33 @@ export default function JoinApplicationForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
+      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] gap-4">
+        <div className="min-w-0">
           <label className={labelClass} htmlFor="join-email">{t.join_form_email_lbl}</label>
-          <input
+          <textarea
             id="join-email"
-            type="email"
             required
+            rows={2}
             maxLength={254}
+            autoComplete="email"
+            inputMode="email"
             value={form.email}
             onChange={(event) => update('email', event.target.value)}
-            className={inputClass}
+            className={`${inputClass} resize-none break-all leading-snug`}
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <label className={labelClass} htmlFor="join-phone">{t.join_form_phone_lbl}</label>
           <div className="flex min-w-0 items-stretch gap-2">
             <label className="sr-only" htmlFor="join-phone-code">
               {t.join_form_phone_code_lbl}
             </label>
-            <select
+            <PhoneDialSelect
               id="join-phone-code"
               value={form.phoneDial}
-              onChange={(event) => update('phoneDial', event.target.value)}
-              className="w-[5.5rem] max-w-[5.5rem] shrink-0 px-2 py-2.5 rounded-xl glass-pill focus:border-brand-blue-500 dark:focus:border-brand-sky-400 focus:bg-white dark:focus:bg-brand-slate-900 text-sm text-brand-slate-800 dark:text-brand-slate-200 outline-none transition-all"
-              aria-label={t.join_form_phone_code_lbl}
-            >
-              {PHONE_COUNTRY_CODES.map((item) => (
-                <option key={item.dial} value={item.dial} title={`${item.iso} ${item.dial}`}>
-                  {item.dial}
-                </option>
-              ))}
-            </select>
+              onChange={(dial) => update('phoneDial', dial)}
+              label={t.join_form_phone_code_lbl}
+            />
             <input
               id="join-phone"
               type="tel"

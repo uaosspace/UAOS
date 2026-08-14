@@ -389,3 +389,5 @@ src/lib/turnstileClient.ts
 src/lib/turnstileClient.test.ts
 src/components/join/JoinApplicationForm.tsx
 api/_lib/turnstile.test.ts
+src/components/join/PhoneDialSelect.tsx
+api/_lib/meetings/geminiMeetingProtocol.live.test.ts
