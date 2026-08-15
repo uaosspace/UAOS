@@ -66,7 +66,7 @@ import {
   buildCabinetUsersCsv,
   buildContentMembersCatalogCsv,
 } from './_lib/memberDirectoryExport.js'
-import {buildExcelCsv} from './_lib/csvExcel.js'
+import {buildExcelCsv, csvContentDisposition, csvDownloadFilename, csvExcelText} from './_lib/csvExcel.js'
 import {listCabinetDirectoryForNotify} from './_lib/meetings/eventNotifyRecipients.js'
 import {getBlobByPathname, putPublicBlob, putPrivateBlob} from './_lib/blobStore.js'
 import {fetchOgImageFromPageUrl} from './_lib/fetchOgImage.js'
@@ -401,21 +401,21 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
       const items = await listApplications({status: 'all', limit: 500})
       const body = buildExcelCsv(
         [
-          'id',
-          'status',
-          'companyName',
-          'email',
-          'phone',
-          'applicantKind',
-          'sectors',
-          'submittedAt',
+          'ID',
+          'Статус',
+          'Назва компанії',
+          'Email',
+          'Телефон',
+          'Тип заявника',
+          'Сектори',
+          'Дата подання',
         ],
         items.map((item) => [
-          item.id,
+          csvExcelText(item.id),
           item.status,
           item.companyName,
           item.email,
-          item.phone,
+          csvExcelText(item.phone),
           item.applicantKind,
           item.sectors.join('|'),
           item.submittedAt,
@@ -429,7 +429,10 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
         metadata: {count: items.length},
       })
       res.setHeader('content-type', 'text/csv; charset=utf-8')
-      res.setHeader('content-disposition', 'attachment; filename="applications.csv"')
+      res.setHeader(
+        'content-disposition',
+        csvContentDisposition(csvDownloadFilename('zayavky')),
+      )
       return res.status(200).send(body)
     }
 
@@ -625,7 +628,10 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
           metadata: {bytes: body.length},
         })
         res.setHeader('content-type', 'text/csv; charset=utf-8')
-        res.setHeader('content-disposition', 'attachment; filename="members-catalog.csv"')
+        res.setHeader(
+          'content-disposition',
+          csvContentDisposition(csvDownloadFilename('katalog-uchasnykiv')),
+        )
         return res.status(200).send(body)
       }
       if (method === 'GET') {
@@ -1058,7 +1064,10 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
       metadata: {bytes: body.length},
     })
     res.setHeader('content-type', 'text/csv; charset=utf-8')
-    res.setHeader('content-disposition', 'attachment; filename="cabinet-users.csv"')
+    res.setHeader(
+      'content-disposition',
+      csvContentDisposition(csvDownloadFilename('kabinet-users')),
+    )
     return res.status(200).send(body)
   }
 

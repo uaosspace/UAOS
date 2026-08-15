@@ -1,5 +1,5 @@
 import {getSql} from './db.js'
-import {buildExcelCsv} from './csvExcel.js'
+import {buildExcelCsv, csvExcelText} from './csvExcel.js'
 import {
   catalogGroupLabels,
   primaryMemberCatalogGroupId,
@@ -87,20 +87,20 @@ export async function buildContentMembersCatalogCsv(): Promise<string> {
   })
 
   const header = [
-    'groupId',
-    'groupUk',
-    'groupEn',
-    'status',
-    'nameUk',
-    'nameEn',
-    'email',
-    'phone',
-    'website',
-    'region',
-    'participantTypes',
-    'memberSince',
-    'updatedAt',
-    'slug',
+    'ID групи',
+    'Група (UK)',
+    'Група (EN)',
+    'Статус',
+    'Назва (UK)',
+    'Назва (EN)',
+    'Email',
+    'Телефон',
+    'Вебсайт',
+    'Регіон',
+    'Типи учасників',
+    'Учасник з',
+    'Оновлено',
+    'Slug',
   ]
   return buildExcelCsv(
     header,
@@ -112,7 +112,7 @@ export async function buildContentMembersCatalogCsv(): Promise<string> {
       item.nameUk,
       item.nameEn,
       item.email,
-      item.phone,
+      csvExcelText(item.phone),
       item.website,
       item.region,
       item.participantTypes,
@@ -195,19 +195,19 @@ export async function buildCabinetUsersCsv(): Promise<string> {
   })
 
   const header = [
-    'groupId',
-    'groupUk',
-    'groupEn',
-    'email',
-    'displayName',
-    'companyName',
-    'phone',
-    'accessLevel',
-    'active',
-    'memberSince',
-    'applicationStatus',
-    'applicantKind',
-    'applicationSubmittedAt',
+    'ID групи',
+    'Група (UK)',
+    'Група (EN)',
+    'Email',
+    'Імʼя',
+    'Компанія',
+    'Телефон',
+    'Рівень доступу',
+    'Активний',
+    'Учасник з',
+    'Статус заявки',
+    'Тип заявника',
+    'Дата подання заявки',
   ]
   return buildExcelCsv(
     header,
@@ -218,7 +218,7 @@ export async function buildCabinetUsersCsv(): Promise<string> {
       item.email,
       item.displayName,
       item.companyName,
-      item.phone,
+      csvExcelText(item.phone),
       item.accessLevel,
       item.active,
       item.memberSince,

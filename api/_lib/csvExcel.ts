@@ -20,3 +20,24 @@ export function buildExcelCsv(header: string[], rows: string[][]): string {
   ]
   return `\uFEFF${lines.join('\n')}`
 }
+
+/** Download name for admin CSV exports: `uaos-<slug>-YYYY-MM-DD.csv`. */
+export function csvDownloadFilename(slug: string, now = new Date()): string {
+  const day = now.toISOString().slice(0, 10)
+  const safe = slug.replace(/[^a-z0-9-]+/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+  return `uaos-${safe || 'export'}-${day}.csv`
+}
+
+export function csvContentDisposition(filename: string): string {
+  return `attachment; filename="${filename}"`
+}
+
+/**
+ * Force Excel to treat value as text (phones/IDs), not a number / scientific notation.
+ * Leading tab is stripped from display in most Excel versions when opened from CSV.
+ */
+export function csvExcelText(value: string): string {
+  if (!value) return ''
+  return `\t${value}`
+}
+
