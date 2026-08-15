@@ -35,7 +35,7 @@ export const PARTICIPANT_TYPES: ReferenceListItem[] = [
   {
     id: 'expert-org',
     label: {
-      uk: 'Експерти та професійні організації',
+      uk: 'Експертні та професійні організації',
       en: 'Experts and professional organizations',
       de: 'Experten und Fachorganisationen',
       es: 'Expertos y organizaciones profesionales',
