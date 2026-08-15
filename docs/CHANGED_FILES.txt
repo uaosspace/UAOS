@@ -396,3 +396,7 @@ src/lib/cabinetPasswordPolicy.ts
 src/lib/cabinetPasswordPolicy.test.ts
 src/lib/cabinetMeetingUi.ts
 src/lib/cabinetMeetingUi.test.ts
+src/data/translations/industrial.ts
+src/data/siteSettings.test.ts
+public/member-logos/README.md
+public/member-logos/stg.svg

@@ -2,6 +2,7 @@ import {useMemo} from 'react'
 import {TRANSLATIONS} from '../data/translations'
 import BrandLogo from './BrandLogo'
 import type {Locale} from '../data/locales'
+import {resolveSiteContacts, telHref} from '../data/siteSettings'
 import {APP_ROUTES, type AppRoute} from '../routes/appRoutes'
 import {useSiteSettingsResource} from '../hooks/content/useSiteSettingsResource'
 
@@ -38,6 +39,7 @@ export default function Footer({
   const t = TRANSLATIONS[currentLang]
   const year = new Date().getFullYear()
   const {data: settings} = useSiteSettingsResource(true)
+  const contacts = resolveSiteContacts(settings, currentLang)
   const footerNav = useMemo(
     () =>
       FOOTER_NAV.filter(
@@ -65,10 +67,10 @@ export default function Footer({
           <p>{t.footer_desc}</p>
           {settings.socialsShowOnSite ? (
           <div className="socials">
-            <a href={`mailto:${t.footer_email}`} aria-label={t.social_linkedin}>in</a>
-            <a href={`mailto:${t.footer_email}`} aria-label={t.social_facebook}>f</a>
-            <a href={`mailto:${t.footer_email}`} aria-label={t.social_youtube}>▶</a>
-            <a href={`mailto:${t.footer_email}`} aria-label={t.social_telegram}>↗</a>
+            <a href={`mailto:${contacts.email}`} aria-label={t.social_linkedin}>in</a>
+            <a href={`mailto:${contacts.email}`} aria-label={t.social_facebook}>f</a>
+            <a href={`mailto:${contacts.email}`} aria-label={t.social_youtube}>▶</a>
+            <a href={`mailto:${contacts.email}`} aria-label={t.social_telegram}>↗</a>
           </div>
           ) : null}
         </div>
@@ -93,14 +95,14 @@ export default function Footer({
 
         <div className="footer-col">
           <h3>{t.footer_contacts_title}</h3>
-          <p>{t.footer_address.split('\n').map((line, index) => (
-            <span key={line}>
+          <p>{contacts.address.split('\n').map((line, index) => (
+            <span key={`${index}-${line}`}>
               {index > 0 && <br />}
               {line}
             </span>
           ))}</p>
-          <a href={`tel:${t.footer_phone.replace(/\s/g, '')}`}>{t.footer_phone}</a>
-          <a href={`mailto:${t.footer_email}`}>{t.footer_email}</a>
+          <a href={telHref(contacts.phone)}>{contacts.phone}</a>
+          <a href={`mailto:${contacts.email}`}>{contacts.email}</a>
         </div>
       </div>
 

@@ -1,3 +1,5 @@
+import type {Locale} from './locales'
+import {resolveLocalized} from './locales'
 import {LocalizedText} from '../types'
 import {ContentApiError, fetchContentItem} from '../lib/contentApi'
 import {isRecord, readLocalizedText, readStringOr} from '../lib/contentGuards'
@@ -76,6 +78,23 @@ function readStats(source: Record<string, unknown>): Pick<
     knowledgeShowOnSite: Boolean(source.knowledgeShowOnSite),
     socialsShowOnSite: Boolean(source.socialsShowOnSite),
   }
+}
+
+/** Контакти з адмін-налаштувань для публічного UI (підвал, /contacts, legal). */
+export function resolveSiteContacts(settings: SiteSettings, locale: Locale): {
+  phone: string
+  email: string
+  address: string
+} {
+  return {
+    phone: settings.phone,
+    email: settings.email,
+    address: resolveLocalized(settings.address, locale),
+  }
+}
+
+export function telHref(phone: string): string {
+  return `tel:${phone.replace(/[\s()-]/g, '')}`
 }
 
 export async function fetchSiteSettings(): Promise<SiteSettings> {

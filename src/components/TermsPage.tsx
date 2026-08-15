@@ -1,8 +1,8 @@
 import type {Locale} from '../data/locales'
-import {resolveLocalized} from '../data/locales'
 import {FileText, ArrowLeft, AlertTriangle, Info} from 'lucide-react'
-import {DEFAULT_SITE_SETTINGS} from '../data/siteSettings'
+import {resolveSiteContacts} from '../data/siteSettings'
 import {TRANSLATIONS} from '../data/translations'
+import {useSiteSettingsResource} from '../hooks/content/useSiteSettingsResource'
 import {SITE_TERMS_UPDATED, SITE_TERMS_VERSION} from '../lib/siteTerms'
 
 interface TermsPageProps {
@@ -16,8 +16,11 @@ interface TermsPageProps {
  */
 export default function TermsPage({currentLang, onBack}: TermsPageProps) {
   const isUk = currentLang === 'uk'
-  const address = resolveLocalized(DEFAULT_SITE_SETTINGS.address, isUk ? 'uk' : 'en')
-  const email = DEFAULT_SITE_SETTINGS.email
+  const {data: settings} = useSiteSettingsResource(true)
+  /** Юридичний текст лише uk/en — контакти з налаштувань у мові документа. */
+  const contacts = resolveSiteContacts(settings, isUk ? 'uk' : 'en')
+  const address = contacts.address
+  const email = contacts.email
   const t = TRANSLATIONS[currentLang]
   /** Автентичні версії документа існують лише uk/en — інші локалі бачать англійський текст. */
   const showLangNotice = currentLang !== 'uk' && currentLang !== 'en'

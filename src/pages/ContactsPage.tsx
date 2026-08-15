@@ -1,5 +1,6 @@
 import type {Locale} from '../data/locales'
 import {TRANSLATIONS} from '../data/translations'
+import {resolveSiteContacts, telHref} from '../data/siteSettings'
 import {useDocumentMeta} from '../hooks/useDocumentMeta'
 import {useSiteSettingsResource} from '../hooks/content/useSiteSettingsResource'
 import {Phone, Mail, MapPin, Share2} from 'lucide-react'
@@ -11,6 +12,7 @@ interface ContactsPageProps {
 export default function ContactsPage({currentLang}: ContactsPageProps) {
   const t = TRANSLATIONS[currentLang]
   const {data: settings} = useSiteSettingsResource(true)
+  const contacts = resolveSiteContacts(settings, currentLang)
   useDocumentMeta({
     title: `${t.contacts_title} — ${t.brand_name}`,
     description: t.contacts_subtitle,
@@ -43,7 +45,7 @@ export default function ContactsPage({currentLang}: ContactsPageProps) {
                 {t.contact_address}
               </span>
               <p className="text-sm text-brand-slate-800 dark:text-white whitespace-pre-line">
-                {t.footer_address}
+                {contacts.address}
               </p>
             </div>
           </div>
@@ -54,8 +56,8 @@ export default function ContactsPage({currentLang}: ContactsPageProps) {
               <span className="block text-xs font-semibold text-brand-slate-500 dark:text-brand-slate-300 mb-0.5">
                 {t.contact_phone}
               </span>
-              <a href={`tel:${t.footer_phone.replace(/\s/g, '')}`} className="text-sm text-brand-slate-800 dark:text-white hover:text-brand-blue-500">
-                {t.footer_phone}
+              <a href={telHref(contacts.phone)} className="text-sm text-brand-slate-800 dark:text-white hover:text-brand-blue-500">
+                {contacts.phone}
               </a>
             </div>
           </div>
@@ -66,8 +68,8 @@ export default function ContactsPage({currentLang}: ContactsPageProps) {
               <span className="block text-xs font-semibold text-brand-slate-500 dark:text-brand-slate-300 mb-0.5">
                 {t.contact_email}
               </span>
-              <a href={`mailto:${t.footer_email}`} className="text-sm text-brand-slate-800 dark:text-white hover:text-brand-blue-500">
-                {t.footer_email}
+              <a href={`mailto:${contacts.email}`} className="text-sm text-brand-slate-800 dark:text-white hover:text-brand-blue-500">
+                {contacts.email}
               </a>
             </div>
           </div>
@@ -83,7 +85,7 @@ export default function ContactsPage({currentLang}: ContactsPageProps) {
                 {socials.map((social) => (
                   <a
                     key={social.key}
-                    href={`mailto:${t.footer_email}`}
+                    href={`mailto:${contacts.email}`}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium glass-pill text-brand-slate-700 dark:text-brand-slate-200 hover:border-brand-blue-500"
                   >
                     {social.label}

@@ -1,8 +1,8 @@
 import type {Locale} from '../data/locales'
-import {resolveLocalized} from '../data/locales'
 import {ShieldAlert, ArrowLeft, Info} from 'lucide-react'
-import {DEFAULT_SITE_SETTINGS} from '../data/siteSettings'
+import {resolveSiteContacts} from '../data/siteSettings'
 import {TRANSLATIONS} from '../data/translations'
+import {useSiteSettingsResource} from '../hooks/content/useSiteSettingsResource'
 import {PRIVACY_POLICY_UPDATED, PRIVACY_POLICY_VERSION} from '../lib/privacyPolicy'
 
 interface PrivacyPageProps {
@@ -17,9 +17,12 @@ interface PrivacyPageProps {
  */
 export default function PrivacyPage({currentLang, onBack}: PrivacyPageProps) {
   const isUk = currentLang === 'uk'
-  const address = resolveLocalized(DEFAULT_SITE_SETTINGS.address, isUk ? 'uk' : 'en')
-  const privacyEmail = DEFAULT_SITE_SETTINGS.email
-  const phone = DEFAULT_SITE_SETTINGS.phone
+  const {data: settings} = useSiteSettingsResource(true)
+  /** Юридичний текст лише uk/en — контакти з налаштувань у мові документа. */
+  const contacts = resolveSiteContacts(settings, isUk ? 'uk' : 'en')
+  const address = contacts.address
+  const privacyEmail = contacts.email
+  const phone = contacts.phone
   const edrpou = isUk ? 'буде уточнено' : 'to be confirmed'
   const t = TRANSLATIONS[currentLang]
   /** Автентичні версії документа існують лише uk/en — інші локалі бачать англійський текст. */

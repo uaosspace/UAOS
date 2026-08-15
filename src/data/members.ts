@@ -771,7 +771,7 @@ export const INITIAL_MEMBERS: AssociationMember[] = [
       kk: 'STG 2006 жылы құрылған және Украинаның арнайы киім нарығына жоғары сапалы қорғаныш маталарын жеткізеді. Компания — Sapphire Finishing Mills (Пәкістан) және Daletec (Норвегия) компанияларының эксклюзивті өкілі, 2010 жылдан бері ЖҚҚ саласындағы салалық нормаларды әзірлеуге қатысады. Клиенттерінің қатарында DTEK, Metinvest, Ukrzaliznytsia, Ferrexpo, ArcelorMittal және басқалары бар. 2022 жылдан бастап еуропалық бағытты дамытады (Жешув қаласындағы логистикалық орталық, Польша).',
       fr: 'Fondée en 2006, STG fournit des tissus de protection de haute qualité au marché ukrainien des vêtements de travail. L’entreprise est le représentant exclusif de Sapphire Finishing Mills (Pakistan) et de Daletec (Norvège) et participe depuis 2010 à l’élaboration des normes sectorielles relatives aux EPI. Parmi ses clients figurent DTEK, Metinvest, Ukrzaliznytsia, Ferrexpo, ArcelorMittal et d’autres. Depuis 2022, elle développe son activité européenne (centre logistique à Rzeszów, en Pologne).',
     },
-    logoUrl: '/members/stg.png?v=2',
+    logoUrl: '/member-logos/stg.svg',
     coverImageUrl: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&q=80&w=800',
     websiteUrl: 'https://stg.ua/',
     publicEmail: 'info@stg.ua',
