@@ -25,14 +25,14 @@ function MemberLogoBadge({logoUrl, shortName, name}: {logoUrl: string; shortName
 
   if (!logoUrl || failed) {
     return (
-      <span className="inline-flex items-center justify-center px-2 py-1 rounded-lg bg-white dark:bg-brand-slate-900 border border-brand-slate-200/50 dark:border-brand-slate-800/50 font-display font-black text-xs tracking-tighter text-brand-blue-600 dark:text-brand-sky-300 shrink-0">
+      <span className="inline-flex items-center justify-center px-2 py-1 rounded-lg bg-[#b0b0b0] border border-brand-slate-200/50 dark:border-brand-slate-800/50 font-display font-black text-xs tracking-tighter text-brand-blue-600 dark:text-brand-sky-300 shrink-0">
         {shortName || name}
       </span>
     )
   }
 
   return (
-    <span className="inline-flex items-center justify-center h-8 px-2 rounded-lg bg-white dark:bg-brand-slate-900 border border-brand-slate-200/50 dark:border-brand-slate-800/50 shrink-0 overflow-hidden">
+    <span className="inline-flex items-center justify-center h-8 px-2 rounded-lg bg-[#b0b0b0] border border-brand-slate-200/50 dark:border-brand-slate-800/50 shrink-0 overflow-hidden">
       <img
         src={logoUrl}
         alt={shortName || name}

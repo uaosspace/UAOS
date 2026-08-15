@@ -554,10 +554,7 @@
       place-items: center;
       padding: 18px 20px;
       border: 1px solid var(--line);
-      background: #05070a;
-    }
-    html[data-theme="light"] .member-card-logo {
-      background: #0a1018;
+      background: #b0b0b0;
     }
     .member-card-logo img {
       width: auto;
@@ -575,7 +572,7 @@
       place-items: center;
       padding: 12px;
       text-align: center;
-      color: color-mix(in srgb, var(--neon) 55%, var(--muted));
+      color: color-mix(in srgb, var(--brand, #2563eb) 70%, #0f172a);
       font-size: 13px;
       font-weight: 850;
       letter-spacing: -.02em;

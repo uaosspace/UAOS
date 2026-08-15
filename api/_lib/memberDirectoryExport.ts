@@ -1,14 +1,10 @@
 import {getSql} from './db.js'
+import {buildExcelCsv} from './csvExcel.js'
 import {
   catalogGroupLabels,
   primaryMemberCatalogGroupId,
   type MemberCatalogGroupId,
 } from './memberCatalogGroups.js'
-
-function csvCell(value: string): string {
-  if (/[",\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`
-  return value
-}
 
 function isoDate(value: unknown): string {
   if (!value) return ''
@@ -29,7 +25,7 @@ function groupSortKey(groupId: MemberCatalogGroupId): number {
   return idx >= 0 ? idx : 99
 }
 
-/** Catalogue members CSV, sorted by public catalogue groups. */
+/** Catalogue members CSV, sorted by public catalogue groups. Excel-friendly (BOM + `;`). */
 export async function buildContentMembersCatalogCsv(): Promise<string> {
   const sql = getSql()
   const rows = await sql`
@@ -106,28 +102,25 @@ export async function buildContentMembersCatalogCsv(): Promise<string> {
     'updatedAt',
     'slug',
   ]
-  const lines = [header.join(',')]
-  for (const item of out) {
-    lines.push(
-      [
-        item.groupId,
-        csvCell(item.groupUk),
-        csvCell(item.groupEn),
-        item.status,
-        csvCell(item.nameUk),
-        csvCell(item.nameEn),
-        csvCell(item.email),
-        csvCell(item.phone),
-        csvCell(item.website),
-        csvCell(item.region),
-        csvCell(item.participantTypes),
-        item.memberSince,
-        item.updatedAt,
-        csvCell(item.slug),
-      ].join(','),
-    )
-  }
-  return lines.join('\n')
+  return buildExcelCsv(
+    header,
+    out.map((item) => [
+      item.groupId,
+      item.groupUk,
+      item.groupEn,
+      item.status,
+      item.nameUk,
+      item.nameEn,
+      item.email,
+      item.phone,
+      item.website,
+      item.region,
+      item.participantTypes,
+      item.memberSince,
+      item.updatedAt,
+      item.slug,
+    ]),
+  )
 }
 
 /**
@@ -216,25 +209,22 @@ export async function buildCabinetUsersCsv(): Promise<string> {
     'applicantKind',
     'applicationSubmittedAt',
   ]
-  const lines = [header.join(',')]
-  for (const item of out) {
-    lines.push(
-      [
-        item.groupId,
-        csvCell(item.groupUk),
-        csvCell(item.groupEn),
-        csvCell(item.email),
-        csvCell(item.displayName),
-        csvCell(item.companyName),
-        csvCell(item.phone),
-        item.accessLevel,
-        item.active,
-        item.memberSince,
-        item.applicationStatus,
-        csvCell(item.applicantKind),
-        item.applicationSubmittedAt,
-      ].join(','),
-    )
-  }
-  return lines.join('\n')
+  return buildExcelCsv(
+    header,
+    out.map((item) => [
+      item.groupId,
+      item.groupUk,
+      item.groupEn,
+      item.email,
+      item.displayName,
+      item.companyName,
+      item.phone,
+      item.accessLevel,
+      item.active,
+      item.memberSince,
+      item.applicationStatus,
+      item.applicantKind,
+      item.applicationSubmittedAt,
+    ]),
+  )
 }

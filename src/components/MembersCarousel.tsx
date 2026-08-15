@@ -66,7 +66,7 @@ function MemberCoverImage({ src, logoSrc, alt, shortName, isCentral, isHovered }
     return (
       <div className="member-card-logo">
         {status === 'loading' && (
-          <div className="absolute inset-0 animate-pulse bg-black/40" />
+          <div className="absolute inset-0 animate-pulse bg-brand-slate-200/60" />
         )}
         {status === 'loaded' && primary && (
           <img

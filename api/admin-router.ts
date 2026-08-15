@@ -66,6 +66,7 @@ import {
   buildCabinetUsersCsv,
   buildContentMembersCatalogCsv,
 } from './_lib/memberDirectoryExport.js'
+import {buildExcelCsv} from './_lib/csvExcel.js'
 import {listCabinetDirectoryForNotify} from './_lib/meetings/eventNotifyRecipients.js'
 import {getBlobByPathname, putPublicBlob, putPrivateBlob} from './_lib/blobStore.js'
 import {fetchOgImageFromPageUrl} from './_lib/fetchOgImage.js'
@@ -398,31 +399,28 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
       const session = await requireSession(req, res, 'applications.export')
       if (!session) return
       const items = await listApplications({status: 'all', limit: 500})
-      const header = [
-        'id',
-        'status',
-        'companyName',
-        'email',
-        'phone',
-        'applicantKind',
-        'sectors',
-        'submittedAt',
-      ]
-      const lines = [header.join(',')]
-      for (const item of items) {
-        lines.push(
-          [
-            item.id,
-            item.status,
-            csv(item.companyName),
-            csv(item.email),
-            csv(item.phone),
-            item.applicantKind,
-            csv(item.sectors.join('|')),
-            item.submittedAt,
-          ].join(','),
-        )
-      }
+      const body = buildExcelCsv(
+        [
+          'id',
+          'status',
+          'companyName',
+          'email',
+          'phone',
+          'applicantKind',
+          'sectors',
+          'submittedAt',
+        ],
+        items.map((item) => [
+          item.id,
+          item.status,
+          item.companyName,
+          item.email,
+          item.phone,
+          item.applicantKind,
+          item.sectors.join('|'),
+          item.submittedAt,
+        ]),
+      )
       await writeAuditEvent({
         actorType: 'admin',
         actorId: session.user.id,
@@ -432,7 +430,7 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
       })
       res.setHeader('content-type', 'text/csv; charset=utf-8')
       res.setHeader('content-disposition', 'attachment; filename="applications.csv"')
-      return res.status(200).send(lines.join('\n'))
+      return res.status(200).send(body)
     }
 
     if (parts[1] && parts.length === 2 && method === 'GET') {
@@ -1265,11 +1263,6 @@ async function handleAdminRequest(req: VercelRequest, res: VercelResponse) {
   }
 
   return sendJsonError(res, 404, 'Not found')
-}
-
-function csv(value: string): string {
-  const escaped = value.replace(/"/g, '""')
-  return `"${escaped}"`
 }
 
 // silence unused in some builds
