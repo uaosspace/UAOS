@@ -238,34 +238,40 @@
       isolation: isolate;
     }
     /*
-      Фото: якір — правий верх hero; розмір підбираємо ітеративно.
-      Поточний крок: ×1.10 від попереднього (52.7% / 0.85h).
+      Фото в межах колонки контенту, contain — без обрізки людей.
+      М’які «розмиті» краї (mask + inset vignette), особливо верх і правий край біля орнаменту.
     */
     .hero-photos {
+      --hero-side: max(32px, calc((100vw - var(--max)) / 2));
       position: absolute;
-      top: var(--header-h);
-      right: 0;
+      top: calc(var(--header-h) + 18px);
+      right: var(--hero-side);
       left: auto;
       bottom: auto;
-      width: 58%;
-      height: calc((100% - var(--header-h)) * 0.935);
+      width: min(860px, calc(var(--max) * 0.62));
+      aspect-ratio: 4 / 3;
+      height: auto;
+      max-height: min(640px, calc((100% - var(--header-h) - 36px) * 0.9));
       z-index: -4;
       pointer-events: none;
+      overflow: hidden;
       -webkit-mask-image:
         linear-gradient(
           90deg,
           transparent 0%,
-          rgba(0, 0, 0, .22) 10%,
-          rgba(0, 0, 0, .65) 24%,
-          rgba(0, 0, 0, .95) 40%,
-          #000 54%,
-          #000 100%
+          rgba(0, 0, 0, .45) 5%,
+          #000 14%,
+          #000 91%,
+          rgba(0, 0, 0, .55) 96%,
+          transparent 100%
         ),
         linear-gradient(
           180deg,
-          #000 0%,
-          #000 72%,
-          rgba(0, 0, 0, .55) 88%,
+          transparent 0%,
+          rgba(0, 0, 0, .4) 3%,
+          #000 7%,
+          #000 93%,
+          rgba(0, 0, 0, .5) 97%,
           transparent 100%
         );
       -webkit-mask-composite: source-in;
@@ -273,28 +279,49 @@
         linear-gradient(
           90deg,
           transparent 0%,
-          rgba(0, 0, 0, .22) 10%,
-          rgba(0, 0, 0, .65) 24%,
-          rgba(0, 0, 0, .95) 40%,
-          #000 54%,
-          #000 100%
+          rgba(0, 0, 0, .45) 5%,
+          #000 14%,
+          #000 91%,
+          rgba(0, 0, 0, .55) 96%,
+          transparent 100%
         ),
         linear-gradient(
           180deg,
-          #000 0%,
-          #000 72%,
-          rgba(0, 0, 0, .55) 88%,
+          transparent 0%,
+          rgba(0, 0, 0, .4) 3%,
+          #000 7%,
+          #000 93%,
+          rgba(0, 0, 0, .5) 97%,
           transparent 100%
         );
       mask-composite: intersect;
+    }
+    .hero-photos::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      box-shadow:
+        inset 0 14px 18px -12px color-mix(in srgb, var(--page-deep) 88%, transparent),
+        inset 0 -14px 18px -12px color-mix(in srgb, var(--page-deep) 78%, transparent),
+        inset 36px 0 40px -14px color-mix(in srgb, var(--page-deep) 72%, transparent),
+        inset -20px 0 24px -12px color-mix(in srgb, var(--page-deep) 82%, transparent);
+    }
+    html[data-theme="light"] .hero-photos::after {
+      box-shadow:
+        inset 0 14px 18px -12px rgba(232, 247, 254, .92),
+        inset 0 -14px 18px -12px rgba(232, 247, 254, .82),
+        inset 36px 0 40px -14px rgba(232, 247, 254, .75),
+        inset -20px 0 24px -12px rgba(232, 247, 254, .88);
     }
     .hero-photo {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
-      object-fit: cover;
-      object-position: right top;
+      object-fit: contain;
+      object-position: right center;
       opacity: 0;
       transition: opacity 1s ease;
     }
@@ -316,9 +343,9 @@
         linear-gradient(
           90deg,
           color-mix(in srgb, var(--page-deep) 97%, transparent) 0%,
-          color-mix(in srgb, var(--page-deep) 92%, transparent) 30%,
-          color-mix(in srgb, var(--page-deep) 48%, transparent) 48%,
-          transparent 62%
+          color-mix(in srgb, var(--page-deep) 88%, transparent) 22%,
+          color-mix(in srgb, var(--page-deep) 42%, transparent) 38%,
+          transparent 52%
         );
       transition: background .6s ease;
     }
@@ -329,9 +356,9 @@
         linear-gradient(
           90deg,
           rgba(232, 247, 254, .98) 0%,
-          rgba(232, 247, 254, .94) 32%,
-          rgba(232, 247, 254, .48) 50%,
-          transparent 64%
+          rgba(232, 247, 254, .88) 22%,
+          rgba(232, 247, 254, .42) 38%,
+          transparent 52%
         );
     }
     .hero::after {
@@ -409,7 +436,21 @@
     .outline-link span { font-size: 17px; }
     .hero-index { position: absolute; left: 0; bottom: 34px; display: flex; align-items: center; gap: 12px; color: var(--muted); font: 700 13.2px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .14em; text-transform: uppercase; }
     .hero-index::before { content: ""; width: 62px; height: 1px; background: var(--line-strong); }
-    .side-identity { position: absolute; z-index: 4; right: 25px; top: 24%; bottom: 19%; width: 92px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 5px 0; pointer-events: none; }
+    .side-identity {
+      --hero-side: max(32px, calc((100vw - var(--max)) / 2));
+      position: absolute;
+      z-index: 6;
+      right: calc(var(--hero-side) + 6px);
+      top: 22%;
+      bottom: 18%;
+      width: 92px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 0;
+      pointer-events: none;
+    }
     .side-identity::before { content: ""; position: absolute; top: 88px; bottom: 88px; left: 50%; width: 1px; background: linear-gradient(transparent, var(--neon), transparent); box-shadow: 0 0 12px rgba(var(--neon-rgb), .56); opacity: .72; }
     .side-identity span { color: var(--muted); font: 760 10px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .16em; writing-mode: vertical-rl; text-transform: uppercase; }
     .side-tryzub { width: 44px; height: 62px; color: var(--neon); opacity: .64; filter: drop-shadow(0 0 8px rgba(var(--neon-rgb), .5)); }
@@ -650,12 +691,20 @@
       .hero { min-height: 755px; }
       .hero-grid { min-height: 680px; }
       .hero-photos {
-        width: 61.7%; /* 56.1% × 1.10 */
+        --hero-side: max(24px, calc((100vw - var(--max)) / 2));
+        width: min(720px, calc(var(--max) * 0.58));
+        aspect-ratio: 4 / 3;
+        height: auto;
+        max-height: min(540px, calc((100% - var(--header-h) - 40px) * 0.86));
+        right: var(--hero-side);
         left: auto;
-        right: 0;
       }
-      .hero-photo { object-position: right top; }
-      .hero-copy { max-width: min(540px, 52vw); }
+      .hero-photo { object-fit: contain; object-position: right center; }
+      .side-identity {
+        --hero-side: max(24px, calc((100vw - var(--max)) / 2));
+        right: calc(var(--hero-side) + 4px);
+      }
+      .hero-copy { max-width: min(500px, 42vw); }
       .feature-card { padding-inline: 21px; }
       .logo-grid { grid-template-columns: repeat(4, 1fr); }
       .member-logo { border-bottom: 1px solid var(--line); }
@@ -687,37 +736,104 @@
         font-weight: 680;
         background: transparent;
       }
-      .hero { min-height: 820px; }
-      .hero-grid { min-height: 740px; }
+      .hero {
+        min-height: max(820px, 100dvh);
+        /* Висота фото на мобілці; верхня межа blur = якір для кнопок */
+        --hero-photo-h: min(40vh, 320px);
+      }
+      /* end: copy притиснутий до низу hero → кнопки на верхньому blur фото */
+      .hero-grid {
+        min-height: calc(100dvh - var(--header-h));
+        align-items: end;
+      }
       .hero-photos {
         left: auto;
-        right: 0;
+        right: 14px;
         top: auto;
         bottom: 0;
-        width: 93.5%; /* 85% × 1.10 */
-        height: min(calc(52vh * 0.935), 393px);
+        width: min(96%, 640px);
+        height: var(--hero-photo-h);
+        aspect-ratio: auto;
+        max-height: none;
+        /* Коротший верхній fade ≈ «межа розмиття» під кнопки */
         -webkit-mask-image:
-          linear-gradient(180deg, transparent 0%, #000 28%, #000 78%, transparent 100%),
-          linear-gradient(90deg, transparent 0%, #000 22%, #000 100%);
+          linear-gradient(180deg, transparent 0%, #000 6%, #000 94%, transparent 100%),
+          linear-gradient(90deg, transparent 0%, #000 10%, #000 94%, transparent 100%);
         -webkit-mask-composite: source-in;
         mask-image:
-          linear-gradient(180deg, transparent 0%, #000 28%, #000 78%, transparent 100%),
-          linear-gradient(90deg, transparent 0%, #000 22%, #000 100%);
+          linear-gradient(180deg, transparent 0%, #000 6%, #000 94%, transparent 100%),
+          linear-gradient(90deg, transparent 0%, #000 10%, #000 94%, transparent 100%);
         mask-composite: intersect;
       }
-      .hero-photo { object-position: right top; }
+      .hero-photo { object-fit: contain; object-position: center center; }
       .hero::before {
         background:
-          linear-gradient(180deg, color-mix(in srgb, var(--page-deep) 96%, transparent) 0%, color-mix(in srgb, var(--page-deep) 72%, transparent) 58%, transparent 88%),
+          linear-gradient(180deg, color-mix(in srgb, var(--page-deep) 96%, transparent) 0%, color-mix(in srgb, var(--page-deep) 55%, transparent) 62%, transparent 78%),
           linear-gradient(90deg, color-mix(in srgb, var(--page-deep) 90%, transparent), transparent 70%);
       }
       html[data-theme="light"] .hero::before {
         background:
-          linear-gradient(180deg, rgba(232, 247, 254, .98) 0%, rgba(232, 247, 254, .78) 58%, transparent 90%),
+          linear-gradient(180deg, rgba(232, 247, 254, .98) 0%, rgba(232, 247, 254, .55) 62%, transparent 80%),
           linear-gradient(90deg, rgba(232, 247, 254, .9), transparent 70%);
       }
-      .hero-copy { max-width: 670px; padding: 82px 0 280px; }
-      .hero-actions { flex-direction: column; flex-wrap: wrap; align-items: flex-start; gap: 10px; }
+      .hero-copy {
+        max-width: 670px;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        padding: 56px 0 0;
+        /* Кнопки на верхній межі blur (~20px у зону fade, без наїзду на обличчя) */
+        padding-bottom: calc(var(--hero-photo-h) - 20px);
+        box-sizing: border-box;
+      }
+      .hero-lead { margin-bottom: 18px; }
+      .hero-actions {
+        position: relative;
+        z-index: 6;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        margin-top: 0;
+        margin-bottom: 0;
+      }
+      .hero-actions .scribble-link {
+        --scribble-width: 148px;
+        min-width: 0;
+        flex: 1 1 0;
+        min-height: 36px;
+        padding: 5px 10px;
+        font-size: 10px;
+        overflow: visible;
+        background: color-mix(in srgb, var(--page-deep) 82%, transparent);
+        backdrop-filter: blur(8px);
+      }
+      .hero-actions .scribble-link .arrow { display: none; }
+      .hero-actions .outline-link {
+        flex: 1 1 0;
+        min-width: 0;
+        min-height: 36px;
+        padding: 0 10px;
+        font-size: 10px;
+        gap: 0;
+        justify-content: center;
+        background: color-mix(in srgb, var(--page-deep) 82%, transparent);
+        backdrop-filter: blur(8px);
+      }
+      .hero-actions .outline-link span { display: none; }
+      /* Індекс лише внизу фото, не під кнопками */
+      .hero-index {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 12px;
+        z-index: 5;
+        margin: 0;
+        pointer-events: none;
+        font-size: 11px;
+        letter-spacing: .1em;
+      }
       .side-identity { display: none; }
       .features { margin-top: -43px; }
       .feature-grid { grid-template-columns: repeat(2, 1fr); }
@@ -742,18 +858,75 @@
       .brand-copy strong { max-width: 130px; font-size: 10px; line-height: 1.18; }
       .theme-switch { grid-template-columns: 30px 30px; }
       .theme-switch button { width: 30px; }
-      .hero { min-height: 780px; }
-      .hero-photos { height: min(calc(46vh * 0.935), 318px); width: 97%; }
-      .hero-photo { object-position: right top; }
-      .hero-grid { min-height: 700px; }
+      .hero {
+        min-height: max(780px, 100dvh);
+        --hero-photo-h: min(38vh, 300px);
+      }
+      .hero-photos {
+        height: var(--hero-photo-h);
+        width: min(97%, 480px);
+        right: 13px;
+        left: auto;
+        bottom: 0;
+        aspect-ratio: auto;
+        max-height: none;
+      }
+      .hero-photo { object-fit: contain; object-position: center center; }
+      .hero-grid {
+        min-height: calc(100dvh - var(--header-h));
+        align-items: end;
+      }
       .hero-copy {
         max-width: none;
-        padding: 78px 0 250px;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        padding: 52px 0 0;
+        padding-bottom: calc(var(--hero-photo-h) - 18px);
+        box-sizing: border-box;
       }
       .hero-copy h1 { font-size: clamp(30px, 8.5vw, 42px); }
-      .hero-lead { max-width: 92%; font-size: 14px; }
+      .hero-lead { max-width: 92%; font-size: 14px; margin-bottom: 16px; }
       .eyebrow { font-size: 12px; }
-      .hero-actions { align-items: flex-start; flex-direction: column; gap: 10px; }
+      .hero-actions {
+        position: relative;
+        z-index: 6;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        gap: 6px;
+        margin-top: 0;
+        margin-bottom: 0;
+      }
+      .hero-actions .scribble-link {
+        --scribble-width: 132px;
+        min-height: 34px;
+        font-size: 9.5px;
+        padding: 4px 8px;
+        overflow: visible;
+        background: color-mix(in srgb, var(--page-deep) 82%, transparent);
+        backdrop-filter: blur(8px);
+      }
+      .hero-actions .scribble-link .arrow { display: none; }
+      .hero-actions .outline-link {
+        min-height: 34px;
+        font-size: 9.5px;
+        padding: 0 8px;
+        background: color-mix(in srgb, var(--page-deep) 82%, transparent);
+        backdrop-filter: blur(8px);
+      }
+      .hero-actions .outline-link span { display: none; }
+      .hero-index {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 10px;
+        z-index: 5;
+        margin: 0;
+        pointer-events: none;
+        font-size: 10px;
+        letter-spacing: .08em;
+      }
       .side-identity { display: none; }
       .features { margin-top: -30px; }
       .feature-grid { grid-template-columns: 1fr; }

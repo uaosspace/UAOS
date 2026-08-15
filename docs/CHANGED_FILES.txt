@@ -400,3 +400,8 @@ src/data/translations/industrial.ts
 src/data/siteSettings.test.ts
 public/member-logos/README.md
 public/member-logos/stg.svg
+api/_lib/csvExcel.ts
+api/_lib/csvExcel.test.ts
+src/styles/industrial-neon.css
+public/images/hero_1.png
+public/images/hero_2.png
